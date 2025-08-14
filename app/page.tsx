@@ -3,18 +3,12 @@
 'use client';
 
 import { useState } from 'react';
-import OcrModal from '../components/OcrModal';
+import OcrModal from '../components/OcrModal'; // Assuming you have this component from your original code
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
-  
-  // States for the two-step process
-  const [ocrText, setOcrText] = useState('');
   const [finalText, setFinalText] = useState('');
-  
-  const [isOcrLoading, setIsOcrLoading] = useState(false);
-  const [isEvaluating, setIsEvaluating] = useState(false);
-
+  const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,63 +28,36 @@ export default function Home() {
 
     // Reset states and open modal
     setIsModalOpen(true);
-    setIsOcrLoading(true);
-    setIsEvaluating(false);
+    setIsLoading(true);
     setError('');
-    setOcrText('');
     setFinalText('');
 
-    // --- Step 1: OCR Extraction ---
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const ocrResponse = await fetch('/api/ocr', {
+      // Call our new all-in-one endpoint
+      const response = await fetch('/api/evaluate', {
         method: 'POST',
         body: formData,
       });
 
-      if (!ocrResponse.ok) {
-        throw new Error('Failed to extract text from the document.');
-      }
+      const result = await response.json();
 
-      const ocrData = await ocrResponse.json();
-      setOcrText(ocrData.text);
-      setIsOcrLoading(false); // OCR finished
-
-      // --- Step 2: LLM Evaluation ---
-      setIsEvaluating(true); // Start evaluation
-      const evaluateResponse = await fetch('/api/evaluate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ocrText: ocrData.text }),
-      });
-
-      if (!evaluateResponse.ok) {
-        throw new Error('The AI model failed to process the text.');
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to evaluate the document.');
       }
       
-      const evaluateData = await evaluateResponse.json();
-      setFinalText(evaluateData.formattedText);
+      setFinalText(result.formattedText);
 
     } catch (err: any) {
       setError(err.message);
+      // Close the modal on error so the user can see the error message on the main page
       setIsModalOpen(false); 
     } finally {
-      setIsOcrLoading(false);
-      setIsEvaluating(false);
+      setIsLoading(false);
     }
   };
-
-  // Determine what text to show in the modal
-  let modalText = '';
-  if (isOcrLoading) {
-    modalText = 'Step 1/2: Extracting text from document...';
-  } else if (isEvaluating) {
-    modalText = 'Step 2/2: Reformatting text with AI...';
-  } else {
-    modalText = finalText;
-  }
   
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-8">
@@ -110,18 +77,18 @@ export default function Home() {
         
         <button
           onClick={handleSubmit}
-          disabled={!file || isOcrLoading || isEvaluating}
+          disabled={!file || isLoading}
           className="w-full rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          {(isOcrLoading || isEvaluating) ? 'Processing...' : 'Evaluate Document'}
+          {isLoading ? 'Evaluating...' : 'Evaluate Document'}
         </button>
       </div>
 
       <OcrModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        text={modalText}
-        isLoading={isOcrLoading || isEvaluating}
+        text={finalText}
+        isLoading={isLoading}
       />
     </main>
   );
