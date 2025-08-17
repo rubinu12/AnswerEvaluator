@@ -1,26 +1,120 @@
+/* app/globals.css */
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+    --background: #fdfcf9;
+    --text-primary: #2d3748;
+    --text-secondary: #718096;
+    --border-color: #e2e8f0;
+    --primary-accent: #8c2d2d;
+    --primary-accent-hover: #7c2828;
+    --secondary-accent: #2c5282;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--background);
+    color: var(--text-primary);
+}
+
+h1, h2, h3, h4, .font-serif {
+    font-family: 'Lora', serif;
+}
+
+.sub-nav {
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    border-bottom: 1px solid var(--border-color);
+}
+.sub-nav-hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+}
+.sub-nav-link {
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+.sub-nav-link.active, .sub-nav-link:hover {
+    color: var(--primary-accent);
+    border-bottom-color: var(--primary-accent);
+}
+
+.dropdown {
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.2s ease-in-out;
+}
+.group:hover .dropdown {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.card {
+    background-color: white;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.calendar-day.streak {
+    background-color: #ebf8ff;
+    color: var(--secondary-accent);
+    font-weight: 600;
+}
+.calendar-day.today {
+    background-color: var(--primary-accent);
+    color: white;
+    font-weight: 700;
+}
+
+.drag-over {
+    border-color: var(--primary-accent);
+    background-color: #fff5f5;
+}
+
+.btn-evaluate {
+    background-color: var(--primary-accent);
+    color: white;
+    transition: all 0.2s ease;
+}
+.btn-evaluate:hover {
+    background-color: var(--primary-accent-hover);
+    box-shadow: 0 4px 14px 0 rgba(0,0,0,0.1);
+}
+.btn-evaluate:disabled {
+    background-color: #fca5a5;
+    cursor: not-allowed;
+}
+
+.subject-selector-container {
+    position: relative;
+    display: flex;
+    background-color: #f1f5f9;
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+}
+.subject-btn {
+    flex: 1;
+    padding: 0.5rem 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    z-index: 10;
+}
+.subject-selector-slider {
+    position: absolute;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    background-color: white;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 5;
 }

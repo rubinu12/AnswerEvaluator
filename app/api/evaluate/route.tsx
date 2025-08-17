@@ -70,17 +70,21 @@ export async function POST(request: Request) {
       if (!resultFile) throw new Error("OCR result file not found for PDF.");
 
       const [jsonData] = await resultFile.download();
-      const ocrResult = JSON.parse(jsonData.toString()) as { responses: IAnnotateFileResponse[] };
+      const ocrResult = JSON.parse(jsonData.toString());
       
-      // **FIXED**: Using a simpler, more direct method to get text from each page.
-      const pageResponses = ocrResult.responses[0]?.responses;
-      if (pageResponses) {
-        for (const pageResponse of pageResponses) {
-          if (pageResponse.fullTextAnnotation?.text) {
-            combinedText += pageResponse.fullTextAnnotation.text + '\n';
+      if (ocrResult && ocrResult.responses && ocrResult.responses.length > 0) {
+        ocrResult.responses.forEach((pageResponse: any) => {
+          if (pageResponse.fullTextAnnotation && pageResponse.fullTextAnnotation.text) {
+            combinedText += pageResponse.fullTextAnnotation.text + '\n\n';
+          } else if (pageResponse.error) {
+            console.warn(`Skipping a page due to an error: ${pageResponse.error.message}`);
           }
-        }
+        });
       }
+
+    } catch(err: any) {
+        console.error("CRITICAL ERROR in PDF processing block:", err);
+        return NextResponse.json({ error: `An error occurred during PDF processing: ${err.message}` }, { status: 500 });
     } finally {
       // Cleanup GCS files for the PDF process
       const bucket = storageClient.bucket(bucketName);
@@ -107,12 +111,12 @@ export async function POST(request: Request) {
 
   try {
     // --- Step 4: Format Text with Gemini API (same for both paths) ---
-    const prompt = `You are an expert editor tasked with cleaning up text from a scanned handwritten exam answer.
+    const prompt = `You are an expert editor tasked with cleaning up text from a scanned handwritten exam answer. Your goal is to make the text clean, readable, and well-structured.
       Follow these rules strictly:
-      1.  **Reconstruct Content:** Re-join broken sentences. Group related sentences into logical paragraphs. Use a single newline character to separate paragraphs for clean formatting.
-      2.  **Preserve Core Answer:** Maintain the original headings and list structures (like bullet points) that are part of the actual answer.
+      1.  **Reconstruct Content:** Analyze the flow of the text. Re-join sentences that are broken across lines. Group related sentences into logical paragraphs. Use a single newline character to separate paragraphs for clean formatting.
+      2.  **Preserve Core Answer:** Maintain the original headings and list structures (like bullet points) that are part of the actual answer. If you see text that is clearly a heading, preserve it as a heading.
       3.  **Remove Boilerplate:** You MUST identify and completely REMOVE all instructional text, headers, footers, and margin notes from the answer sheet template. This includes, but is not limited to, phrases like: "Specimen Answer Booklet - For Practice Purpose Only", "Candidates must not write on this margin", "UPSC", any text in Hindi, and any standalone page numbers.
-      4.  **No Commentary:** Do not add any introductions, summaries, or comments like "Here is the cleaned text:". Output only the student's cleaned-up answer.
+      4.  **No Commentary:** Do not add any introductions, summaries, or comments like "Here is the cleaned text:". Output only the student's cleaned-up answer, ready for display.
       Here is the messy OCR text to be cleaned:
       ---
       ${combinedText}
