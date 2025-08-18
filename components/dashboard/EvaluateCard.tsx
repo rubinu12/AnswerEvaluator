@@ -3,10 +3,9 @@
 
 import { useState } from 'react';
 
-// Define the props the EvaluateCard will accept to communicate with its parent
 interface EvaluateCardProps {
     onEvaluationStart: () => void;
-    onEvaluationComplete: (result: string) => void;
+    onEvaluationComplete: (result: any) => void;
     onEvaluationError: (error: string) => void;
 }
 
@@ -31,10 +30,11 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
 
         setIsLoading(true);
         setError('');
-        onEvaluationStart(); // Notify the parent page that evaluation is starting
+        onEvaluationStart();
 
         const formData = new FormData();
         formData.append('file', selectedFile);
+        formData.append('subject', selectedSubject); // Add the selected subject to the form data
 
         try {
             const response = await fetch('/api/evaluate', {
@@ -48,13 +48,11 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
                 throw new Error(result.error || 'Failed to evaluate the document.');
             }
             
-            // Send the successful result back to the parent page
-            onEvaluationComplete(result.formattedText);
+            onEvaluationComplete(result);
 
         } catch (err: any) {
             const errorMessage = err.message || 'An unknown error occurred.';
             setError(errorMessage);
-            // Notify the parent page that an error occurred
             onEvaluationError(errorMessage);
         } finally {
             setIsLoading(false);
@@ -73,7 +71,7 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
                         <span>{selectedSubject}</span>
                         <svg className="w-4 h-4 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                     </button>
-                    <div className="dropdown absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-slate-200 py-1">
+                    <div className="dropdown absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-slate-200 py-1 z-10">
                         {['GS1', 'GS2', 'GS3', 'GS4', 'Essay'].map(subject => (
                              <a href="#" key={subject} onClick={(e) => {e.preventDefault(); setSelectedSubject(subject)}} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">{subject}</a>
                         ))}
@@ -99,7 +97,7 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
             </div>
             {error && <p className="text-sm text-red-500 mb-4 text-center">{error}</p>}
             <button onClick={handleEvaluate} className="w-full rounded-lg px-6 py-3 text-md font-semibold transition-all btn-evaluate" disabled={!selectedFile || isLoading}>
-                {isLoading ? 'Processing...' : (selectedFile ? 'Start Evaluation' : 'Select a File to Evaluate')}
+                {isLoading ? 'Processing...' : (selectedFile ? `Evaluate for ${selectedSubject}` : 'Select a File to Evaluate')}
             </button>
         </div>
     );
