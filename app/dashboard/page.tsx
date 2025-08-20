@@ -10,7 +10,6 @@ import StreakCalendar from '@/components/dashboard/StreakCalendar';
 import InProgressCard from '@/components/dashboard/InProgressCard';
 import ResultModal from '@/components/dashboard/ResultModal';
 
-// Define the shape of the data coming from EvaluateCard
 interface PreparedQuestion {
     questionNumber: number;
     questionText: string;
@@ -18,8 +17,9 @@ interface PreparedQuestion {
     maxMarks: number;
 }
 interface EvaluationCompletePayload {
-    analysis: any; // The JSON from the main evaluation AI
-    preparedData: PreparedQuestion[]; // The user-confirmed data
+    analysis: any;
+    preparedData: PreparedQuestion[];
+    subject: string; // Add subject to the payload
 }
 
 export default function DashboardPage() {
@@ -45,29 +45,40 @@ export default function DashboardPage() {
         setIsResultModalOpen(false);
     };
 
-    // UPDATED FUNCTION TO MERGE AND SAVE DATA
     const handleEvaluationComplete = (payload: EvaluationCompletePayload) => {
-        const { analysis, preparedData } = payload;
+        const { analysis, preparedData, subject } = payload;
         
-        // --- THIS IS THE CRITICAL MERGING LOGIC ---
-        const finalQuestionAnalysis = preparedData.map(prepItem => {
-            // Find the corresponding analysis object from the AI's response
-            const analysisItem = analysis.questionAnalysis.find(
-                (item: any) => item.questionNumber === prepItem.questionNumber
-            );
-            // Combine the prepared data (Q&A) with the analysis data (scores, feedback)
-            return {
-                ...prepItem, // Contains questionNumber, questionText, userAnswer, maxMarks
-                ...analysisItem, // Contains score, wordCount, detailedAnalysis, etc.
-            };
-        });
+        let finalDataForStorage;
 
-        // Create the final, complete object to save
-        const finalDataForStorage = {
-            ...analysis, // Contains overallScore, totalMarks, overallFeedback
-            questionAnalysis: finalQuestionAnalysis,
-        };
-        // --- END OF MERGING LOGIC ---
+        if (subject === 'Essay') {
+            // --- NEW LOGIC FOR ESSAY ---
+            // The essay prompt returns a single analysis object, not an array.
+            const essayData = preparedData[0]; // There's only one "question" for an essay
+            finalDataForStorage = {
+                ...analysis, // Contains overallScore, essayType, detailedAnalysis etc.
+                // We add the user's original data manually for the results page
+                questionText: essayData.questionText,
+                userAnswer: essayData.userAnswer,
+                maxMarks: essayData.maxMarks,
+                subject: subject, // Pass the subject along
+            };
+        } else {
+            // --- EXISTING LOGIC FOR GS PAPERS ---
+            const finalQuestionAnalysis = preparedData.map(prepItem => {
+                const analysisItem = analysis.questionAnalysis.find(
+                    (item: any) => item.questionNumber === prepItem.questionNumber
+                );
+                return {
+                    ...prepItem,
+                    ...analysisItem,
+                };
+            });
+            finalDataForStorage = {
+                ...analysis,
+                questionAnalysis: finalQuestionAnalysis,
+                subject: subject, // Pass the subject along
+            };
+        }
 
         const uniqueId = `eval_${Date.now()}`;
         setNewEvaluationId(uniqueId);

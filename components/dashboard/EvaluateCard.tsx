@@ -1,7 +1,7 @@
 // app/components/dashboard/EvaluateCard.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface PreparedQuestion {
     questionNumber: number;
@@ -13,7 +13,7 @@ interface PreparedQuestion {
 // The onEvaluationComplete prop now expects an object with both data pieces
 interface EvaluateCardProps {
     onEvaluationStart: () => void;
-    onEvaluationComplete: (result: { analysis: any; preparedData: PreparedQuestion[] }) => void;
+    onEvaluationComplete: (result: { analysis: any; preparedData: PreparedQuestion[], subject: string }) => void;
     onEvaluationError: (error: string) => void;
 }
 
@@ -25,6 +25,23 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
     const [isConfirming, setIsConfirming] = useState(false);
     const [preparedData, setPreparedData] = useState<PreparedQuestion[]>([]);
     const [loadingMessage, setLoadingMessage] = useState('Processing...');
+
+    // --- LOGIC FOR SUBJECT SELECTOR ---
+    const [sliderStyle, setSliderStyle] = useState({});
+    const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
+    const subjects = ['GS1', 'GS2', 'GS3', 'GS4', 'Essay'];
+
+    useEffect(() => {
+        const activeTabIndex = subjects.indexOf(selectedSubject);
+        const activeTab = tabsRef.current[activeTabIndex];
+        if (activeTab) {
+            setSliderStyle({
+                width: `${activeTab.offsetWidth}px`,
+                transform: `translateX(${activeTab.offsetLeft}px)`,
+            });
+        }
+    }, [selectedSubject]);
+    // --- END OF LOGIC ---
 
     const handleFileChange = (file: File | null) => {
         if (file) {
@@ -79,10 +96,11 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to get final evaluation.');
             
-            // CRITICAL CHANGE: Pass both the analysis AND the preparedData to the dashboard
+            // Pass both the analysis AND the preparedData to the dashboard
             onEvaluationComplete({
                 analysis: result,
-                preparedData: preparedData
+                preparedData: preparedData,
+                subject: selectedSubject // Pass the subject for contextual handling
             });
 
         } catch (err: any) {
@@ -94,7 +112,6 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
         }
     };
 
-    // --- JSX for Confirmation and Default views remain the same ---
     if (isConfirming) {
         return (
             <div className="card p-6">
@@ -121,13 +138,26 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
 
     return (
         <div className="card p-6">
-            {/* Default view JSX */}
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h3 className="text-xl font-bold text-slate-900 font-serif">Evaluate a New Answer</h3>
                     <p className="text-sm text-slate-500 mt-1">You have <span className="font-bold text-green-600">12</span> credits remaining.</p>
                 </div>
-                {/* Subject Selector Dropdown */}
+                {/* --- SUBJECT SELECTOR UI --- */}
+                <div className="subject-selector-container">
+                    <div className="subject-selector-slider" style={sliderStyle}></div>
+                    {subjects.map((subject, index) => (
+                        <button
+                            key={subject}
+                            ref={(el) => { tabsRef.current[index] = el; }}
+                            className={`subject-btn ${selectedSubject === subject ? 'text-slate-900' : ''}`}
+                            onClick={() => setSelectedSubject(subject)}
+                        >
+                            {subject}
+                        </button>
+                    ))}
+                </div>
+                {/* --- END OF SUBJECT SELECTOR UI --- */}
             </div>
             <div className="mb-4">
                 <p className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Upload Answer Sheet</p>
