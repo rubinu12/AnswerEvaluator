@@ -1,7 +1,7 @@
 // app/components/dashboard/EvaluateCard.tsx
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 
 interface PreparedQuestion {
     questionNumber: number;
@@ -26,22 +26,7 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
     const [preparedData, setPreparedData] = useState<PreparedQuestion[]>([]);
     const [loadingMessage, setLoadingMessage] = useState('Processing...');
 
-    // --- LOGIC FOR SUBJECT SELECTOR ---
-    const [sliderStyle, setSliderStyle] = useState({});
-    const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
     const subjects = ['GS1', 'GS2', 'GS3', 'GS4', 'Essay'];
-
-    useEffect(() => {
-        const activeTabIndex = subjects.indexOf(selectedSubject);
-        const activeTab = tabsRef.current[activeTabIndex];
-        if (activeTab) {
-            setSliderStyle({
-                width: `${activeTab.offsetWidth}px`,
-                transform: `translateX(${activeTab.offsetLeft}px)`,
-            });
-        }
-    }, [selectedSubject]);
-    // --- END OF LOGIC ---
 
     const handleFileChange = (file: File | null) => {
         if (file) {
@@ -61,6 +46,8 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
         setLoadingMessage('Extracting text (OCR)...');
         const formData = new FormData();
         formData.append('file', selectedFile);
+        formData.append('subject', selectedSubject); // Pass the subject here
+
         try {
             const response = await fetch('/api/prepare-evaluation', {
                 method: 'POST',
@@ -96,11 +83,10 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Failed to get final evaluation.');
             
-            // Pass both the analysis AND the preparedData to the dashboard
             onEvaluationComplete({
                 analysis: result,
                 preparedData: preparedData,
-                subject: selectedSubject // Pass the subject for contextual handling
+                subject: selectedSubject // Pass subject on complete
             });
 
         } catch (err: any) {
@@ -116,11 +102,11 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
         return (
             <div className="card p-6">
                 <h3 className="text-xl font-bold text-slate-900 font-serif">Confirm Extracted Content</h3>
-                <p className="text-sm text-slate-500 mt-1 mb-4">Please verify that the questions and answers have been extracted correctly before proceeding.</p>
+                <p className="text-sm text-slate-500 mt-1 mb-4">Please verify that the content has been extracted correctly before proceeding.</p>
                 <div className="max-h-96 overflow-y-auto space-y-4 bg-slate-50 p-4 rounded-md border">
                     {preparedData.map(q => (
                         <div key={q.questionNumber}>
-                            <p className="font-semibold text-slate-700">Q{q.questionNumber} ({q.maxMarks} Marks): <span className="font-normal">{q.questionText}</span></p>
+                            <p className="font-semibold text-slate-700">{selectedSubject === 'Essay' ? 'Essay Topic' : `Q${q.questionNumber}`} ({q.maxMarks} Marks): <span className="font-normal">{q.questionText}</span></p>
                             <p className="mt-2 text-sm text-slate-600 whitespace-pre-wrap border-l-2 pl-2 border-slate-300"><em>{q.userAnswer}</em></p>
                         </div>
                     ))}
@@ -141,24 +127,32 @@ export default function EvaluateCard({ onEvaluationStart, onEvaluationComplete, 
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h3 className="text-xl font-bold text-slate-900 font-serif">Evaluate a New Answer</h3>
-                    <p className="text-sm text-slate-500 mt-1">You have <span className="font-bold text-green-600">12</span> credits remaining.</p>
+                    <p className="text-sm text-slate-500 mt-1">Select a subject and upload your answer sheet.</p>
                 </div>
-                {/* --- SUBJECT SELECTOR UI --- */}
+            </div>
+
+            <div className="mb-4">
+                <p className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Select Subject</p>
                 <div className="subject-selector-container">
-                    <div className="subject-selector-slider" style={sliderStyle}></div>
-                    {subjects.map((subject, index) => (
+                    <div
+                        className="subject-selector-slider"
+                        style={{
+                            width: `${100 / subjects.length}%`,
+                            transform: `translateX(${subjects.indexOf(selectedSubject) * 100}%)`,
+                        }}
+                    ></div>
+                    {subjects.map(subject => (
                         <button
                             key={subject}
-                            ref={(el) => { tabsRef.current[index] = el; }}
-                            className={`subject-btn ${selectedSubject === subject ? 'text-slate-900' : ''}`}
                             onClick={() => setSelectedSubject(subject)}
+                            className={`subject-btn ${selectedSubject === subject ? 'text-slate-900' : ''}`}
                         >
                             {subject}
                         </button>
                     ))}
                 </div>
-                {/* --- END OF SUBJECT SELECTOR UI --- */}
             </div>
+
             <div className="mb-4">
                 <p className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Upload Answer Sheet</p>
                 <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full min-h-32 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">

@@ -1,116 +1,101 @@
-// app/components/result/QuestionCard.tsx
+// components/result/QuestionCard.tsx
 'use client';
+import { useState } from 'react';
+import { QuestionAnalysis } from '@/lib/types';
 
-// Reusable Collapsible Section
-const CollapsibleSection = ({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) => {
+export default function QuestionCard({ questionData: q, subject }: { questionData: QuestionAnalysis, subject: string }) {
+    const [activeTab, setActiveTab] = useState('detailed-breakdown');
+
+    const renderTabContent = () => {
+        switch (activeTab) {
+            case 'your-answer':
+                return <p className="whitespace-pre-wrap rounded-md bg-gray-50 p-4 font-['Comic_Sans_MS'] text-lg">{q.userAnswer}</p>;
+            case 'constructed-answer':
+                return (
+                    <div className="space-y-3 text-base leading-relaxed">
+                        {q.constructedAnswer.map((segment, index) => (
+                            <span key={index} className={segment.type === 'user' ? "font-['Comic_Sans_MS'] text-lg text-slate-700" : "font-semibold text-green-700"}>
+                                {segment.text.replace(/\n/g, '\n')}
+                            </span>
+                        ))}
+                    </div>
+                );
+            case 'value-addition':
+                 return (
+                    <div className="rounded-r-lg border-l-4 border-blue-400 bg-blue-50 p-4">
+                        <h4 className="font-serif text-lg font-bold text-blue-900">Value Addition</h4>
+                        <ul className="mt-2 ml-4 list-['✓_'] space-y-1 pl-2 text-sm text-slate-700">
+                            {q.valueAddition.map((n, i) => <li key={i}>{n}</li>)}
+                        </ul>
+                    </div>
+                );
+            case 'detailed-breakdown':
+            default:
+                return (
+                    <div className="space-y-6">
+                        <div>
+                            <h4 className="font-serif text-lg font-bold text-slate-800">Score Deduction Analysis</h4>
+                            <div className="mt-2 space-y-3">
+                                {q.scoreDeductionAnalysis.map((d, i) => (
+                                    <div className="flex items-start gap-4" key={i}>
+                                        <div className="text-2xl font-bold text-[--primary-accent]">{d.points}</div>
+                                        <div><strong className="text-slate-700">{d.reason}</strong></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                         <div className="rounded-r-lg border-l-4 border-blue-400 bg-blue-50 p-4">
+                            <h4 className="font-serif text-lg font-bold text-blue-900">Strategic Notes</h4>
+                            <ul className="mt-2 ml-4 list-['✓_'] space-y-1 pl-2 text-sm text-slate-700">
+                                {q.strategicNotes.map((n, i) => <li key={i}>{n}</li>)}
+                            </ul>
+                        </div>
+                    </div>
+                );
+        }
+    };
+
+    const TabButton = ({ id, label }: { id: string; label: string }) => (
+        <button 
+            className={`border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${activeTab === id ? 'border-[--primary-accent] text-[--primary-accent]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
+            onClick={() => setActiveTab(id)}
+        >
+            {label}
+        </button>
+    );
+
     return (
-        <details open={defaultOpen} className="mt-6 border-t border-gray-200 pt-6 group">
-            <summary className="font-semibold text-lg cursor-pointer flex justify-between items-center list-none">
-                <span className="font-serif">{title}</span>
-                <svg className="w-5 h-5 text-gray-500 transition-transform duration-200 group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
-                </svg>
+        <details id={`question-${q.questionNumber}`} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" open>
+            <summary className="flex cursor-pointer list-none items-start justify-between p-6">
+                <div className="flex-1">
+                    <p className="text-sm font-semibold uppercase text-[--primary-accent]">
+                        {subject === 'Essay' ? `Essay ${q.questionNumber}` : `Question ${q.questionNumber}`}
+                    </p>
+                    <h3 className="mt-1 font-serif text-xl font-bold text-slate-900">{q.questionText}</h3>
+                </div>
+                <div className="ml-6 flex items-center space-x-2">
+                    <div className="text-center font-serif">
+                        <span className="text-4xl font-bold text-[--primary-accent]">{q.score.toFixed(1)}</span>
+                        <span className="text-slate-500"> / {q.maxMarks}</span>
+                    </div>
+                    <button className="rounded-full p-2 text-slate-500 transition-colors hover:bg-gray-100 hover:text-[--primary-accent]" title="Bookmark">
+                        <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                    </button>
+                </div>
             </summary>
-            <div className="mt-4">
-                {children}
+            <div className="border-t border-gray-200 px-6 pb-6">
+                <div className="mb-4 border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-4">
+                        <TabButton id="detailed-breakdown" label="Detailed Breakdown" />
+                        <TabButton id="value-addition" label="Value Addition" />
+                        <TabButton id="your-answer" label="Your Answer" />
+                        <TabButton id="constructed-answer" label="Constructed Answer" />
+                    </nav>
+                </div>
+                <div>
+                    {renderTabContent()}
+                </div>
             </div>
         </details>
     );
-};
-
-// Final interface including writingStrategyNotes
-interface QuestionCardProps {
-  questionData: {
-    questionNumber: number;
-    questionText: string;
-    score: number;
-    maxMarks: number;
-    userAnswer: string;
-    detailedAnalysis: {
-        strengths: string[];
-        improvements: string[];
-    };
-    answerFramework: {
-        introduction: string;
-        body: string[];
-        conclusion: string;
-    };
-    writingStrategyNotes: string[];
-  };
-}
-
-export default function QuestionCard({ questionData }: QuestionCardProps) {
-    const wordCount = questionData.userAnswer.split(/\s+/).filter(Boolean).length;
-
-    return (
-    <section id={`question-${questionData.questionNumber}`} className="bg-white p-6 rounded-lg border border-gray-200 scroll-mt-24">
-        <div className="flex justify-between items-start">
-            <div>
-                <p className="text-sm font-semibold" style={{ color: 'var(--primary-accent)' }}>
-                    Question {questionData.questionNumber}
-                </p>
-                <h3 className="text-xl font-serif mt-1">{questionData.questionText}</h3>
-            </div>
-            
-            <div className="flex items-center space-x-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                <button className="text-slate-400 hover:text-slate-600 transition-colors" aria-label="Bookmark">
-                    <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-                </button>
-                <span className="text-xs text-slate-500 font-medium">{wordCount} words</span>
-                <div className="font-mono text-lg font-semibold px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-center">
-                    {questionData.score.toFixed(1)}
-                    <span className="text-xs text-amber-700"> / {questionData.maxMarks}</span>
-                </div>
-            </div>
-        </div>
-
-        <div className="mt-4">
-             <CollapsibleSection title="Your Original Answer">
-                <div className="prose prose-sm max-w-none text-slate-600 whitespace-pre-wrap">{questionData.userAnswer}</div>
-            </CollapsibleSection>
-            
-            <CollapsibleSection title="Detailed Analysis">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                        <h4 className="font-semibold text-green-800">Key Strengths</h4>
-                        <ul className="mt-2 list-disc list-inside text-sm text-slate-600 space-y-1">
-                            {questionData.detailedAnalysis.strengths.map((item, index) => <li key={index}>{item}</li>)}
-                        </ul>
-                    </div>
-                    <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-                        <h4 className="font-semibold text-amber-800">Areas for Improvement</h4>
-                        <ul className="mt-2 list-disc list-inside text-sm text-slate-600 space-y-1">
-                            {questionData.detailedAnalysis.improvements.map((item, index) => <li key={index}>{item}</li>)}
-                        </ul>
-                    </div>
-                </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Model Answer & Strategy" defaultOpen={true}>
-                <div className="space-y-4 prose prose-sm max-w-none text-slate-700">
-                    <div>
-                        <h4 className="font-semibold text-slate-800 !mb-1">Ideal Framework</h4>
-                        <div className="mt-2 text-sm text-slate-600 space-y-2 border-l-2 border-slate-300 pl-4">
-                            <p><strong>Introduction:</strong> {questionData.answerFramework.introduction}</p>
-                            <div>
-                                <p className="font-semibold">Body:</p>
-                                <ul className="list-decimal list-inside ml-4">
-                                    {questionData.answerFramework.body.map((item, index) => <li key={index}>{item}</li>)}
-                                </ul>
-                            </div>
-                            <p><strong>Conclusion:</strong> {questionData.answerFramework.conclusion}</p>
-                        </div>
-                    </div>
-
-                    <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg !mt-6">
-                        <h4 className="font-bold text-blue-900 !m-0">Strategic Notes</h4>
-                         <ul className="!mt-2 !list-none !p-0">
-                            {questionData.writingStrategyNotes.map((item, index) => <li key={index} className="!before:content-['✓'] !before:mr-2 !before:text-blue-500">{item}</li>)}
-                        </ul>
-                    </div>
-                </div>
-            </CollapsibleSection>
-        </div>
-    </section>
-  );
 }

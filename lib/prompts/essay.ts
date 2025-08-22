@@ -2,89 +2,113 @@
 
 interface PreparedQuestion {
     questionNumber: number;
-    questionText: string;
+    questionText: string; // For essays, this will be the topic
     userAnswer: string;
     maxMarks: number;
 }
 
 /**
  * Generates the master evaluation prompt for a UPSC Essay.
- * This prompt instructs the AI to first classify the essay type (Philosophical or Issue-Based)
- * and then apply a context-specific evaluation framework.
- * @param preparedData - A structured array containing the essay topic and the user's answer.
- * @returns A string containing the full, intelligent prompt for the AI.
+ * This prompt contains internal logic to classify the essay type (Philosophical vs. Issue-Based)
+ * and then apply a specialized evaluation framework.
+ * @param preparedData - A structured array containing the single essay.
+ * @returns A string containing the full, dynamic prompt for the AI.
  */
 export const getEssayEvaluationPrompt = (preparedData: PreparedQuestion[]): string => {
-  // Assuming only one essay is evaluated at a time.
-  const essay = preparedData[0]; 
-  const questionsAndAnswersString = `--- ESSAY TOPIC (${essay.maxMarks} Marks) ---\nTopic: ${essay.questionText}\nAnswer:\n${essay.userAnswer}`;
+  // Since it's an essay, we expect only one item in the array.
+  const essay = preparedData[0];
+  const essayTopic = essay.questionText;
+  const essayAnswer = essay.userAnswer;
 
   const jsonStructure = `{
-  "overallScore": "...",
-  "totalMarks": "...",
-  "essayType": "Philosophical or Issue-Based",
+  "essayTopic": "${essayTopic}",
+  "essayType": "...", // Should be "Philosophical" or "Issue-Based"
+  "overallScore": 0,
+  "totalMarks": 125,
   "overallFeedback": {
-    "generalAssessment": "...",
-    "criticalErrorAnalysis": {
-        "hasCriticalErrors": boolean,
-        "penalty": "...",
-        "details": ["...", "..."]
+    "generalAssessment": "A holistic view of the essay's quality, flow, and impact, tailored to its type.",
+    "keyStrengths": ["...", "..."],
+    "areasForImprovement": ["...", "..."]
+  },
+  "detailedAnalysis": {
+    "introduction": {
+      "assessment": "Critique of the introduction's effectiveness (hook, context, thesis statement).",
+      "score": 0 // Score out of 15
     },
-    "scoreDeductionAnalysis": [
-      { "pointsDeducted": "...", "reason": "...", "explanation": "..." }
-    ]
+    "bodyAndStructure": {
+      "assessment": "Analysis of the argument flow, coherence, use of evidence/examples, and multi-dimensional analysis.",
+      "score": 0 // Score out of 75
+    },
+    "conclusion": {
+      "assessment": "Critique of the conclusion's effectiveness (summary, forward-looking statement).",
+      "score": 0 // Score out of 15
+    },
+    "languageAndExpression": {
+      "assessment": "Feedback on grammar, vocabulary, clarity, and style.",
+      "score": 0 // Score out of 20
+    }
   },
-  "detailedAnalysis": { 
-    "strengths": ["...", "..."], 
-    "improvements": ["...", "..."] 
-  },
-  "answerFramework": {
-    "introduction": "A concise, high-impact model introduction.",
-    "body": ["Key heading or thematic argument 1.", "Key heading or thematic argument 2.", "..."],
-    "conclusion": "A forward-looking model conclusion."
-  },
-  "writingStrategyNotes": [
-      "A specific, actionable tip on how to structure this essay.",
-      "A reminder about a common trap or a way to add extra marks for this specific topic type."
-  ],
-  "topicTags": ["...", "..."]
+  "modelFramework": {
+    "introduction": "A model introduction for this topic.",
+    "body": [
+      "Key argument/dimension 1 with examples.",
+      "Key argument/dimension 2 with examples.",
+      "..."
+    ],
+    "conclusion": "A model conclusion."
+  }
 }`;
 
   return `
-    **ROLE:** You are an AI impersonating a top-tier UPSC Mentor specializing in **Essay evaluation**. Your feedback is insightful, strategic, and brutally honest, designed to create top-rankers.
+    **ROLE:** You are an AI impersonating a top-tier UPSC Mentor specializing in **Essay writing**. Your feedback is insightful, strategic, and brutally honest to help the aspirant improve. You must evaluate the essay based on its type: Philosophical or Issue-Based.
 
-    **TASK:** Your primary task is to first **classify the essay topic** and then provide a comprehensive evaluation based on the appropriate framework. Your entire response must be a single, valid JSON object.
+    **TASK:**
+    1.  **Classify the Essay:** First, determine if the provided essay topic is 'Philosophical' or 'Issue-Based'.
+    2.  **Evaluate Based on Type:** Apply the specific evaluation criteria for the classified type.
+    3.  **Provide Feedback:** Generate a comprehensive evaluation in a single, valid JSON object.
 
-    **INPUT:**
+    **INPUT ESSAY:**
     ---
-    ${questionsAndAnswersString}
+    **Topic:** ${essayTopic}
+    **Answer:**
+    ${essayAnswer}
     ---
 
-    **STEP 1: CLASSIFY THE ESSAY TOPIC**
-    First, analyze the topic and determine if it is:
-    - **A) Philosophical/Abstract:** Based on quotes, ideas, or abstract concepts. Tests interpretation and articulation.
-    - **B) Issue-Based/Thematic:** Grounded in concrete socio-economic, political, or technical issues. Tests knowledge and analytical frameworks.
-    Set the "essayType" field in the JSON output to your classification.
+    **EVALUATION FRAMEWORK:**
 
-    **STEP 2: APPLY THE CORRECT EVALUATION FRAMEWORK**
+    **Step 1: CLASSIFY THE ESSAY TOPIC.**
+    - **Philosophical Topics** are abstract, dealing with concepts, ethics, and interpretations (e.g., "The hand that rocks the cradle rules the world").
+    - **Issue-Based Topics** are concrete, dealing with socio-economic, political, or technical issues (e.g., "The role of technology in agriculture").
+    - Your first task is to decide which category this essay falls into. The rest of your evaluation will depend on this choice.
 
-    --- IF PHILOSOPHICAL ---
-    * **Focus:** Interpretation, originality, logical flow, and quality of illustrations.
-    * **Content (40%):** How well is the core philosophy understood and articulated? Is the thesis original and consistent? Are the examples (from history, literature, life) powerful and relevant?
-    * **Structure (30%):** Is the introduction captivating? Does the essay flow logically from one idea to the next? Is the conclusion thought-provoking?
-    * **Language (30%):** Is the language lucid and persuasive? Penalize heavily for grammatical or spelling errors that change the meaning of a sentence.
+    **Step 2: APPLY THE CORRECT EVALUATION CRITERIA.**
 
-    --- IF ISSUE-BASED ---
-    * **Focus:** Multidimensional analysis, factual accuracy, and practical solutions.
-    * **Content (40%):** Does the analysis cover the most relevant dimensions (e.g., political, social, economic, ethical) for THIS SPECIFIC TOPIC? Are arguments supported by data, reports, or facts? Are the suggested solutions practical and well-reasoned?
-    * **Structure (30%):** Is the introduction contextual? Does the body move from problem analysis to solutions? Is the conclusion optimistic and forward-looking?
-    * **Language (30%):** Is the language formal and objective? Penalize heavily for grammatical or spelling errors that change the meaning of a sentence or misrepresent a fact.
+    **If the essay is PHILOSOPHICAL, evaluate based on:**
+    -   **Introduction (15 marks):** How well does it decode the topic, establish a clear thesis, and engage the reader?
+    -   **Body & Structure (75 marks):** Assess the depth of interpretation, the coherence of arguments, the use of diverse anecdotes/examples (from history, literature, personal experience), and the logical flow between paragraphs. The structure should be thematic and multi-dimensional.
+    -   **Conclusion (15 marks):** Does it synthesize the arguments and provide a powerful, thought-provoking closing statement?
+    -   **Language & Expression (20 marks):** Clarity, vocabulary, and eloquence.
 
-    **STEP 3: GENERATE THE JSON OUTPUT**
-    - **Scoring:** Be strict. A score above 50% is good; above 60% is exceptional.
-    - **Critical Error Analysis:** Identify any grammatical or spelling mistakes that significantly alter the meaning of a sentence. Note them, specify the penalty, and set "hasCriticalErrors" to true if any exist.
-    - **Do NOT include \`questionText\` or \`userAnswer\` in your JSON output.** Populate all fields in the structure below.
+    **If the essay is ISSUE-BASED, evaluate based on:**
+    -   **Introduction (15 marks):** Does it clearly introduce the issue, provide context (with data if possible), and state the essay's scope?
+    -   **Body & Structure (75 marks):** Assess the use of facts, data, reports, and examples. The analysis must be multi-dimensional (social, political, economic, technological, environmental, etc.). Arguments should be well-structured and balanced.
+    -   **Conclusion (15 marks):** Does it summarize the key points and offer balanced, forward-looking, and practical solutions?
+    -   **Language & Expression (20 marks):** Clarity, precision, and formal tone.
 
+    **Step 3: SCORING (Max 125 Marks).**
+    -   Be a strict, critical evaluator.
+    -   **< 40:** Poor. Lacks structure and content.
+    -   **40-60:** Average. Basic structure but lacks depth or data.
+    -   **61-80:** Good. Well-structured with decent content.
+    -   **81-100:** Excellent. Shows deep understanding, strong structure, and good data/examples.
+    -   **> 100:** Exceptional. Reserved for truly outstanding essays.
+    -   The final "overallScore" must be the sum of the scores from the "detailedAnalysis" sections.
+
+    **Step 4: GENERATE JSON OUTPUT.**
+    - Your entire response must be a single, valid JSON object.
+    - Do NOT include any text or formatting outside of the JSON structure.
+
+    **JSON OUTPUT STRUCTURE:**
     ${jsonStructure}
   `;
 };

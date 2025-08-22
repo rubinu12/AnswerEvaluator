@@ -23,49 +23,82 @@ function getClients() {
   return { storageClient, visionClient, geminiModel, bucketName };
 }
 
-// --- The Final, Most Advanced Pre-computation Prompt ---
-const getPreparationPrompt = (rawText: string) => {
-    const jsonStructure = `[
+// --- Robust JSON Extraction ---
+function extractJsonFromText(text: string): string | null {
+    const markdownMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (markdownMatch && markdownMatch[1]) {
+        return markdownMatch[1].trim();
+    }
+    const firstBracket = text.indexOf('[');
+    const lastBracket = text.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket > firstBracket) {
+        return text.substring(firstBracket, lastBracket + 1);
+    }
+    return null;
+}
+
+// --- FINAL "CHAIN OF THOUGHT" DYNAMIC PROMPT ---
+const getPreparationPrompt = (rawText: string, subject: string) => {
+    const isEssay = subject === 'Essay';
+
+    // **CORRECTED PART**: The JSON structure for GS now shows a multi-question example.
+    const jsonStructure = isEssay
+        ? `[
     {
         "questionNumber": 1,
-        "questionText": "The full text of the question.",
-        "userAnswer": "The user's answer, reconstructed with proper paragraphs and bullet points.",
+        "questionText": "Topic of the first essay (e.g., from Section A).",
+        "userAnswer": "The full reconstructed text of the first essay.",
+        "maxMarks": 125
+    }
+]`
+        : `[
+    {
+        "questionNumber": 1,
+        "questionText": "The full text of the first question.",
+        "userAnswer": "The user's answer for the first question.",
         "maxMarks": 10
+    },
+    {
+        "questionNumber": 2,
+        "questionText": "The full text of the second question.",
+        "userAnswer": "The user's answer for the second question.",
+        "maxMarks": 15
     }
 ]`;
-    
+
+    const taskInstructions = isEssay
+        ? `**Step 1: Identify Content.** From the messy text, identify the single essay topic and reconstruct the full text of the essay answer with proper paragraph breaks.
+           **Step 2: Create JSON.** Take the topic and the reconstructed answer from Step 1 and place them into the JSON structure provided below. The 'maxMarks' must be 125.`
+        : `**Step 1: Identify Content.** From the messy text, identify each question, its corresponding answer, and the marks allocated (10 or 15). Reconstruct the answer text with proper paragraphs and lists.
+           **Step 2: Create JSON.** Take the content from Step 1 and create a JSON object for each question-answer pair. Place these objects into the JSON array structure provided below.`;
+
     return `
-        **ROLE:** You are an expert AI assistant specializing in document reconstruction. Your task is to take a block of messy text extracted from a handwritten exam via OCR and reformat it into a clean, well-structured document.
+        **ROLE:** You are an expert AI assistant that flawlessly converts messy OCR text from handwritten exams into a structured JSON format.
 
-        **TASK:** From the raw text, you must accurately identify each question and its answer, determine the marks, and most importantly, reconstruct the answer's original formatting.
-
-        **CRITICAL FORMATTING RULES:**
-        1.  **Identify Paragraphs:** The OCR text often merges paragraphs. You must intelligently re-introduce line breaks (\`\\n\`) to separate distinct ideas and create coherent paragraphs.
-        2.  **Reconstruct Lists:** Look for list indicators like "→", "-", "*", "1)", "a)". Reformat these into clean, bulleted lists. Each list item should be on a new line.
-        3.  **Preserve Headings:** The user may have written subheadings like "Introduction" or "Concerns Associated". Preserve these and place them on their own lines.
-        4.  **Do Not Summarize:** Your job is to reformat the *entire* user answer, not to summarize or change its content.
+        **TASK:** Follow these two steps precisely.
+        ${taskInstructions}
 
         **INPUT TEXT (MESSY OCR):**
         ---
         ${rawText}
         ---
 
-        **JSON OUTPUT INSTRUCTIONS:**
-        1.  **\`questionText\`:** Capture the full text of the question.
-        2.  **\`userAnswer\`:** Provide the fully reconstructed user answer with correct paragraphs and line breaks.
-        3.  **\`maxMarks\`:** Determine the marks (10 or 15) from the text.
-        4.  **Output Format:** Return ONLY a valid JSON array.
+        **CRITICAL OUTPUT INSTRUCTIONS:**
+        - Your final output must ONLY be the valid JSON array.
+        - Do not include any explanatory text, notes, or markdown formatting around the final JSON.
 
-        **JSON OUTPUT STRUCTURE:**
+        **FINAL JSON OUTPUT STRUCTURE:**
         ${jsonStructure}
     `;
 };
+
 
 export async function POST(request: Request) {
     const { storageClient, visionClient, geminiModel, bucketName } = getClients();
     
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
+    const subject = formData.get('subject') as string || 'GS1';
 
     if (!file) {
         return NextResponse.json({ error: 'No file provided.' }, { status: 400 });
@@ -120,19 +153,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Could not extract any text from the document." }, { status: 500 });
         }
 
-        const prepPrompt = getPreparationPrompt(rawOcrText);
+        const prepPrompt = getPreparationPrompt(rawOcrText, subject);
         const prepResult = await geminiModel.generateContent(prepPrompt);
         const rawPrepResponse = prepResult.response.text();
         
-        const firstBracketIndex = rawPrepResponse.indexOf('[');
-        const lastBracketIndex = rawPrepResponse.lastIndexOf(']');
+        const jsonString = extractJsonFromText(rawPrepResponse);
 
-        if (firstBracketIndex === -1 || lastBracketIndex === -1) {
+        if (!jsonString) {
             console.error("AI Prep Failed. Raw Response:", rawPrepResponse);
             throw new Error("The AI failed to reconstruct the document into a valid format.");
         }
 
-        const jsonString = rawPrepResponse.substring(firstBracketIndex, lastBracketIndex + 1);
         const preparedData = JSON.parse(jsonString);
 
         return NextResponse.json(preparedData);

@@ -1,55 +1,39 @@
-// app/components/result/SidebarNav.tsx
+// components/result/SidebarNav.tsx
 'use client';
+import { EvaluationData } from '@/lib/types';
 
-// The interface is updated here
 interface SidebarNavProps {
-  overallScore: number;
-  totalMarks: number;
-  questionAnalyses: Array<{
-    questionNumber: number;
-    score: number;
-    maxMarks: number; // CHANGED FROM detectedMaxMarks
-  }>;
+  data: EvaluationData;
 }
 
-export default function SidebarNav({ overallScore, totalMarks, questionAnalyses }: SidebarNavProps) {
-  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
-    e.preventDefault();
-    const targetElement = document.getElementById(targetId);
-    if (targetElement) {
-      targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  return (
-    <aside className="lg:col-span-1 lg:sticky lg:top-24 bg-white p-4 rounded-lg border border-gray-200">
-      <h3 className="font-bold font-serif mb-4 text-lg">Report Sections</h3>
-      <nav id="question-nav" className="space-y-1">
-        <a 
-          href="#overall-feedback" 
-          onClick={(e) => handleLinkClick(e, 'overall-feedback')}
-          className="sidebar-link active flex justify-between items-center px-3 py-2 text-sm rounded-md hover:bg-gray-100"
-        >
-          <span>Overall Feedback</span>
-          <span className="font-mono text-xs font-semibold px-2 py-0.5 bg-red-100 text-red-800 rounded-full">
-            {overallScore}/{totalMarks}
-          </span>
-        </a>
-        {questionAnalyses.map((q) => (
-          <a
-            key={q.questionNumber}
-            href={`#question-${q.questionNumber}`}
-            onClick={(e) => handleLinkClick(e, `question-${q.questionNumber}`)}
-            className="sidebar-link flex justify-between items-center px-3 py-2 text-sm rounded-md hover:bg-gray-100"
-          >
-            <span>Question {q.questionNumber}</span>
-            <span className="font-mono text-xs font-semibold px-2 py-0.5 bg-gray-200 rounded-full">
-                {/* The property is updated here */}
-              {q.score}/{q.maxMarks}
-            </span>
-          </a>
-        ))}
-      </nav>
-    </aside>
-  );
+export default function SidebarNav({ data }: SidebarNavProps) {
+    const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+        e.preventDefault();
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+    
+    return (
+        <aside className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="font-serif text-lg font-bold">{data.subject} Report</h3>
+            <nav className="mt-4 space-y-1">
+                <a href="#overall-feedback" className="group flex items-center justify-between rounded-md border-l-4 border-[--primary-accent] bg-red-50 px-3 py-2 text-sm font-semibold text-[--primary-accent]" onClick={(e) => handleLinkClick(e, 'overall-feedback')}>
+                    <span>Overall Feedback</span>
+                    <span className="font-mono text-xs font-bold text-white bg-[--primary-accent-hover] rounded-full px-2 py-0.5">
+                        {data.overallScore}/{data.totalMarks}
+                    </span>
+                </a>
+                {data.questionAnalysis.map(q => (
+                    <a key={q.questionNumber} href={`#question-${q.questionNumber}`} className="group flex items-center justify-between rounded-md border-l-4 border-transparent px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100" onClick={(e) => handleLinkClick(e, `question-${q.questionNumber}`)}>
+                        <span>{data.subject === 'Essay' ? `Essay ${q.questionNumber}` : `Question ${q.questionNumber}`}</span>
+                        <span className="font-mono text-xs font-bold text-gray-700 bg-gray-200 rounded-full px-2 py-0.5 transition-colors group-hover:bg-gray-300">
+                            {q.score}/{q.maxMarks}
+                        </span>
+                    </a>
+                ))}
+            </nav>
+        </aside>
+    );
 }
