@@ -1,24 +1,29 @@
-// app/dashboard/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useAuthContext } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/dashboard/Header';
+
+// Importing all the new UI components
+import Navbar from '@/components/dashboard/Navbar';
 import EvaluateCard from '@/components/dashboard/EvaluateCard';
-import StreakCalendar from '@/components/dashboard/StreakCalendar';
+import StudyStreakCalendar from '@/components/dashboard/StudyStreakCalendar';
+import MentorsWisdom from '@/components/dashboard/MentorsWisdom';
+import PerformanceGauges from '@/components/dashboard/PerformanceGauges';
+import RecentEvaluations from '@/components/dashboard/RecentEvaluations';
+import LottieAnimation from '@/components/dashboard/LottieAnimation';
+
+// Preserving your existing components for logic
 import InProgressCard from '@/components/dashboard/InProgressCard';
 import ResultModal from '@/components/dashboard/ResultModal';
 
-// Define the shape of the data coming from EvaluateCard
+// Preserving your existing types
 interface PreparedQuestion {
     questionNumber: number;
     questionText: string;
     userAnswer: string;
     maxMarks: number;
 }
-
-// UPDATE: The payload now includes the subject
 interface EvaluationCompletePayload {
     analysis: any;
     preparedData: PreparedQuestion[];
@@ -26,6 +31,7 @@ interface EvaluationCompletePayload {
 }
 
 export default function DashboardPage() {
+    // --- All of your existing logic is preserved ---
     const { user, loading } = useAuthContext();
     const router = useRouter();
     
@@ -48,30 +54,21 @@ export default function DashboardPage() {
         setIsResultModalOpen(false);
     };
 
-    // UPDATED FUNCTION TO HANDLE THE NEW PAYLOAD
     const handleEvaluationComplete = (payload: EvaluationCompletePayload) => {
         const { analysis, preparedData, subject } = payload;
         
-        // --- THIS IS THE CRITICAL MERGING LOGIC ---
-        // For GS papers, we merge question by question. For Essays, it's usually a single item.
         const finalQuestionAnalysis = preparedData.map(prepItem => {
             const analysisItem = analysis.questionAnalysis?.find(
                 (item: any) => item.questionNumber === prepItem.questionNumber
             );
-            return {
-                ...prepItem,
-                ...analysisItem,
-            };
+            return { ...prepItem, ...analysisItem };
         });
 
-        // Create the final, complete object to save
         const finalDataForStorage = {
             ...analysis,
-            // If it was a GS paper, use the merged analysis. If it was an essay, the analysis is already complete.
             questionAnalysis: subject === 'Essay' ? analysis.questionAnalysis : finalQuestionAnalysis,
-            subject: subject // CRITICAL: Save the subject
+            subject: subject
         };
-        // --- END OF MERGING LOGIC ---
 
         const uniqueId = `eval_${Date.now()}`;
         setNewEvaluationId(uniqueId);
@@ -90,20 +87,24 @@ export default function DashboardPage() {
             router.push(`/result/${newEvaluationId}`);
         }
     };
-
+    
+    // --- This is the new, final render method for the page ---
     return (
-        <div className="min-h-screen">
-            <Header 
-                evaluationStatus={evaluationStatus}
-                onViewResult={handleViewResult}
-            />
-            <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-                <div className="mb-8">
-                    <h2 className="text-4xl font-bold text-slate-900 font-serif">Welcome Back, {user.email?.split('@')[0]}!</h2>
-                    <p className="mt-1 text-md text-slate-500">Let's make today productive.</p>
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2">
+        <>
+            <Navbar />
+            <div className="p-4 sm:p-6 lg:p-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+                    {/* --- Main Column (Left) --- */}
+                    <div className="lg:col-span-2 flex flex-col gap-6 lg:gap-8">
+                        <div>
+                            <h1 className="text-4xl lg:text-5xl font-bold text-gray-800">
+                                Welcome back, {user.email?.split('@')[0]}!
+                            </h1>
+                            <p className="mt-2 text-lg text-gray-600">
+                                Let's make today count.
+                            </p>
+                        </div>
+
                         {evaluationStatus === 'processing' ? (
                             <InProgressCard />
                         ) : (
@@ -113,18 +114,24 @@ export default function DashboardPage() {
                                 onEvaluationError={handleEvaluationError}
                             />
                         )}
+                        <MentorsWisdom />
+                        <PerformanceGauges />
                     </div>
-                    <div>
-                        <StreakCalendar />
+
+                    {/* --- Sidebar Column (Right) --- */}
+                    <div className="flex flex-col gap-6 lg:gap-8">
+                        <LottieAnimation />
+                        <StudyStreakCalendar />
+                        <RecentEvaluations />
                     </div>
                 </div>
-            </main>
+            </div>
             <ResultModal 
                 isOpen={isResultModalOpen}
                 onClose={() => setIsResultModalOpen(false)}
                 onConfirm={handleViewResult}
                 resultText="Your detailed evaluation is complete and ready for review."
             />
-        </div>
+        </>
     );
 }

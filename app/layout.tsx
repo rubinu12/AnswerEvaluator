@@ -1,23 +1,17 @@
-// app/layout.tsx
-
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Poppins } from "next/font/google"; // Using Poppins for the new design
 import "./globals.css";
-import { AuthContextProvider } from '../lib/AuthContext'; // Import the provider
+import { AuthContextProvider } from '../lib/AuthContext'; // Preserved your Auth provider
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Setup Poppins font to match the new dashboard's aesthetic
+const poppins = Poppins({
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "UPSC Mains Answer Evaluator", // Updated title
-  description: "AI-Powered UPSC Mains Answer Evaluation", // Updated description
+  title: "Root & Rise - UPSC Evaluator", // Using your app's title
+  description: "AI-Powered UPSC Mains Answer Evaluation",
 };
 
 export default function RootLayout({
@@ -27,9 +21,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={poppins.className}>
+        {/* Added the animated background div for the new dashboard */}
+        <div className="fixed-background" />
+        
+        {/* Your existing AuthContextProvider is preserved */}
         <AuthContextProvider>
           {children}
         </AuthContextProvider>

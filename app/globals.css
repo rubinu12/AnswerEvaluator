@@ -1,6 +1,7 @@
 /* app/globals.css */
 @import "tailwindcss";
 
+/* --- EXISTING VARIABLES (PRESERVED) --- */
 :root {
     --background: #fdfcf9;
     --text-primary: #2d3748;
@@ -11,6 +12,7 @@
     --secondary-accent: #2c5282;
 }
 
+/* --- BODY AND FONT STYLES (PRESERVED) --- */
 body {
     font-family: 'Inter', sans-serif;
     background-color: var(--background);
@@ -21,7 +23,7 @@ h1, h2, h3, h4, .font-serif {
     font-family: 'Lora', serif;
 }
 
-/* NEW STYLES FOR HIDING NAVBAR */
+/* --- EXISTING COMPONENT STYLES (PRESERVED) --- */
 .main-header {
     position: sticky;
     top: 0;
@@ -32,11 +34,9 @@ h1, h2, h3, h4, .font-serif {
     transition: transform 0.3s ease-in-out;
     height: 64px;
 }
-
 .main-header.header-hidden {
     transform: translateY(-100%);
 }
-
 .header-content {
     max-width: 1152px;
     margin: 0 auto;
@@ -46,7 +46,6 @@ h1, h2, h3, h4, .font-serif {
     align-items: center;
     height: 100%;
 }
-
 .sub-nav {
     transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
     border-bottom: 1px solid var(--border-color);
@@ -73,10 +72,8 @@ h1, h2, h3, h4, .font-serif {
 .sub-nav-link.active {
     color: var(--primary-accent);
     font-weight: 600;
-    border-bottom-color: transparent; /* We don't need the border for the top nav */
+    border-bottom-color: transparent;
 }
-
-
 .dropdown {
     visibility: hidden;
     opacity: 0;
@@ -88,14 +85,12 @@ h1, h2, h3, h4, .font-serif {
     opacity: 1;
     transform: translateY(0);
 }
-
 .card {
     background-color: white;
     border-radius: 0.5rem;
     border: 1px solid var(--border-color);
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
 }
-
 .calendar-day.streak {
     background-color: #ebf8ff;
     color: var(--secondary-accent);
@@ -106,12 +101,10 @@ h1, h2, h3, h4, .font-serif {
     color: white;
     font-weight: 700;
 }
-
 .drag-over {
     border-color: var(--primary-accent);
     background-color: #fff5f5;
 }
-
 .btn-evaluate {
     background-color: var(--primary-accent);
     color: white;
@@ -125,7 +118,6 @@ h1, h2, h3, h4, .font-serif {
     background-color: #fca5a5;
     cursor: not-allowed;
 }
-
 .subject-selector-container {
     position: relative;
     display: flex;
@@ -153,4 +145,43 @@ h1, h2, h3, h4, .font-serif {
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 5;
+}
+
+/* --- NEW ANIMATED BACKGROUND --- */
+.fixed-background {
+    background: linear-gradient(135deg, #FFD1B5 0%, #FFF5E1 33%, #E0F7FA 66%, #E1E5F8 100%);
+    background-size: 400% 400%;
+    animation: gradientShift 25s ease infinite;
+    position: fixed;
+    inset: 0;
+    z-index: -10;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* --- NEW NOTIFICATION PING ANIMATION --- */
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.animate-ping {
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* --- NEW UNIVERSAL BUTTON CLICK EFFECT --- */
+.btn {
+  transition: all 0.2s ease-in-out;
+}
+.btn:hover {
+  transform: translateY(-2px);
+}
+.btn:active {
+  transform: translateY(0px) scale(0.98);
 }
