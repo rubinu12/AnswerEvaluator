@@ -5,10 +5,10 @@ import {
     createUserWithEmailAndPassword, 
     signInWithEmailAndPassword 
 } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
+import { auth } from '@/lib/firebase';
 
 export default function AuthPage() {
-    const [isLogin, setIsLogin] = useState(true); // State to toggle between Login and Sign Up
+    const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -22,7 +22,7 @@ export default function AuthPage() {
             // Handle Login
             try {
                 await signInWithEmailAndPassword(auth, email, password);
-                router.push('/'); // Redirect to homepage on successful login
+                router.push('/dashboard'); // FIX: Redirect to dashboard on successful login
             } catch (error: any) {
                 setError(error.message);
                 console.error('Error logging in:', error);
@@ -31,7 +31,7 @@ export default function AuthPage() {
             // Handle Sign Up
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
-                router.push('/'); // Redirect to homepage on successful sign-up
+                router.push('/dashboard'); // FIX: Redirect to dashboard on successful sign-up
             } catch (error: any)
 {
                 setError(error.message);

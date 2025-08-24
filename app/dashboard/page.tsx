@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuthContext } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
 
-// Importing all the new UI components
+// Importing all the UI components
 import Navbar from '@/components/dashboard/Navbar';
 import EvaluateCard from '@/components/dashboard/EvaluateCard';
 import StudyStreakCalendar from '@/components/dashboard/StudyStreakCalendar';
@@ -12,8 +12,6 @@ import MentorsWisdom from '@/components/dashboard/MentorsWisdom';
 import PerformanceGauges from '@/components/dashboard/PerformanceGauges';
 import RecentEvaluations from '@/components/dashboard/RecentEvaluations';
 import LottieAnimation from '@/components/dashboard/LottieAnimation';
-
-// Preserving your existing components for logic
 import InProgressCard from '@/components/dashboard/InProgressCard';
 import ResultModal from '@/components/dashboard/ResultModal';
 
@@ -31,7 +29,6 @@ interface EvaluationCompletePayload {
 }
 
 export default function DashboardPage() {
-    // --- All of your existing logic is preserved ---
     const { user, loading } = useAuthContext();
     const router = useRouter();
     
@@ -39,16 +36,20 @@ export default function DashboardPage() {
     const [isResultModalOpen, setIsResultModalOpen] = useState(false);
     const [newEvaluationId, setNewEvaluationId] = useState<string | null>(null);
 
+    // --- THIS IS THE NEW ACCESS CONTROL LOGIC ---
     useEffect(() => {
+        // If auth check is done and there's NO user, redirect to the auth page.
         if (!loading && !user) {
             router.push('/auth');
         }
     }, [user, loading, router]);
 
+    // Show a loading state while we check for a user.
     if (loading || !user) {
         return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
     }
 
+    // --- All of your existing logic from here is preserved ---
     const handleEvaluationStart = () => {
         setEvaluationStatus('processing');
         setIsResultModalOpen(false);

@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google"; // Using Poppins for the new design
+import { Poppins } from "next/font/google";
 import "./globals.css";
-import { AuthContextProvider } from '../lib/AuthContext'; // Preserved your Auth provider
+import { AuthContextProvider } from '../lib/AuthContext';
 
-// Setup Poppins font to match the new dashboard's aesthetic
 const poppins = Poppins({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: '--font-poppins',
 });
 
 export const metadata: Metadata = {
-  title: "Root & Rise - UPSC Evaluator", // Using your app's title
-  description: "AI-Powered UPSC Mains Answer Evaluation",
+  title: "Root & Rise - Your Path to Exam Success",
+  description: "The ultimate AI-powered platform for UPSC, State PCS, and other competitive exam aspirants.",
 };
 
 export default function RootLayout({
@@ -21,11 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={poppins.className}>
-        {/* Added the animated background div for the new dashboard */}
-        <div className="fixed-background" />
-        
-        {/* Your existing AuthContextProvider is preserved */}
+      <body className={`${poppins.variable} font-poppins`}>
         <AuthContextProvider>
           {children}
         </AuthContextProvider>
