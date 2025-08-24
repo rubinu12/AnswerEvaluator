@@ -1,26 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/lib/AuthContext';
 import Link from 'next/link';
-
-// Import the Universal Navbar and its NavLink type
-import UniversalNavbar, { NavLink } from '@/components/shared/UniversalNavbar';
-
-// Import all landing page sections
+import UniversalNavbar from '@/components/shared/UniversalNavbar';
 import Hero from '@/components/landing/Hero';
 import Features from '@/components/landing/Features';
 import Testimonials from '@/components/landing/Testimonials';
 import FreeTrial from '@/components/landing/FreeTrial';
 import PricingAndCta from '@/components/landing/PricingAndCta';
-
-// Define the links for the LANDING PAGE
-const landingNavLinks: NavLink[] = [
-  { name: 'Features', href: '#features' },
-  { name: 'How It Works', href: '#how-it-works' },
-  { name: 'Pricing', href: '#pricing' },
-];
 
 const LandingPageActions = () => (
     <>
@@ -36,16 +25,13 @@ const LandingPageActions = () => (
 export default function MarketingPage() {
     const { user, loading } = useAuthContext();
     const router = useRouter();
-    
-    // For the landing page, the active link state is simple
-    const [activeLink, setActiveLink] = useState<NavLink>(landingNavLinks[0]);
 
     useEffect(() => {
         if (!loading && user) {
             router.push('/dashboard');
             return;
         }
-        
+
         if (!loading && !user) {
             document.body.classList.add('marketing-page-body');
             return () => {
@@ -60,13 +46,9 @@ export default function MarketingPage() {
 
     return (
         <>
-             <UniversalNavbar 
-                navLinks={landingNavLinks} 
-                // --- THIS IS THE FIX ---
-                // We now pass the component directly, not a function
-                actions={<LandingPageActions />}
-                activeLink={activeLink}
-                onLinkClick={setActiveLink}
+             <UniversalNavbar
+                pageType='landing'
+                actions={() => <LandingPageActions />}
             />
             <main id="page-container" className="page-container">
                 <Hero />

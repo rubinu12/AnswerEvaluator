@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import React from 'react';
 
-// Define the shape of the links, which includes the color data
 export interface NavLink {
   name: string;
   href: string;
@@ -11,15 +12,40 @@ export interface NavLink {
   color?: string;
 }
 
-// Define the props for the navbar
+const landingNavLinks: NavLink[] = [
+  { name: 'Features', href: '#features', gradient: 'linear-gradient(135deg, #E1E5F8, #C5CAE9)', color: '#E1E5F8' },
+  { name: 'How It Works', href: '#how-it-works', gradient: 'linear-gradient(135deg, #D4E9E2, #A5D6A7)', color: '#D4E9E2' },
+  { name: 'Pricing', href: '#pricing', gradient: 'linear-gradient(135deg, #B3D8E0, #80DEEA)', color: '#B3D8E0' },
+];
+
+const dashboardNavLinks: NavLink[] = [
+  { name: 'Dashboard', href: '/dashboard', gradient: 'linear-gradient(135deg, #FFD1B5, #E1E5F8)', color: '#FFD1B5' },
+  { name: 'My Evaluations', href: '#', gradient: 'linear-gradient(135deg, #B3D8E0, #80DEEA)', color: '#B3D8E0' },
+  { name: 'Study Plan', href: '#', gradient: 'linear-gradient(135deg, #D4E9E2, #A5D6A7)', color: '#D4E9E2' },
+  { name: 'Resources', href: '#', gradient: 'linear-gradient(135deg, #E1E5F8, #C5CAE9)', color: '#E1E5F8' },
+];
+
 interface UniversalNavbarProps {
-  navLinks: NavLink[];
-  actions: React.ReactNode; // Receives the fully rendered buttons/icons
-  activeLink: NavLink;      // Receives the current active link object
-  onLinkClick: (link: NavLink) => void; // A function to call when a link is clicked
+  pageType: 'landing' | 'dashboard';
+  actions: (activeLink: NavLink) => React.ReactNode;
 }
 
-export default function UniversalNavbar({ navLinks, actions, activeLink, onLinkClick }: UniversalNavbarProps) {
+export default function UniversalNavbar({ pageType, actions }: UniversalNavbarProps) {
+    const [navLinks, setNavLinks] = useState<NavLink[]>([]);
+    const [activeLink, setActiveLink] = useState<NavLink | null>(null);
+
+    useEffect(() => {
+        if (pageType === 'landing') {
+            setNavLinks(landingNavLinks);
+            setActiveLink(landingNavLinks[0]);
+        } else {
+            setNavLinks(dashboardNavLinks);
+            setActiveLink(dashboardNavLinks[0]);
+        }
+    }, [pageType]);
+
+    if (!activeLink) return null;
+
     return (
         <nav className="sticky top-0 z-50 w-full bg-white/70 backdrop-blur-xl border-b border-white/80">
             <div className="flex items-center justify-between p-2 max-w-7xl mx-auto">
@@ -32,7 +58,7 @@ export default function UniversalNavbar({ navLinks, actions, activeLink, onLinkC
                         <Link
                             key={link.name}
                             href={link.href}
-                            onClick={() => onLinkClick(link)}
+                            onClick={() => setActiveLink(link)}
                             className={`relative px-5 py-2 text-sm font-medium transition-colors duration-300
                                 ${activeLink.name === link.name ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'}
                             `}
@@ -41,9 +67,9 @@ export default function UniversalNavbar({ navLinks, actions, activeLink, onLinkC
                                 <motion.div
                                     layoutId="active-pill"
                                     className="absolute inset-0 rounded-lg shadow-md"
-                                    style={{ 
+                                    style={{
                                         backgroundImage: activeLink.gradient || 'linear-gradient(135deg, #FFFFFF, #F1F5F9)',
-                                        borderRadius: 10 
+                                        borderRadius: 10
                                     }}
                                     transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                                 />
@@ -54,7 +80,7 @@ export default function UniversalNavbar({ navLinks, actions, activeLink, onLinkC
                 </div>
 
                 <div className="flex items-center gap-6 px-4">
-                    {actions}
+                    {actions(activeLink)}
                 </div>
             </div>
         </nav>

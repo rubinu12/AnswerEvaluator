@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useAuthContext } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
-
-// Importing all the UI components
-import Navbar from '@/components/dashboard/Navbar';
+import UniversalNavbar, { NavLink } from '@/components/shared/UniversalNavbar';
+import { Search, Bell } from 'lucide-react';
 import EvaluateCard from '@/components/dashboard/EvaluateCard';
 import StudyStreakCalendar from '@/components/dashboard/StudyStreakCalendar';
 import MentorsWisdom from '@/components/dashboard/MentorsWisdom';
@@ -15,7 +14,27 @@ import LottieAnimation from '@/components/dashboard/LottieAnimation';
 import InProgressCard from '@/components/dashboard/InProgressCard';
 import ResultModal from '@/components/dashboard/ResultModal';
 
-// Preserving your existing types
+const DashboardActions = ({ activeLink }: { activeLink: NavLink }) => (
+    <>
+        <Search className="text-gray-600 cursor-pointer btn" size={22} />
+        <div className="relative cursor-pointer">
+            <Bell className="text-gray-600 btn" size={22} />
+            <span className="absolute flex h-2 w-2 top-0 right-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+        </div>
+        <div className="relative cursor-pointer btn">
+            <img
+                src="https://i.pravatar.cc/150?u=a042581f4e29026704d"
+                alt="Avatar"
+                className="w-10 h-10 rounded-full border-2 transition-colors duration-500"
+                style={{ borderColor: activeLink.color }}
+            />
+        </div>
+    </>
+);
+
 interface PreparedQuestion {
     questionNumber: number;
     questionText: string;
@@ -31,25 +50,21 @@ interface EvaluationCompletePayload {
 export default function DashboardPage() {
     const { user, loading } = useAuthContext();
     const router = useRouter();
-    
+
     const [evaluationStatus, setEvaluationStatus] = useState<'idle' | 'processing' | 'complete'>('idle');
     const [isResultModalOpen, setIsResultModalOpen] = useState(false);
     const [newEvaluationId, setNewEvaluationId] = useState<string | null>(null);
 
-    // --- THIS IS THE NEW ACCESS CONTROL LOGIC ---
     useEffect(() => {
-        // If auth check is done and there's NO user, redirect to the auth page.
         if (!loading && !user) {
             router.push('/auth');
         }
     }, [user, loading, router]);
 
-    // Show a loading state while we check for a user.
     if (loading || !user) {
         return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
     }
 
-    // --- All of your existing logic from here is preserved ---
     const handleEvaluationStart = () => {
         setEvaluationStatus('processing');
         setIsResultModalOpen(false);
@@ -57,7 +72,7 @@ export default function DashboardPage() {
 
     const handleEvaluationComplete = (payload: EvaluationCompletePayload) => {
         const { analysis, preparedData, subject } = payload;
-        
+
         const finalQuestionAnalysis = preparedData.map(prepItem => {
             const analysisItem = analysis.questionAnalysis?.find(
                 (item: any) => item.questionNumber === prepItem.questionNumber
@@ -75,9 +90,9 @@ export default function DashboardPage() {
         setNewEvaluationId(uniqueId);
         setEvaluationStatus('complete');
         sessionStorage.setItem(uniqueId, JSON.stringify(finalDataForStorage));
-        setIsResultModalOpen(true); 
+        setIsResultModalOpen(true);
     };
-    
+
     const handleEvaluationError = (error: string) => {
         setEvaluationStatus('idle');
         alert(`Evaluation failed: ${error}`);
@@ -88,14 +103,15 @@ export default function DashboardPage() {
             router.push(`/result/${newEvaluationId}`);
         }
     };
-    
-    // --- This is the new, final render method for the page ---
+
     return (
         <>
-            <Navbar />
+            <UniversalNavbar
+                pageType='dashboard'
+                actions={(activeLink) => <DashboardActions activeLink={activeLink} />}
+            />
             <div className="p-4 sm:p-6 lg:p-8">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-                    {/* --- Main Column (Left) --- */}
                     <div className="lg:col-span-2 flex flex-col gap-6 lg:gap-8">
                         <div>
                             <h1 className="text-4xl lg:text-5xl font-bold text-gray-800">
@@ -109,7 +125,7 @@ export default function DashboardPage() {
                         {evaluationStatus === 'processing' ? (
                             <InProgressCard />
                         ) : (
-                            <EvaluateCard 
+                            <EvaluateCard
                                 onEvaluationStart={handleEvaluationStart}
                                 onEvaluationComplete={handleEvaluationComplete}
                                 onEvaluationError={handleEvaluationError}
@@ -119,7 +135,6 @@ export default function DashboardPage() {
                         <PerformanceGauges />
                     </div>
 
-                    {/* --- Sidebar Column (Right) --- */}
                     <div className="flex flex-col gap-6 lg:gap-8">
                         <LottieAnimation />
                         <StudyStreakCalendar />
@@ -127,7 +142,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
-            <ResultModal 
+            <ResultModal
                 isOpen={isResultModalOpen}
                 onClose={() => setIsResultModalOpen(false)}
                 onConfirm={handleViewResult}
