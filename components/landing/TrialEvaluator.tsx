@@ -1,63 +1,118 @@
 'use client';
 
-// This is a placeholder for now. In the future, this component
-// would have its own logic to handle the file upload and evaluation process.
-export default function TrialEvaluator() {
+import { useState } from 'react';
+import { useAuthContext } from '@/lib/AuthContext';
+import InteractiveTrialModal from './InteractiveTrialModal';
+import { ArrowRight, UploadCloud, LoaderCircle, FileText, HelpCircle } from 'lucide-react';
+
+// --- This is the component shown BEFORE the user signs up ---
+const FreeTrialPrompt = ({ onSignUpClick }: { onSignUpClick: () => void }) => (
+    <div className="text-center">
+        <p className="text-base font-semibold text-emerald-600">
+            Experience It First-Hand
+        </p>
+        <h2 className="mt-2 text-3xl font-extrabold text-gray-900 sm:text-4xl">
+            Take a Free Trial Evaluation
+        </h2>
+        <p className="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
+            Sign up for free and evaluate your first essay to see the power of AI feedback. No credit card required.
+        </p>
+        <button
+            onClick={onSignUpClick}
+            className="mt-8 btn inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-emerald-500 to-blue-500 text-white font-bold rounded-xl shadow-lg text-lg"
+        >
+            Start Your Free Trial
+            <ArrowRight className="ml-2" />
+        </button>
+    </div>
+);
+
+// --- This is the component shown AFTER the user signs up ---
+const UploadArea = ({ onUploadClick }: { onUploadClick: () => void }) => {
+    const essayTopics = [
+        "Wisdom finds truth.",
+        "Values are not what humanity is, but what humanity ought to be.",
+        "The best way to find yourself is to lose yourself in the service of others.",
+        "Courage is the most important of all the virtues."
+    ];
+
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start max-w-4xl mx-auto">
-            {/* Left Side: Evaluator */}
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200/60">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h3 className="text-lg font-semibold">Evaluate New Answer</h3>
-                        <p className="text-sm text-gray-500">Upload your handwritten answer for AI evaluation</p>
-                    </div>
-                    <div className="text-sm font-medium text-gray-700 p-2 bg-gray-100 rounded-md">
-                        General Studies - I
-                    </div>
+        <div className="grid md:grid-cols-2 gap-8 items-center">
+            {/* Left Column: Upload Box */}
+            <div className="flex flex-col items-center">
+                <h2 className="text-2xl font-bold text-gray-800 text-center">Upload Your Essay</h2>
+                <p className="text-gray-500 text-center mb-6 text-sm">Let's evaluate your writing skills.</p>
+                <div 
+                    onClick={onUploadClick}
+                    className="w-full p-10 flex flex-col items-center justify-center border-4 border-dashed border-gray-300 rounded-2xl bg-gray-50/80 hover:bg-white hover:border-emerald-400 transition-all duration-300 cursor-pointer"
+                >
+                    <UploadCloud className="w-12 h-12 text-gray-400" />
+                    <p className="mt-4 font-semibold text-gray-700">Click here to start evaluation</p>
+                    <p className="mt-1 text-xs text-gray-500">PDF, JPG, PNG accepted</p>
                 </div>
-                
-                <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 p-8 text-center bg-gray-50/50">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <h4 className="mt-4 font-semibold text-gray-700">Upload Answer Sheet</h4>
-                    <p className="mt-1 text-xs text-gray-500">Drag and drop or click to browse</p>
-                    <button className="mt-4 text-sm font-medium bg-white border border-gray-300 rounded-md px-4 py-2 hover:bg-gray-50">
-                        Choose File
-                    </button>
-                </div>
-
-                <button className="w-full mt-6 bg-gray-200 text-gray-500 font-semibold py-3 rounded-lg cursor-not-allowed">
-                    Evaluate for GS1
-                </button>
             </div>
-
-            {/* Right Side: How it Works */}
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200/60">
-                <h3 className="text-lg font-semibold mb-4">How It Works</h3>
-                <ul className="space-y-4">
-                    <li className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-green-100 text-green-600">1</div>
-                        <div>
-                            <p className="font-semibold">Upload Your Answer</p>
-                            <p className="text-sm text-gray-500">Choose a clear PDF or image file of your handwritten essay.</p>
-                        </div>
-                    </li>
-                    <li className="flex items-start space-x-3">
-                         <div className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-green-100 text-green-600">2</div>
-                        <div>
-                            <p className="font-semibold">AI Analysis Begins</p>
-                            <p className="text-sm text-gray-500">Our engine reads your handwriting and analyzes the content.</p>
-                        </div>
-                    </li>
-                    <li className="flex items-start space-x-3">
-                         <div className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-green-100 text-green-600">3</div>
-                        <div>
-                            <p className="font-semibold">Get Your Report</p>
-                            <p className="text-sm text-gray-500">Receive an instant, detailed report with actionable feedback.</p>
-                        </div>
-                    </li>
+            {/* Right Column: Instructions & Topics */}
+            <div className="p-6 bg-slate-50 rounded-2xl">
+                <div className="flex items-center">
+                    <HelpCircle className="w-5 h-5 text-emerald-600 mr-2"/>
+                    <h3 className="text-lg font-bold text-gray-800">Instructions & Topics</h3>
+                </div>
+                <ul className="mt-3 space-y-1 text-gray-600 list-disc list-inside text-sm">
+                    <li>Choose one of the topics below.</li>
+                    <li>Write around 300 words on a plain paper.</li>
                 </ul>
+                 <div className="mt-4 space-y-2">
+                    {essayTopics.map((topic, index) => (
+                        <div key={index} className="flex items-start p-2.5 bg-white rounded-lg shadow-sm">
+                            <FileText className="w-4 h-4 text-gray-400 mt-0.5 mr-2 flex-shrink-0"/>
+                            <p className="text-gray-700 text-sm">{topic}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
+        </div>
+    );
+};
+
+// --- A component to show while we check the auth status ---
+const LoadingState = () => (
+    <div className="text-center flex flex-col items-center justify-center h-64">
+        <LoaderCircle className="w-12 h-12 text-gray-400 animate-spin" />
+        <p className="mt-4 text-lg font-semibold text-gray-600">Checking your status...</p>
+    </div>
+);
+
+
+export default function TrialEvaluator() {
+    const { user, loading } = useAuthContext();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [justSignedUp, setJustSignedUp] = useState(false);
+
+    const renderContent = () => {
+        if (loading) {
+            return <LoadingState />;
+        }
+        if (user || justSignedUp) {
+            return <UploadArea onUploadClick={() => setIsModalOpen(true)} />;
+        }
+        return <FreeTrialPrompt onSignUpClick={() => setIsModalOpen(true)} />;
+    };
+
+    return (
+        // FIX: The outer div handles filling the screen space.
+        <div className="w-full bg-white h-full flex flex-col">
+            {/* FIX: The inner div has fixed padding and handles scrolling, creating a consistent frame. */}
+            <div className="flex-grow overflow-y-auto py-24">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center h-full">
+                    {renderContent()}
+                </div>
+            </div>
+
+            <InteractiveTrialModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSignUpSuccess={() => setJustSignedUp(true)}
+            />
         </div>
     );
 }

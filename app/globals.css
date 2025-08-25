@@ -1,9 +1,4 @@
-/* app/globals.css */
 @import "tailwindcss";
-
-/* ======================================================================== */
-/* --- 1. CORE & DASHBOARD STYLES (PRESERVED) --- */
-/* ======================================================================== */
 
 :root {
     --background: #fdfcf9;
@@ -16,148 +11,14 @@
 }
 
 body {
-    font-family: var(--font-poppins), sans-serif; /* Changed to Poppins for consistency */
+    font-family: var(--font-poppins), sans-serif;
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
-    background-color: var(--background); /* Default background for dashboard */
+    background-color: var(--background);
 }
 
 h1, h2, h3, h4, .font-serif {
     font-family: 'Lora', serif;
-}
-
-/* All your other existing component styles (.main-header, .card, etc.) are preserved below */
-.main-header {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    background-color: rgba(253, 252, 249, 0.85);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border-color);
-    transition: transform 0.3s ease-in-out;
-    height: 64px;
-}
-.main-header.header-hidden {
-    transform: translateY(-100%);
-}
-.header-content {
-    max-width: 1152px;
-    margin: 0 auto;
-    padding: 0 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: 100%;
-}
-.sub-nav {
-    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
-    border-bottom: 1px solid var(--border-color);
-}
-.sub-nav-hidden {
-    transform: translateY(-100%);
-    opacity: 0;
-    pointer-events: none;
-}
-.sub-nav-link {
-    transition: all 0.2s;
-    border-bottom: 2px solid transparent;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-decoration: none;
-}
-.sub-nav-link:hover {
-    color: var(--text-primary);
-    background-color: #f3f4f6;
-}
-.sub-nav-link.active {
-    color: var(--primary-accent);
-    font-weight: 600;
-    border-bottom-color: transparent;
-}
-.dropdown {
-    visibility: hidden;
-    opacity: 0;
-    transform: translateY(10px);
-    transition: all 0.2s ease-in-out;
-}
-.group:hover .dropdown {
-    visibility: visible;
-    opacity: 1;
-    transform: translateY(0);
-}
-.card {
-    background-color: white;
-    border-radius: 0.5rem;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-}
-.calendar-day.streak {
-    background-color: #ebf8ff;
-    color: var(--secondary-accent);
-    font-weight: 600;
-}
-.calendar-day.today {
-    background-color: var(--primary-accent);
-    color: white;
-    font-weight: 700;
-}
-.drag-over {
-    border-color: var(--primary-accent);
-    background-color: #fff5f5;
-}
-.btn-evaluate {
-    background-color: var(--primary-accent);
-    color: white;
-    transition: all 0.2s ease;
-}
-.btn-evaluate:hover {
-    background-color: var(--primary-accent-hover);
-    box-shadow: 0 4px 14px 0 rgba(0,0,0,0.1);
-}
-.btn-evaluate:disabled {
-    background-color: #fca5a5;
-    cursor: not-allowed;
-}
-.subject-selector-container {
-    position: relative;
-    display: flex;
-    background-color: #f1f5f9;
-    border-radius: 0.5rem;
-    padding: 0.25rem;
-}
-.subject-btn {
-    flex: 1;
-    padding: 0.5rem 0;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    border-radius: 0.375rem;
-    cursor: pointer;
-    transition: color 0.3s ease;
-    z-index: 10;
-}
-.subject-selector-slider {
-    position: absolute;
-    top: 0.25rem;
-    bottom: 0.25rem;
-    background-color: white;
-    border-radius: 0.375rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 5;
-}
-
-@keyframes ping {
-  75%, 100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-}
-.animate-ping {
-  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 .btn {
@@ -170,10 +31,6 @@ h1, h2, h3, h4, .font-serif {
   transform: translateY(0px) scale(0.98);
 }
 
-
-/* ======================================================================== */
-/* --- 2. UNIVERSAL ANIMATED BACKGROUND --- */
-/* ======================================================================== */
 .fixed-background {
     background: linear-gradient(135deg, #FFD1B5 0%, #FFF5E1 33%, #E0F7FA 66%, #E1E5F8 100%);
     background-size: 400% 400%;
@@ -187,4 +44,17 @@ h1, h2, h3, h4, .font-serif {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
+}
+
+/* scrollbar hide */
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

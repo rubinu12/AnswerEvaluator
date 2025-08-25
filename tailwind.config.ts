@@ -9,6 +9,8 @@ const config: Config = {
   theme: {
     extend: {},
   },
-  plugins: [],
+  plugins: [
+    require('tailwind-scrollbar-hide') // This line enables the scrollbar-hide utility
+  ],
 }
-export default config
+export default config;

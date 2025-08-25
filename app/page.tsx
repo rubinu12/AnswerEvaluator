@@ -1,62 +1,83 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthContext } from '@/lib/AuthContext';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import UniversalNavbar from '@/components/shared/UniversalNavbar';
+
+import UniversalNavbar from '@/components/shared/UniversalNavbar'; 
 import Hero from '@/components/landing/Hero';
 import Features from '@/components/landing/Features';
+import TrialEvaluator from '@/components/landing/TrialEvaluator';
 import Testimonials from '@/components/landing/Testimonials';
-import FreeTrial from '@/components/landing/FreeTrial';
 import PricingAndCta from '@/components/landing/PricingAndCta';
 
-const LandingPageActions = () => (
-    <>
-        <Link href="/auth" className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors rounded-full hover:bg-slate-100">
-            Login
-        </Link>
-        <Link href="/auth" className="rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-900">
-            Sign Up
-        </Link>
-    </>
-);
+export default function Home() {
+  const [isDestinationSelected, setIsDestinationSelected] = useState(false);
 
-export default function MarketingPage() {
-    const { user, loading } = useAuthContext();
-    const router = useRouter();
-
-    useEffect(() => {
-        if (!loading && user) {
-            router.push('/dashboard');
-            return;
-        }
-
-        if (!loading && !user) {
-            document.body.classList.add('marketing-page-body');
-            return () => {
-                document.body.classList.remove('marketing-page-body');
-            };
-        }
-    }, [user, loading, router]);
-
-    if (loading || user) {
-        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  useEffect(() => {
+    const scrollContainer = document.getElementById('scroll-container');
+    if (scrollContainer) {
+      scrollContainer.style.overflowY = isDestinationSelected ? 'scroll' : 'hidden';
     }
+  }, [isDestinationSelected]);
 
-    return (
-        <>
-             <UniversalNavbar
-                pageType='landing'
-                actions={() => <LandingPageActions />}
-            />
-            <main id="page-container" className="page-container">
-                <Hero />
+  return (
+    <>
+      <div className="fixed-background"></div>
+      
+      <UniversalNavbar 
+        pageType="landing"
+        actions={() => (
+          <>
+            <Link href="/auth" className="text-sm font-semibold text-gray-600 hover:text-gray-900">
+              Log In
+            </Link>
+            <Link href="/auth" className="btn px-5 py-2 text-sm font-semibold text-white bg-gray-800 rounded-lg hover:bg-gray-900">
+              Sign Up
+            </Link>
+          </>
+        )}
+      />
+
+      <div
+        id="scroll-container"
+        className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+      >
+        <main className="relative z-10">
+          
+          {/* Hero is now a direct snap point */}
+          <Hero onDestinationSelect={() => setIsDestinationSelected(true)} />
+
+          {isDestinationSelected && (
+            <>
+              <section id="features" className="snap-start h-screen">
                 <Features />
+              </section>
+              <section className="snap-start h-screen">
+                <TrialEvaluator />
+              </section>
+              <section className="snap-start h-screen">
                 <Testimonials />
-                <FreeTrial />
+              </section>
+              <section className="snap-start h-screen">
                 <PricingAndCta />
-            </main>
-        </>
-    );
+              </section>
+            </>
+          )}
+        </main>
+      </div>
+
+      {isDestinationSelected && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-20"
+        >
+          <a href="#features" className="p-2 bg-white/50 backdrop-blur-sm rounded-full shadow-lg block">
+            <ChevronDown className="h-8 w-8 text-gray-600 animate-bounce" />
+          </a>
+        </motion.div>
+      )}
+    </>
+  );
 }

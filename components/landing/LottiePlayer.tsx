@@ -1,13 +1,17 @@
 'use client';
 
 import { Player } from '@lottiefiles/react-lottie-player';
-import heroAnimation from '@/public/hero.json';
 
-export default function LottiePlayer() {
+// Define an interface for the component's props
+interface LottiePlayerProps {
+  animationData: object;
+}
+
+export default function LottiePlayer({ animationData }: LottiePlayerProps) {
   return (
     <Player
-      src={heroAnimation}
-      className="hero-lottie-animation"
+      src={animationData} // Use the prop here instead of the direct import
+      className="w-full h-auto max-w-md" // Added some basic sizing with Tailwind
       autoplay
       loop
     />
