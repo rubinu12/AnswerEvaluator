@@ -16,6 +16,8 @@
     "@lottiefiles/react-lottie-player": "^3.6.0",
     "firebase": "^12.1.0",
     "framer-motion": "^12.23.12",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.541.0",
     "next": "15.4.6",

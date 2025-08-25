@@ -1,21 +1,30 @@
 // app/result/[evaluationId]/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Header from '@/components/result/Header';
+import UniversalNavbar, { NavLink } from '@/components/shared/UniversalNavbar';
 import SidebarNav from '@/components/result/SidebarNav';
 import OverallAssessmentCard from '@/components/result/OverallAssessmentCard';
 import QuestionCard from '@/components/result/QuestionCard';
 import { EvaluationData } from '@/lib/types';
+import { useAuthContext } from '@/lib/AuthContext';
+import { LogOut, User, Settings, ArrowLeft, Download, Loader } from 'lucide-react';
+import { downloadPdf } from '@/lib/pdfGenerator';
 
 export default function ResultPage() {
     const params = useParams();
     const router = useRouter();
+    const { user, logout } = useAuthContext();
     const evaluationId = params.evaluationId as string;
 
     const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    
+    // Create a ref for the content wrapper
+    const reportContentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!evaluationId) return;
@@ -23,30 +32,82 @@ export default function ResultPage() {
 
         if (resultDataString) {
             try {
-                // CORRECTED LOGIC: The data from sessionStorage is already in the final, correct shape.
-                // We no longer need to merge it here.
                 const parsedData = JSON.parse(resultDataString);
-                
                 setEvaluationData({
                     ...parsedData,
                     submittedOn: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
                 });
-
             } catch (e) {
                 console.error("Parsing error:", e);
-                setError("Failed to load and parse evaluation data. The data from the API might be malformed.");
+                setError("Failed to load and parse evaluation data.");
             }
         } else {
-            setError("No evaluation data found for this ID. Please try evaluating again.");
+            setError("No evaluation data found for this ID.");
         }
     }, [evaluationId]);
+
+    const handleDownloadReport = async () => {
+        setIsDownloading(true);
+        // Pass the ref's current element to the utility
+        await downloadPdf(reportContentRef.current, "Evaluation-Report");
+        setIsDownloading(false);
+    };
+
+    const navLinks: NavLink[] = [
+        { label: 'Dashboard', href: '/dashboard', gradient: 'linear-gradient(to right, #ff9966, #ff5e62)' },
+        { label: 'History', href: '/history', gradient: 'linear-gradient(to right, #60a5fa, #3b82f6)' },
+        { label: 'Analytics', href: '/analytics', gradient: 'linear-gradient(to right, #34d399, #10b981)' },
+    ];
+
+    const actions = (activeLink: NavLink) => {
+        if (!user) return null;
+        return (
+            <div className="relative">
+                <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    onBlur={() => setIsDropdownOpen(false)}
+                    className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400"
+                >
+                    {user.email?.substring(0, 2).toUpperCase()}
+                </button>
+                {isDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                        <div className="py-1" role="none">
+                            <div className="px-4 py-2 border-b">
+                                <p className="text-sm text-gray-700">Signed in as</p>
+                                <p className="truncate text-sm font-medium text-gray-900">{user.email}</p>
+                            </div>
+                            <a href="#" className="text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm" role="menuitem">
+                                <User size={16} />
+                                Profile
+                            </a>
+                            <a href="#" className="text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm" role="menuitem">
+                                <Settings size={16} />
+                                Settings
+                            </a>
+                            <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => logout().then(() => router.push('/auth'))}
+                                className="w-full text-left text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm"
+                                role="menuitem"
+                            >
+                                <LogOut size={16} />
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     if (error) return <div className="min-h-screen flex items-center justify-center text-red-500 bg-gray-50 p-4">{error}</div>;
     if (!evaluationData) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading Evaluation Report...</div>;
 
     return (
-        <div className="bg-gray-50 min-h-screen">
-            <Header />
+        <div className="min-h-screen">
+            <div className="fixed-background" />
+            <UniversalNavbar navLinks={navLinks} actions={actions} />
             <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
                  <div className="mb-8 flex flex-col md:flex-row justify-between md:items-center">
                     <div>
@@ -56,27 +117,37 @@ export default function ResultPage() {
                         </p>
                     </div>
                     <div className="flex space-x-2 mt-4 md:mt-0">
-                        <button className="px-4 py-2 text-sm font-semibold bg-slate-200 hover:bg-slate-300 rounded-md transition-colors flex items-center gap-2" onClick={() => router.push('/dashboard')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                        <button 
+                            className="px-4 py-2 text-sm font-semibold bg-white/60 text-slate-800 hover:bg-white rounded-md transition-colors flex items-center gap-2 backdrop-blur-sm shadow-sm border border-white/20 btn" 
+                            onClick={() => router.push('/dashboard')}
+                        >
+                            <ArrowLeft size={18} />
                             Evaluate New
                         </button>
-                        <button className="px-4 py-2 text-sm font-semibold text-white rounded-md transition-colors flex items-center gap-2" style={{backgroundColor: 'var(--primary-accent)'}} onClick={() => window.print()}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            Download Report
+                        <button 
+                            className="px-4 py-2 text-sm font-semibold text-white rounded-md transition-colors flex items-center gap-2 shadow-lg bg-gradient-to-r from-red-400 to-orange-400 hover:from-red-500 hover:to-orange-500 btn" 
+                            onClick={handleDownloadReport}
+                            disabled={isDownloading}
+                        >
+                            {isDownloading ? <Loader size={18} className="animate-spin" /> : <Download size={18} />}
+                            {isDownloading ? 'Downloading...' : 'Download Report'}
                         </button>
                     </div>
                 </div>
+                
+                {/* Attach the ref to the content wrapper */}
+                <div id="report-content" ref={reportContentRef}>
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+                        <div className="lg:col-span-1 lg:sticky lg:top-24">
+                            <SidebarNav data={evaluationData} />
+                        </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-                    <div className="lg:col-span-1 lg:sticky lg:top-24">
-                        <SidebarNav data={evaluationData} />
-                    </div>
-
-                    <div className="lg:col-span-3 space-y-8">
-                        <OverallAssessmentCard feedback={evaluationData.overallFeedback} />
-                        {evaluationData.questionAnalysis.map((q, index) => (
-                            <QuestionCard key={index} questionData={q} subject={evaluationData.subject} />
-                        ))}
+                        <div className="lg:col-span-3 space-y-8">
+                            <OverallAssessmentCard feedback={evaluationData.overallFeedback} />
+                            {evaluationData.questionAnalysis.map((q, index) => (
+                                <QuestionCard key={index} questionData={q} subject={evaluationData.subject} />
+                            ))}
+                        </div>
                     </div>
                 </div>
             </main>
