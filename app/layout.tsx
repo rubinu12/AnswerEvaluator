@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
-import { AuthContextProvider } from '../lib/AuthContext';
+import { AuthContextProvider } from "@/lib/AuthContext"; 
+import PageLoader from "@/components/shared/PageLoader"; // For the navigation progress bar
+import { Suspense } from "react"; // Required for PageLoader
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -20,11 +22,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${poppins.variable} font-poppins`}>
-        {/* --- ADD THESE TWO LINES --- */}
+    <html lang="en" className="h-full">
+      <body className={`${poppins.variable} font-poppins h-full`}>
         <div className="fixed-background" />
-        {/* <div className="background-overlay" />  */}
+        
+        {/* --- YOUR UPDATES --- */}
+        {/* This adds the top loading bar for page navigation */}
+        <Suspense fallback={null}>
+            <PageLoader />
+        </Suspense>
         
         <AuthContextProvider>
           {children}

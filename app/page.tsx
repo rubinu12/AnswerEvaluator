@@ -1,34 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
-import Link from 'next/link';
 
-import UniversalNavbar from '@/components/shared/UniversalNavbar'; 
+import UniversalNavbar, { NavLink } from '@/components/shared/UniversalNavbar';
 import Hero from '@/components/landing/Hero';
 import Features from '@/components/landing/Features';
 import TrialEvaluator from '@/components/landing/TrialEvaluator';
 import Testimonials from '@/components/landing/Testimonials';
-import PricingAndCta from '@/components/landing/PricingAndCta';
 
 export default function Home() {
   const [isDestinationSelected, setIsDestinationSelected] = useState(false);
 
-  useEffect(() => {
-    const scrollContainer = document.getElementById('scroll-container');
-    if (scrollContainer) {
-      scrollContainer.style.overflowY = isDestinationSelected ? 'scroll' : 'hidden';
-    }
-  }, [isDestinationSelected]);
+  // ADDED: "Home" link and updated other links
+  const navLinks: NavLink[] = [
+    { label: 'Home', href: '/', gradient: 'linear-gradient(135deg, #E1E5F8, #C5CAE9)' },
+    { label: 'Features', href: '/features', gradient: 'linear-gradient(135deg, #D4E9E2, #A5D6A7)' },
+    { label: 'Pricing', href: '/pricing', gradient: 'linear-gradient(135deg, #B3D8E0, #80DEEA)' },
+  ];
 
   return (
     <>
       <div className="fixed-background"></div>
       
       <UniversalNavbar 
-        pageType="landing"
-        actions={() => (
+        navLinks={navLinks}
+        actions={(activeLink) => (
           <>
             <Link href="/auth" className="text-sm font-semibold text-gray-600 hover:text-gray-900">
               Log In
@@ -40,37 +39,21 @@ export default function Home() {
         )}
       />
 
-      <div
-        id="scroll-container"
-        className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-      >
-        <main className="relative z-10">
-          
-          {/* Hero is now a direct snap point */}
-          <Hero onDestinationSelect={() => setIsDestinationSelected(true)} />
-
-          {isDestinationSelected && (
-            <>
-              <section id="features" className="snap-start h-screen">
-                <Features />
-              </section>
-              <section className="snap-start h-screen">
-                <TrialEvaluator />
-              </section>
-              <section className="snap-start h-screen">
-                <Testimonials />
-              </section>
-              <section className="snap-start h-screen">
-                <PricingAndCta />
-              </section>
-            </>
-          )}
-        </main>
-      </div>
+      <main className="relative z-10">
+        <Hero onDestinationSelect={() => setIsDestinationSelected(true)} />
+        {isDestinationSelected && (
+          <>
+            <Features />
+            <TrialEvaluator />
+            <Testimonials />
+          </>
+        )}
+      </main>
 
       {isDestinationSelected && (
         <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           className="fixed bottom-10 left-1/2 -translate-x-1/2 z-20"
         >
           <a href="#features" className="p-2 bg-white/50 backdrop-blur-sm rounded-full shadow-lg block">
