@@ -87,7 +87,8 @@ h1, h2, h3, h4, .font-serif {
 }
 
 /* for pdf download feature */
-.pdf-capture {
-    box-shadow: none !important;
-    border: none !important;
+.pdf-capture, .pdf-capture * {
+  box-shadow: none !important;
+  border: none !important;
+ 
 }

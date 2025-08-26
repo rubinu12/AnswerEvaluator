@@ -2,47 +2,79 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-// The function now accepts an HTMLElement directly
-export const downloadPdf = async (element: HTMLElement | null, fileName:string) => {
-    // A small delay to ensure the DOM is fully painted, especially after state changes.
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    if (!element) {
-        console.error("The element to be downloaded was not found.");
+// The function now accepts an array of HTMLElements
+export const downloadPdf = async (elements: (HTMLElement | null)[], fileName: string) => {
+    const validElements = elements.filter(el => el !== null) as HTMLElement[];
+    if (validElements.length === 0) {
+        console.error("No valid elements provided for PDF generation.");
         return;
     }
 
-    // Temporarily apply a class that removes box-shadow and borders for a cleaner PDF.
-    element.classList.add('pdf-capture');
+    // 1. Create a container for the clones that will be rendered off-screen
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.position = 'absolute';
+    pdfContainer.style.left = '-9999px';
+    pdfContainer.style.top = '0';
+    pdfContainer.style.width = '1024px'; // A fixed width helps stabilize layout
+    pdfContainer.style.padding = '20px'; // Add padding to mimic the page
+    pdfContainer.style.backgroundColor = 'white';
+
+    // 2. Clone each element and append it to our off-screen container
+    validElements.forEach(el => {
+        const clone = el.cloneNode(true) as HTMLElement;
+        pdfContainer.appendChild(clone);
+    });
+
+    // --- Start Cleanup and Style Normalization on the Cloned Content ---
+
+    // 3. Remove the buttons from the cloned header
+    const buttonsToRemove = pdfContainer.querySelector('#pdf-exclude');
+    if (buttonsToRemove) {
+        buttonsToRemove.remove();
+    }
+    
+    // 4. Fix the grid layout for vertical stacking in the PDF
+    const gridContainer = pdfContainer.querySelector('.grid') as HTMLElement;
+    if (gridContainer) {
+        gridContainer.style.display = 'block'; // Remove grid behavior
+        const gridChildren = Array.from(gridContainer.children) as HTMLElement[];
+        gridChildren.forEach(child => {
+            child.style.position = 'relative'; // Override sticky positioning
+            child.style.top = 'auto';
+            child.style.width = '100%';
+            child.style.marginBottom = '24px'; // Add space between stacked items
+            child.style.breakInside = 'avoid'; // Try to prevent items from splitting across pages
+        });
+    }
+
+    // --- End Cleanup ---
+
+    // 5. Append the container to the body to be rendered by html2canvas
+    document.body.appendChild(pdfContainer);
 
     try {
-        const canvas = await html2canvas(element, {
-            scale: 2, // Higher scale for better resolution
+        const canvas = await html2canvas(pdfContainer, {
+            scale: 2,
             useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff', // Explicitly set a white background
+            backgroundColor: '#ffffff',
+            windowWidth: pdfContainer.scrollWidth,
+            windowHeight: pdfContainer.scrollHeight,
         });
 
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/png', 1.0);
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-
-        // Calculate the ratio to fit the image onto the PDF page width
-        const ratio = canvasWidth / pdfWidth;
-        const imgHeight = canvasHeight / ratio;
+        const ratio = canvas.width / pdfWidth;
+        const imgHeight = canvas.height / ratio;
 
         let heightLeft = imgHeight;
         let position = 0;
 
-        // Add the first page
         pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
         heightLeft -= pdfHeight;
 
-        // Add new pages if the content is longer than one page
         while (heightLeft > 0) {
             position = -heightLeft;
             pdf.addPage();
@@ -54,7 +86,7 @@ export const downloadPdf = async (element: HTMLElement | null, fileName:string) 
     } catch (error) {
         console.error("Error generating PDF:", error);
     } finally {
-        // IMPORTANT: Always remove the temporary class
-        element.classList.remove('pdf-capture');
+        // 6. IMPORTANT: Always remove the container from the DOM
+        document.body.removeChild(pdfContainer);
     }
 };

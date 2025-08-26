@@ -1,7 +1,7 @@
 // app/result/[evaluationId]/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import UniversalNavbar, { NavLink } from '@/components/shared/UniversalNavbar';
 import SidebarNav from '@/components/result/SidebarNav';
@@ -10,7 +10,6 @@ import QuestionCard from '@/components/result/QuestionCard';
 import { EvaluationData } from '@/lib/types';
 import { useAuthContext } from '@/lib/AuthContext';
 import { LogOut, User, Settings, ArrowLeft, Download, Loader } from 'lucide-react';
-import { downloadPdf } from '@/lib/pdfGenerator';
 
 export default function ResultPage() {
     const params = useParams();
@@ -22,9 +21,6 @@ export default function ResultPage() {
     const [error, setError] = useState<string | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
-    
-    // Create a ref for the content wrapper
-    const reportContentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!evaluationId) return;
@@ -45,12 +41,44 @@ export default function ResultPage() {
             setError("No evaluation data found for this ID.");
         }
     }, [evaluationId]);
-
+    
+    // This function calls the server-side API to generate and download the PDF
     const handleDownloadReport = async () => {
+        if (!evaluationData) {
+            alert("Evaluation data is not available to download.");
+            return;
+        }
+        
         setIsDownloading(true);
-        // Pass the ref's current element to the utility
-        await downloadPdf(reportContentRef.current, "Evaluation-Report");
-        setIsDownloading(false);
+        try {
+            const response = await fetch('/api/generate-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(evaluationData),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate PDF.');
+            }
+
+            // Create a blob from the PDF stream and trigger a download in the browser
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Evaluation-Report.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+
+        } catch (err: any) {
+            console.error("Download Error:", err);
+            alert(`Error: ${err.message}`);
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     const navLinks: NavLink[] = [
@@ -60,7 +88,7 @@ export default function ResultPage() {
     ];
 
     const actions = (activeLink: NavLink) => {
-        if (!user) return null;
+        if (!user) return <></>;
         return (
             <div className="relative">
                 <button
@@ -71,7 +99,7 @@ export default function ResultPage() {
                     {user.email?.substring(0, 2).toUpperCase()}
                 </button>
                 {isDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                     <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                         <div className="py-1" role="none">
                             <div className="px-4 py-2 border-b">
                                 <p className="text-sm text-gray-700">Signed in as</p>
@@ -109,7 +137,7 @@ export default function ResultPage() {
             <div className="fixed-background" />
             <UniversalNavbar navLinks={navLinks} actions={actions} />
             <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-                 <div className="mb-8 flex flex-col md:flex-row justify-between md:items-center">
+                <div className="mb-8 flex flex-col md:flex-row justify-between md:items-center">
                     <div>
                         <h1 className="text-4xl font-bold font-serif text-slate-900">Evaluation Report</h1>
                         <p className="mt-1 text-md text-slate-500">
@@ -135,8 +163,7 @@ export default function ResultPage() {
                     </div>
                 </div>
                 
-                {/* Attach the ref to the content wrapper */}
-                <div id="report-content" ref={reportContentRef}>
+                <div id="report-content">
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
                         <div className="lg:col-span-1 lg:sticky lg:top-24">
                             <SidebarNav data={evaluationData} />
