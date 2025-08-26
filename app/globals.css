@@ -92,3 +92,14 @@ h1, h2, h3, h4, .font-serif {
   border: none !important;
  
 }
+
+
+/* the user's answer font */
+.font-user-answer {
+    font-family: "Comic Sans MS", "Comic Sans", cursive;
+}
+
+/* Add this for the AI's answer font */
+.font-ai-answer {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}

@@ -1,10 +1,9 @@
-// components/result/OverallAssessmentCard.tsx
 'use client';
 import { OverallFeedback } from '@/lib/types';
 import { ShieldCheck, Target, Feather, Bot, BrainCircuit, MessageSquareQuote, ChevronDown } from 'lucide-react';
 import React, { useState } from 'react';
 
-// A small component for the score gauge circle
+// A small component for the score gauge circle (no changes needed here)
 const ScoreGauge = ({ score }: { score: number }) => {
     const percentage = score * 10;
     const circumference = 2 * Math.PI * 45; // 2 * pi * radius
@@ -17,17 +16,7 @@ const ScoreGauge = ({ score }: { score: number }) => {
     return (
         <div className="relative w-32 h-32">
             <svg className="w-full h-full" viewBox="0 0 100 100">
-                {/* Background circle */}
-                <circle
-                    className="text-slate-200"
-                    strokeWidth="10"
-                    stroke="currentColor"
-                    fill="transparent"
-                    r="45"
-                    cx="50"
-                    cy="50"
-                />
-                {/* Progress circle */}
+                <circle className="text-slate-200" strokeWidth="10" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
                 <circle
                     className={`${colorClass} transition-all duration-1000 ease-in-out`}
                     strokeWidth="10"
@@ -50,7 +39,7 @@ const ScoreGauge = ({ score }: { score: number }) => {
     );
 };
 
-// A component for each parameter's score bar
+// A component for each parameter's score bar (no changes needed here)
 const ParameterScore = ({ icon, label, score, colorClasses, onMouseEnter, onMouseLeave }: { 
     icon: React.ElementType, 
     label: string, 
@@ -64,7 +53,7 @@ const ParameterScore = ({ icon, label, score, colorClasses, onMouseEnter, onMous
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
     >
-         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colorClasses.bg} bg-opacity-30`}>
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colorClasses.bg} bg-opacity-30`}>
             {React.createElement(icon, { className: `h-6 w-6 ${colorClasses.text}` })}
         </div>
         <div className="mt-2 text-sm font-bold text-slate-800">{label}</div>
@@ -75,50 +64,56 @@ const ParameterScore = ({ icon, label, score, colorClasses, onMouseEnter, onMous
     </div>
 );
 
+// This object maps parameter names from the AI to the icons and colors for the UI.
+const PARAMETER_CONFIG: { [key: string]: { icon: React.ElementType, colorClasses: { bg: string, text: string } } } = {
+    'Structure': { icon: Feather, colorClasses: { bg: 'bg-blue-300', text: 'text-blue-800' } },
+    'Structure & Presentation': { icon: Feather, colorClasses: { bg: 'bg-blue-300', text: 'text-blue-800' } },
+    'Content Depth': { icon: BrainCircuit, colorClasses: { bg: 'bg-purple-300', text: 'text-purple-800' } },
+    'Analytical Depth': { icon: BrainCircuit, colorClasses: { bg: 'bg-purple-300', text: 'text-purple-800' } },
+    'Clarity': { icon: MessageSquareQuote, colorClasses: { bg: 'bg-teal-300', text: 'text-teal-800' } },
+    'Use of Examples': { icon: MessageSquareQuote, colorClasses: { bg: 'bg-red-300', text: 'text-red-800' } },
+    'Keyword Usage': { icon: Bot, colorClasses: { bg: 'bg-green-300', text: 'text-green-800' } },
+    'Use of Keywords & Articles': { icon: Bot, colorClasses: { bg: 'bg-green-300', text: 'text-green-800' } },
+    'Overall Coherence': { icon: Target, colorClasses: { bg: 'bg-orange-300', text: 'text-orange-800' } },
+    'Interlinking Concepts': { icon: Target, colorClasses: { bg: 'bg-orange-300', text: 'text-orange-800' } },
+    'Conclusion & Way Forward': { icon: ShieldCheck, colorClasses: { bg: 'bg-indigo-300', text: 'text-indigo-800' } },
+    // Add any other parameter names here
+};
+
 
 export default function OverallAssessmentCard({ feedback }: { feedback: OverallFeedback }) {
-    if (!feedback) {
+    if (!feedback || !feedback.parameters) {
         return null;
     }
 
     const [hoveredParam, setHoveredParam] = useState<string | null>(null);
 
-    const newParameters = {
-        'Structure': feedback.parameters.Structure || 0,
-        'Keywords': feedback.parameters['Keywords Usages'] || 0,
-        'Depth': feedback.parameters['Content Depth'] || 0,
-        'Coherence': feedback.parameters['Overall Coherence'] || 0,
-        'Examples': feedback.parameters['Usage of Example'] || 0,
-    };
+    // MODIFICATION: We now map over the parameters object from the feedback prop.
+    // This combines the dynamic data (score, suggestion) with the static config (icon, colors).
+    const parameterDetails = Object.entries(feedback.parameters).map(([name, data]) => ({
+        label: name,
+        score: data.score,
+        suggestion: data.suggestion,
+        icon: PARAMETER_CONFIG[name]?.icon || ShieldCheck, // Fallback icon
+        colorClasses: PARAMETER_CONFIG[name]?.colorClasses || { bg: 'bg-gray-300', text: 'text-gray-800' },
+    }));
     
-    const totalScore = Object.values(newParameters).reduce((sum, score) => sum + (score || 0), 0);
-    const averageScore = totalScore / Object.keys(newParameters).length;
+    // MODIFICATION: The calculation is now corrected to sum the 'score' property from each parameter object.
+    const totalScore = parameterDetails.reduce((sum, param) => sum + (param.score || 0), 0);
+    const averageScore = parameterDetails.length > 0 ? totalScore / parameterDetails.length : 0;
 
-    const parameterDetails = [
-        { icon: Feather, label: 'Structure', score: newParameters.Structure, colorClasses: { bg: 'bg-blue-300', text: 'text-blue-800' }, insight: "The answer follows a logical flow with a clear introduction, body, and conclusion. To improve, consider using more explicit transition phrases between paragraphs." },
-        { icon: Bot, label: 'Keywords', score: newParameters.Keywords, colorClasses: { bg: 'bg-green-300', text: 'text-green-800' }, insight: "Good usage of relevant keywords throughout the answer. You could enhance this by integrating a few more advanced, subject-specific terms to demonstrate deeper knowledge." },
-        { icon: BrainCircuit, label: 'Depth', score: newParameters.Depth, colorClasses: { bg: 'bg-purple-300', text: 'text-purple-800' }, insight: "The answer provides a solid overview of the topic. To increase depth, try to explore the 'why' and 'how' behind the concepts, offering more critical analysis." },
-        { icon: Target, label: 'Coherence', score: newParameters.Coherence, colorClasses: { bg: 'bg-orange-300', text: 'text-orange-800' }, insight: "The arguments are well-connected and easy to follow. The overall narrative is strong and maintains the reader's interest from start to finish." },
-        { icon: MessageSquareQuote, label: 'Examples', score: newParameters.Examples, colorClasses: { bg: 'bg-red-300', text: 'text-red-800' }, insight: "The use of examples has effectively illustrated your points. For higher marks, ensure examples are specific, relevant, and explained clearly in the context of your argument." },
-    ];
-
+    // MODIFICATION: This function now gets the dynamic suggestion from our data.
     const getInsight = () => {
         if (!hoveredParam) {
-            return {
-                title: "Parameter Insights",
-                text: "Hover over a parameter to see detailed feedback."
-            };
+            return { title: "Parameter Insights", text: "Hover over a parameter to see detailed feedback." };
         }
         const param = parameterDetails.find(p => p.label === hoveredParam);
         if (!param) {
-            return {
-                title: "Parameter Insights",
-                text: "Hover over a parameter to see detailed feedback."
-            };
+            return { title: "Parameter Insights", text: "Hover over a parameter to see detailed feedback." };
         }
         return {
             title: `${param.label} Insights`,
-            text: param.insight
+            text: param.suggestion // This is now the AI-generated suggestion!
         }
     }
 
@@ -133,7 +128,6 @@ export default function OverallAssessmentCard({ feedback }: { feedback: OverallF
             </summary>
             <div className="border-t border-slate-200/80 px-6 pb-6">
                 <div className="flex flex-col md:flex-row items-center gap-8 pt-6">
-                    {/* Left side: Gauge and general feedback */}
                     <div className="flex flex-col items-center text-center md:w-1/3">
                         <h3 className="font-serif text-2xl font-bold text-slate-900 mb-4">Overall Score</h3>
                         <ScoreGauge score={averageScore || 0} />
@@ -142,9 +136,9 @@ export default function OverallAssessmentCard({ feedback }: { feedback: OverallF
                         )}
                     </div>
 
-                    {/* Right side: Parameter breakdown and insights */}
                     <div className="w-full md:w-2/3">
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
+                            {/* The component now correctly maps over the new parameterDetails array */}
                             {parameterDetails.map((param) => (
                             <ParameterScore 
                                 key={param.label} 
@@ -155,7 +149,6 @@ export default function OverallAssessmentCard({ feedback }: { feedback: OverallF
                             ))}
                         </div>
 
-                        {/* Insights Box */}
                         <div className="mt-6 p-4 bg-slate-100/70 rounded-lg min-h-[100px] border border-slate-200/80">
                             <h4 className="font-bold text-slate-800">{getInsight().title}</h4>
                             <p className="text-sm text-slate-600 mt-1">{getInsight().text}</p>

@@ -13,20 +13,28 @@ export interface QuestionAnalysis {
     userAnswer: string;
     maxMarks: number;
     score: number;
+    // UPDATED: Added 'Culture' and split 'Ethics' into 'Ethics Theory' and 'Ethics Case Study'
+    // for more precise classification and feedback.
+    subject: 'History' | 'Culture' | 'Geography' | 'Society' | 'Polity & Constitution' | 'Social Justice & Governance' | 'International Relations' | 'Economy' | 'Environment' | 'Science & Tech' | 'Security' | 'Ethics Theory' | 'Ethics Case Study';
     valueAddition: string[];
     scoreDeductionAnalysis: {
         points: string;
         reason: string;
     }[];
     strategicNotes: string[];
-    constructedAnswer: ConstructedAnswerSegment[];
+    idealAnswer: string; // A single string containing the full, formatted model answer
+    keyPointsToCover: string[]; // A list of essential points, keywords, and data
+
 }
 
 // Represents the overall feedback for the entire paper
 export interface OverallFeedback {
     generalAssessment: string;
     parameters: {
-        [key: string]: number; // e.g., { "Structure": 3, "Content Depth": 4, ... }
+        [key: string]: {
+            score: number;
+            suggestion: string;
+        };
     };
 }
 

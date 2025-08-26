@@ -10,7 +10,8 @@ const config: Config = {
     extend: {},
   },
   plugins: [
-    require('tailwind-scrollbar-hide') // This line enables the scrollbar-hide utility
+    require('tailwind-scrollbar-hide'),
+    require('@tailwindcss/typography'), // This line enables the scrollbar-hide utility
   ],
 }
 export default config;
