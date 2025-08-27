@@ -1,119 +1,109 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import EvaluateCard from '@/components/dashboard/EvaluateCard';
-import StudyStreakCalendar from '@/components/dashboard/StudyStreakCalendar';
-import MentorsWisdom from '@/components/dashboard/MentorsWisdom';
-import PerformanceGauges from '@/components/dashboard/PerformanceGauges';
-import RecentEvaluations from '@/components/dashboard/RecentEvaluations';
-import LottieAnimation from '@/components/dashboard/LottieAnimation';
-import InProgressCard from '@/components/dashboard/InProgressCard';
-import ResultModal from '@/components/dashboard/ResultModal';
-import { useAuthContext } from '@/lib/AuthContext';
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuthContext } from '@/lib/AuthContext'
+import { useEvaluationStore } from '@/lib/store'
+import { EvaluationCompletePayload } from '@/lib/types'
 
-
-// Define these interfaces here or import them from a types file
-interface PreparedQuestion {
-    questionNumber: number;
-    questionText: string;
-    userAnswer: string;
-    maxMarks: number;
-}
-interface EvaluationCompletePayload {
-    analysis: any;
-    preparedData: PreparedQuestion[];
-    subject: string;
-}
+import EvaluateCard from '@/components/dashboard/EvaluateCard'
+import StudyStreakCalendar from '@/components/dashboard/StudyStreakCalendar'
+import MentorsWisdom from '@/components/dashboard/MentorsWisdom'
+import PerformanceGauges from '@/components/dashboard/PerformanceGauges'
+import RecentEvaluations from '@/components/dashboard/RecentEvaluations'
+import LottieAnimation from '@/components/dashboard/LottieAnimation'
+import InProgressCard from '@/components/dashboard/InProgressCard'
+import ResultModal from '@/components/dashboard/ResultModal'
 
 export default function DashboardHomePage() {
-    const { user } = useAuthContext();
-    const router = useRouter();
+  const { user } = useAuthContext()
+  const router = useRouter()
 
-    const [evaluationStatus, setEvaluationStatus] = useState<'idle' | 'processing' | 'complete'>('idle');
-    const [isResultModalOpen, setIsResultModalOpen] = useState(false);
-    const [newEvaluationId, setNewEvaluationId] = useState<string | null>(null);
+  // 1. We get all the necessary state directly from our central store
+  const {
+    evaluationStatus,
+    processingState,
+    isConfirming, // The flag for the confirmation UI is now global
+    newEvaluationId,
+    startEvaluation,
+    completeEvaluation,
+    failEvaluation,
+    resetEvaluation,
+  } = useEvaluationStore()
 
-    const handleEvaluationStart = () => {
-        setEvaluationStatus('processing');
-        setIsResultModalOpen(false);
-    };
+  const [isResultModalOpen, setIsResultModalOpen] = useState(false)
 
-    const handleEvaluationComplete = (payload: EvaluationCompletePayload) => {
-        const { analysis, preparedData, subject } = payload;
+  useEffect(() => {
+    if (evaluationStatus === 'complete' && newEvaluationId) {
+      setIsResultModalOpen(true)
+    }
+  }, [evaluationStatus, newEvaluationId])
 
-        const finalQuestionAnalysis = preparedData.map(prepItem => {
-            const analysisItem = analysis.questionAnalysis?.find(
-                (item: any) => item.questionNumber === prepItem.questionNumber
-            );
-            return { ...prepItem, ...analysisItem };
-        });
+  const handleEvaluationComplete = (payload: EvaluationCompletePayload) => {
+    completeEvaluation(payload)
+  }
 
-        const finalDataForStorage = {
-            ...analysis,
-            questionAnalysis: subject === 'Essay' ? analysis.questionAnalysis : finalQuestionAnalysis,
-            subject: subject
-        };
+  const handleViewResult = () => {
+    if (newEvaluationId) {
+      router.push(`/result/${newEvaluationId}`)
+      setIsResultModalOpen(false)
+      resetEvaluation()
+    }
+  }
 
-        const uniqueId = `eval_${Date.now()}`;
-        setNewEvaluationId(uniqueId);
-        setEvaluationStatus('complete');
-        sessionStorage.setItem(uniqueId, JSON.stringify(finalDataForStorage));
-        setIsResultModalOpen(true);
-    };
+  const handleModalClose = () => {
+    setIsResultModalOpen(false)
+    resetEvaluation()
+  }
 
-    const handleEvaluationError = (error: string) => {
-        setEvaluationStatus('idle');
-        alert(`Evaluation failed: ${error}`);
-    };
+  // 2. The logic to decide which card to show is now cleaner and more reliable
+  // It shows the InProgressCard if the main evaluation is running,
+  // OR if OCR is happening AND the confirmation screen is not active.
+  const showInProgress =
+    evaluationStatus === 'processing' ||
+    (processingState === 'ocr' && !isConfirming)
 
-    const handleViewResult = () => {
-        if (newEvaluationId) {
-            router.push(`/result/${newEvaluationId}`);
-        }
-    };
-
-    return (
-        <>
-            <div className="p-4 sm:p-6 lg:p-8">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-                    <div className="lg:col-span-2 flex flex-col gap-6 lg:gap-8">
-                        <div>
-                            <h1 className="text-4xl lg:text-5xl font-bold text-gray-800">
-                                {/* Check for user before accessing email */}
-                                Welcome back, {user?.email?.split('@')[0]}!
-                            </h1>
-                            <p className="mt-2 text-lg text-gray-600">
-                                Let's make today count.
-                            </p>
-                        </div>
-
-                        {evaluationStatus === 'processing' ? (
-                            <InProgressCard />
-                        ) : (
-                            <EvaluateCard
-                                onEvaluationStart={handleEvaluationStart}
-                                onEvaluationComplete={handleEvaluationComplete}
-                                onEvaluationError={handleEvaluationError}
-                            />
-                        )}
-                        <MentorsWisdom />
-                        <PerformanceGauges />
-                    </div>
-
-                    <div className="flex flex-col gap-6 lg:gap-8">
-                        <LottieAnimation />
-                        <StudyStreakCalendar />
-                        <RecentEvaluations />
-                    </div>
-                </div>
+  return (
+    <>
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          <div className="lg:col-span-2 flex flex-col gap-6 lg:gap-8">
+            <div>
+              <h1 className="text-4xl lg:text-5xl font-bold text-gray-800">
+                Welcome back, {user?.email?.split('@')[0]}!
+              </h1>
+              <p className="mt-2 text-lg text-gray-600">
+                Let's make today count.
+              </p>
             </div>
-            <ResultModal
-                isOpen={isResultModalOpen}
-                onClose={() => setIsResultModalOpen(false)}
-                onConfirm={handleViewResult}
-                resultText="Your detailed evaluation is complete and ready for review."
-            />
-        </>
-    );
+
+            {showInProgress ? (
+              <InProgressCard />
+            ) : (
+              // 3. The EvaluateCard no longer needs any props passed down to it
+              <EvaluateCard
+                onEvaluationStart={startEvaluation}
+                onEvaluationComplete={handleEvaluationComplete}
+                onEvaluationError={failEvaluation}
+              />
+            )}
+            <MentorsWisdom />
+            <PerformanceGauges />
+          </div>
+
+          <div className="flex flex-col gap-6 lg:gap-8">
+            <LottieAnimation />
+            <StudyStreakCalendar />
+            <RecentEvaluations />
+          </div>
+        </div>
+      </div>
+      <ResultModal
+        isOpen={isResultModalOpen}
+        onClose={handleModalClose}
+        onConfirm={handleViewResult}
+        resultText="Your detailed evaluation is complete and ready for review."
+      />
+    </>
+  )
 }

@@ -1,89 +1,80 @@
-// app/api/upload/route.tsx
+import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { NextResponse } from 'next/server';
-import { Storage } from '@google-cloud/storage';
+// Helper function to convert PDF buffer to generative parts
+const filesToGenerativeParts = (buffer: Buffer, mimeType: string) => {
+  return [
+    {
+      inlineData: {
+        data: buffer.toString('base64'),
+        mimeType,
+      },
+    },
+  ];
+};
 
-// Function to initialize the Google Cloud Storage client
-function getStorageClient() {
-  // Ensure all required environment variables are set
-  if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_PROJECT_ID || !process.env.GCS_BUCKET_NAME) {
-    throw new Error("Google Cloud credentials or GCS bucket name are not set in .env.local");
-  }
+// Initialize the AI model
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-  // Format the private key, replacing escaped newlines with actual newlines
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
-
-  // Set up credentials for authentication
-  const credentials = {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: privateKey,
-  };
-
-  // Create a new Storage client with the project ID and credentials
-  const storageClient = new Storage({
-    projectId: process.env.GOOGLE_PROJECT_ID,
-    credentials,
-  });
-
-  // Return the configured client and the bucket name
-  return { storageClient, bucketName: process.env.GCS_BUCKET_NAME };
-}
-
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    // Initialize the Storage client
-    const { storageClient, bucketName } = getStorageClient();
-    
-    // Parse the incoming form data
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
+    const data = await req.formData();
+    const file: File | null = data.get('file') as unknown as File;
 
-    // Check if a file was provided in the form data
     if (!file) {
-      return NextResponse.json({ success: false, error: 'No file provided.' }, { status: 400 });
+      return NextResponse.json({ error: 'No file found' }, { status: 400 });
     }
 
-    // Get a reference to the GCS bucket
-    const bucket = storageClient.bucket(bucketName);
+    const buffer = Buffer.from(await file.arrayBuffer());
     
-    // Create a unique file name to avoid collisions
-    const fileName = `uploads/${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-    const gcsFile = bucket.file(fileName);
+    // --- THIS IS THE ONLY SECTION THAT NEEDS TO BE CHANGED ---
 
-    // Convert the file to a buffer to be uploaded
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
 
-    // Save the file buffer to the GCS bucket
-    await gcsFile.save(fileBuffer, {
-      contentType: file.type,
-    });
+    // The new, more powerful prompt
+    const prompt = `You are an expert OCR and document analysis AI. Your task is to process an exam answer sheet PDF and extract its content in a structured way.
 
-    // --- THIS IS THE UPDATED PART ---
-    // Instead of making the file public, we generate a secure, temporary Signed URL.
-    // This URL will be valid for 15 minutes.
-    const options = {
-      version: 'v4' as const,
-      action: 'read' as const,
-      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-    };
+    Follow these instructions carefully:
+    1.  **Extract All Text**: Read the entire document and extract all text, both printed (like the questions) and handwritten (like the answers).
+    2.  **Identify Questions and Answers**: Structure the extracted content by identifying which text is a question and which is the corresponding answer.
+    3.  **Describe Visuals**: If you encounter any handwritten diagrams, flowcharts, or other non-textual visual elements, describe them clearly and concisely in a structured format (e.g., "[Diagram: A flowchart showing 'Ethical Action' leading to 'Positive Outcome'.]"). Integrate this description where it appears in the answer.
+    4.  **Identify Paper Type**: Based on the questions, determine the subject of the paper. It will be one of the following: GS1, GS2, GS3, GS4, or Essay.
+    5.  **Format Output**: Return a JSON object with two keys: "text" and "paperType".
+        - The "text" key should contain the full, structured text of all questions and answers.
+        - The "paperType" key should contain the identified paper type code (e.g., "GS4").
 
-    const [signedUrl] = await gcsFile.getSignedUrl(options);
+    Example of a good "text" output:
+    "Question: What are the ethical issues involved?
+    Answer: The ethical issues are... [Diagram: A diagram showing X and Y.] ..."`;
 
-    // Return a success response with the Signed URL of the uploaded file
-    return NextResponse.json({ 
-      success: true, 
-      message: 'File uploaded successfully! A temporary link has been created.',
-      url: signedUrl 
-    });
+    const imageParts = filesToGenerativeParts(buffer, file.type);
 
-  } catch (error: any) {
-    // Log the error for debugging purposes
-    console.error("Error in file upload:", error);
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const rawText = response.text();
+
+    // Parse the JSON output from the AI
+    let parsedJson;
+    try {
+        // The AI might return the JSON inside a markdown block, so we clean it up
+        const cleanedText = rawText.replace(/^```json\n|```$/g, '');
+        parsedJson = JSON.parse(cleanedText);
+    } catch (e) {
+        // If parsing fails, it's likely the AI didn't return valid JSON.
+        // We can try to salvage the text or return an error.
+        console.error("Failed to parse AI response as JSON:", rawText);
+        // For now, let's fall back to using the raw text if JSON parsing fails.
+        // A more robust solution could involve retrying or erroring out.
+        return NextResponse.json({ text: rawText, paperType: 'GS1' }); // Default paperType
+    }
     
-    // Return a generic error response
-    return NextResponse.json({ 
-      success: false, 
-      error: `An error occurred during file upload: ${error.message}` 
-    }, { status: 500 });
+    return NextResponse.json({ text: parsedJson.text, paperType: parsedJson.paperType });
+
+  } catch (error) {
+    console.error('Error processing file:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
