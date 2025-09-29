@@ -1,33 +1,33 @@
-// app/api/prepare-evaluation/route.tsx
+// app/api/prepare-evaluation/route.tsx (Corrected with Bolding and Diagram Description)
 
-import { NextResponse } from 'next/server';
-import { Storage } from '@google-cloud/storage';
-import { ImageAnnotatorClient } from '@google-cloud/vision';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { NextRequest, NextResponse } from 'next/server';
+import { VertexAI, Part } from '@google-cloud/vertexai';
 
-// --- Client Initialization ---
-function getClients() {
-  if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_PROJECT_ID || !process.env.GCS_BUCKET_NAME || !process.env.GEMINI_API_KEY) {
-    throw new Error("A required environment variable is not set in .env.local");
-  }
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
-  const credentials = {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: privateKey,
-  };
-  const storageClient = new Storage({ projectId: process.env.GOOGLE_PROJECT_ID, credentials });
-  const visionClient = new ImageAnnotatorClient({ projectId: process.env.GOOGLE_PROJECT_ID, credentials });
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-  const bucketName = process.env.GCS_BUCKET_NAME as string;
-  return { storageClient, visionClient, geminiModel, bucketName };
-}
+// --- Initialize Vertex AI ---
+const vertex_ai = new VertexAI({
+  project: process.env.GOOGLE_PROJECT_ID!,
+  location: 'us-central1',
+});
 
-// --- Robust JSON Extraction ---
+const geminiModel = vertex_ai.getGenerativeModel({
+  model: 'gemini-2.5-flash-lite',
+});
+
+// --- Helper function to extract JSON from the AI's response ---
 function extractJsonFromText(text: string): string | null {
     const markdownMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (markdownMatch && markdownMatch[1]) {
         return markdownMatch[1].trim();
+    }
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+        // Find the first opening bracket of an array if it exists
+        const firstBracket = text.indexOf('[');
+        if (firstBracket !== -1 && firstBracket < firstBrace) {
+            return text.substring(firstBracket, text.lastIndexOf(']') + 1);
+        }
+        return text.substring(firstBrace, lastBrace + 1);
     }
     const firstBracket = text.indexOf('[');
     const lastBracket = text.lastIndexOf(']');
@@ -37,139 +37,95 @@ function extractJsonFromText(text: string): string | null {
     return null;
 }
 
-// --- FINAL "CHAIN OF THOUGHT" DYNAMIC PROMPT ---
-const getPreparationPrompt = (rawText: string, subject: string) => {
-    const isEssay = subject === 'Essay';
 
-    // **CORRECTED PART**: The JSON structure for GS now shows a multi-question example.
-    const jsonStructure = isEssay
-        ? `[
-    {
-        "questionNumber": 1,
-        "questionText": "Topic of the first essay (e.g., from Section A).",
-        "userAnswer": "The full reconstructed text of the first essay.",
-        "maxMarks": 125
-    }
-]`
-        : `[
-    {
-        "questionNumber": 1,
-        "questionText": "The full text of the first question.",
-        "userAnswer": "The user's answer for the first question.",
-        "maxMarks": 10
-    },
-    {
-        "questionNumber": 2,
-        "questionText": "The full text of the second question.",
-        "userAnswer": "The user's answer for the second question.",
-        "maxMarks": 15
-    }
-]`;
-
-    const taskInstructions = isEssay
-        ? `**Step 1: Identify Content.** From the messy text, identify the single essay topic and reconstruct the full text of the essay answer with proper paragraph breaks.
-           **Step 2: Create JSON.** Take the topic and the reconstructed answer from Step 1 and place them into the JSON structure provided below. The 'maxMarks' must be 125.`
-        : `**Step 1: Identify Content.** From the messy text, identify each question, its corresponding answer, and the marks allocated (10 or 15). Reconstruct the answer text with proper paragraphs and lists.
-           **Step 2: Create JSON.** Take the content from Step 1 and create a JSON object for each question-answer pair. Place these objects into the JSON array structure provided below.`;
-
-    return `
-        **ROLE:** You are an expert AI assistant that flawlessly converts messy OCR text from handwritten exams into a structured JSON format.
-
-        **TASK:** Follow these two steps precisely.
-        ${taskInstructions}
-
-        **INPUT TEXT (MESSY OCR):**
-        ---
-        ${rawText}
-        ---
-
-        **CRITICAL OUTPUT INSTRUCTIONS:**
-        - Your final output must ONLY be the valid JSON array.
-        - Do not include any explanatory text, notes, or markdown formatting around the final JSON.
-
-        **FINAL JSON OUTPUT STRUCTURE:**
-        ${jsonStructure}
-    `;
-};
-
-
-export async function POST(request: Request) {
-    const { storageClient, visionClient, geminiModel, bucketName } = getClients();
-    
-    const formData = await request.formData();
+// --- Main API Handler ---
+export async function POST(req: NextRequest) {
+  try {
+    const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const subject = formData.get('subject') as string || 'GS1';
 
     if (!file) {
-        return NextResponse.json({ error: 'No file provided.' }, { status: 400 });
+      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    let rawOcrText = '';
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    // --- Step 1: Get Images from Python Server ---
+    console.log("Sending PDF to Python for image conversion...");
+    const imageConversionResponse = await fetch('http://127.0.0.1:5001/convert_pdf_to_images', {
+      method: 'POST',
+      body: formData,
+    });
 
-    try {
-        if (isPdf) {
-            const bucket = storageClient.bucket(bucketName);
-            const fileBaseName = `${Date.now()}-temp-upload`;
-            const gcsInputUri = `gs://${bucketName}/${fileBaseName}.pdf`;
-            const gcsOutputUri = `gs://${bucketName}/${fileBaseName}-output/`;
-
-            await bucket.file(`${fileBaseName}.pdf`).save(fileBuffer, { contentType: 'application/pdf' });
-
-            const [operation] = await visionClient.asyncBatchAnnotateFiles({
-                requests: [{
-                    inputConfig: { gcsSource: { uri: gcsInputUri }, mimeType: 'application/pdf' },
-                    features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-                    outputConfig: { gcsDestination: { uri: gcsOutputUri }, batchSize: 100 },
-                }],
-            });
-            await operation.promise();
-
-            const [outputFiles] = await bucket.getFiles({ prefix: `${fileBaseName}-output/` });
-            for (const outputFile of outputFiles) {
-                if (outputFile.name.endsWith('.json')) {
-                    const [jsonData] = await outputFile.download();
-                    const ocrResult = JSON.parse(jsonData.toString());
-                    ocrResult.responses.forEach((page: any) => {
-                        if (page.fullTextAnnotation) {
-                            rawOcrText += page.fullTextAnnotation.text + '\n\n';
-                        }
-                    });
-                }
-            }
-            
-            await bucket.deleteFiles({ prefix: fileBaseName }).catch(console.error);
-
-        } else {
-            const [result] = await visionClient.annotateImage({
-                image: { content: fileBuffer },
-                features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-            });
-            rawOcrText = result.fullTextAnnotation?.text || '';
-        }
-
-        if (!rawOcrText || !rawOcrText.trim()) {
-            return NextResponse.json({ error: "Could not extract any text from the document." }, { status: 500 });
-        }
-
-        const prepPrompt = getPreparationPrompt(rawOcrText, subject);
-        const prepResult = await geminiModel.generateContent(prepPrompt);
-        const rawPrepResponse = prepResult.response.text();
-        
-        const jsonString = extractJsonFromText(rawPrepResponse);
-
-        if (!jsonString) {
-            console.error("AI Prep Failed. Raw Response:", rawPrepResponse);
-            throw new Error("The AI failed to reconstruct the document into a valid format.");
-        }
-
-        const preparedData = JSON.parse(jsonString);
-
-        return NextResponse.json(preparedData);
-
-    } catch (error: any) {
-        console.error("Error in prepare-evaluation pipeline:", error);
-        return NextResponse.json({ error: `An error occurred: ${error.message}` }, { status: 500 });
+    if (!imageConversionResponse.ok) {
+        const errorData = await imageConversionResponse.json();
+        throw new Error(`Python server error: ${errorData.error}`);
     }
+    const { images } = await imageConversionResponse.json();
+    console.log(`Received ${images.length} images from Python.`);
+
+    // --- Step 2: Prepare the IMPROVED Prompt for JSON Output ---
+    const imageParts: Part[] = images.map((img: string) => ({
+        inlineData: { mimeType: 'image/jpeg', data: img }
+    }));
+
+    // Example JSON structure for the AI to follow
+    const jsonStructure = `[
+      {
+          "questionNumber": 1,
+          "questionText": "**(a) What are the ethical issues involved?\\n(b) Evaluate the behaviour of the bank manager from an ethical point of view.\\n(c) How would you react to the situation?**",
+          "userAnswer": "The handwritten answer text goes here. If there is a diagram, it should be described in-place like this: [DIAGRAM: A detailed description of the mind map, chart, or diagram, explaining its components and relationships.] The rest of the answer continues here.",
+          "maxMarks": 20
+      }
+    ]`;
+    
+    const prompt = `
+      You are an expert AI assistant that processes handwritten exam answer sheets and converts them into a structured JSON format. Your attention to detail is critical.
+      
+      **TASK:** Analyze the following page images precisely and follow these steps:
+      
+      1.  **IDENTIFY THE COMPLETE QUESTION:**
+          -   Scan all pages to find all parts of the question, including any introductory case study and all sub-questions (a), (b), (c), etc.
+          -   Combine them into a single block of text.
+          -   **CRITICAL:** Format the final combined question using Markdown for bolding by wrapping it in double asterisks (**). For example: "**This is a bold question.**"
+
+      2.  **TRANSCRIBE THE HANDWRITTEN ANSWER:**
+          -   Meticulously transcribe the handwritten answer exactly as it is written, preserving all formatting like paragraphs, bullet points, and numbering.
+          -   **DIAGRAM HANDLING (VERY IMPORTANT):** If you see a diagram, flowchart, or mind map, you MUST describe it. Insert a placeholder tag EXACTLY where it appeared in the text. The format must be: \`[DIAGRAM: A detailed description of the diagram's content and structure.]\`. For example: \`[DIAGRAM: A mind map with '2023 CASE-1' at the center, branching out to 'Dilemma between personal values...'.]\`
+
+      3.  **CREATE JSON OUTPUT:**
+          -   Populate the collected information into the JSON structure provided below.
+          -   Your final output MUST ONLY be the valid JSON array. Do not include any extra text, notes, or markdown formatting like \`\`\`json around the final output.
+
+      **FINAL JSON OUTPUT STRUCTURE:**
+      ${jsonStructure}
+    `;
+    
+    const requestParts: Part[] = [{text: prompt}, ...imageParts];
+
+    // --- Step 3: Call Gemini API ---
+    console.log(`Sending ${images.length} images to Gemini for improved JSON structuring...`);
+    const result = await geminiModel.generateContent({ contents: [{ role: 'user', parts: requestParts }] });
+    const rawResponseText = result.response.candidates?.[0]?.content.parts[0].text;
+
+    if (!rawResponseText) {
+        throw new Error("Received no response text from Gemini.");
+    }
+    
+    // --- Step 4: Extract and Parse the JSON ---
+    const jsonString = extractJsonFromText(rawResponseText);
+
+    if (!jsonString) {
+      console.error("AI Prep Failed. Raw Response:", rawResponseText);
+      throw new Error("The AI failed to create a valid JSON format from the document.");
+    }
+    
+    const preparedData = JSON.parse(jsonString);
+
+    // --- Step 5: Send Structured JSON to Frontend ---
+    return NextResponse.json(preparedData);
+
+  } catch (error: any) {
+    console.error('Error in prepare-evaluation route:', error);
+    return NextResponse.json({ error: error.message || 'An internal server error occurred.' }, { status: 500 });
+  }
 }
