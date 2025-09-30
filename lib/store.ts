@@ -1,3 +1,4 @@
+// lib/store.ts
 import { create } from 'zustand'
 import {
   EvaluationCompletePayload,
@@ -12,30 +13,37 @@ type EvaluationStatus = 'idle' | 'processing' | 'complete'
 
 // Define the structure of our store's state.
 interface EvaluationState {
+  // Existing State
   processingState: ProcessingState
   evaluationStatus: EvaluationStatus
   isProcessingInBackground: boolean
-  isConfirming: boolean // ADDED: To track the confirmation UI state
+  isConfirming: boolean
   extractedText: string
   selectedPaper: string
   evaluationResult: EvaluationData | null
   newEvaluationId: string | null
-  preparedData: PreparedQuestion[] // ADDED: To store extracted text between steps
+  preparedData: PreparedQuestion[]
   error: string | null
+  isReviewing: boolean;
 }
 
 // Define the actions that can be performed on our state.
 interface EvaluationActions {
+  // Existing Actions
   setProcessingState: (state: ProcessingState) => void
-  setIsConfirming: (isConfirming: boolean) => void // ADDED: Action for confirmation UI
+  setIsConfirming: (isConfirming: boolean) => void
   setExtractedText: (text: string, paper: string) => void
-  setPreparedData: (data: PreparedQuestion[]) => void // ADDED: Action for extracted text
+  setPreparedData: (data: PreparedQuestion[]) => void
   startEvaluation: () => void
   completeEvaluation: (payload: EvaluationCompletePayload) => void
   failEvaluation: (error: string) => void
   resetEvaluation: () => void
   setError: (error: string | null) => void
   reset: () => void
+  setIsReviewing: (isReviewing: boolean) => void;
+
+  // ADDED: The missing action for setting the selected paper
+  setSelectedPaper: (paper: string) => void;
 }
 
 // Create the Zustand store by combining the state and actions.
@@ -45,20 +53,21 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
     processingState: 'idle',
     evaluationStatus: 'idle',
     isProcessingInBackground: false,
-    isConfirming: false, // ADDED
+    isConfirming: false,
     extractedText: '',
     selectedPaper: '',
     evaluationResult: null,
     newEvaluationId: null,
-    preparedData: [], // ADDED
+    preparedData: [],
     error: null,
+    isReviewing: false,
 
     // Actions
     setProcessingState: (state) => set({ processingState: state }),
-    setIsConfirming: (isConfirming) => set({ isConfirming }), // ADDED
+    setIsConfirming: (isConfirming) => set({ isConfirming }),
     setExtractedText: (text, paper) =>
       set({ extractedText: text, selectedPaper: paper, processingState: 'editing' }),
-    setPreparedData: (data) => set({ preparedData: data }), // ADDED
+    setPreparedData: (data) => set({ preparedData: data }),
     startEvaluation: () =>
       set({ evaluationStatus: 'processing', isProcessingInBackground: true, isConfirming: false }),
 
@@ -118,9 +127,11 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
         evaluationStatus: 'idle',
         newEvaluationId: null,
         evaluationResult: null,
-        isConfirming: false, // ADDED
-        preparedData: [], // ADDED
+        isConfirming: false,
+        preparedData: [],
         error: null,
+        isReviewing: false,
+        selectedPaper: '', // Ensure selectedPaper is also reset
       }),
 
     setError: (error) => set({ error: error }),
@@ -130,13 +141,19 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
         processingState: 'idle',
         evaluationStatus: 'idle',
         isProcessingInBackground: false,
-        isConfirming: false, // ADDED
+        isConfirming: false,
         extractedText: '',
         selectedPaper: '',
         evaluationResult: null,
         newEvaluationId: null,
-        preparedData: [], // ADDED
+        preparedData: [],
         error: null,
+        isReviewing: false,
       }),
+      
+    setIsReviewing: (isReviewing) => set({ isReviewing }),
+    
+    // ADDED: The implementation for the missing action
+    setSelectedPaper: (paper) => set({ selectedPaper: paper }),
   }),
 )
