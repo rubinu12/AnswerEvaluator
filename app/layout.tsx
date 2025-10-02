@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { AuthContextProvider } from "@/lib/AuthContext";
-import PageLoader from "@/components/shared/PageLoader";
-import { Suspense } from "react";
-import BackgroundProcessingIndicator from "@/components/shared/BackgroundProcessingIndicator"; // 1. Import the new component
+import PageLoader from "@/components/shared/PageLoader"; // 1. Import the PageLoader
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -26,14 +24,11 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <body className={`${poppins.variable} font-poppins h-full`}>
         <div className="fixed-background" />
-
-        <Suspense fallback={null}>
-          <PageLoader />
-        </Suspense>
         
         <AuthContextProvider>
-          <BackgroundProcessingIndicator /> {/* 2. Add the component here */}
           {children}
+          {/* 2. Add the PageLoader component here */}
+          <PageLoader /> 
         </AuthContextProvider>
       </body>
     </html>

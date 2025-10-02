@@ -1,11 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
     createUserWithEmailAndPassword, 
     signInWithEmailAndPassword 
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { useAuthContext } from '@/lib/AuthContext';
+import { useEvaluationStore } from '@/lib/store'; // 1. Import the store
 
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
@@ -13,32 +15,40 @@ export default function AuthPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const router = useRouter();
+    const { user, loading } = useAuthContext();
+    const { setPageLoading } = useEvaluationStore(); // 2. Get the loader action
+
+    // This effect handles redirecting the user if they are already logged in
+    useEffect(() => {
+        if (!loading && user) {
+            router.push('/dashboard');
+        }
+    }, [user, loading, router]);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
         setError('');
+        setPageLoading(true); // 3. Show the loader immediately on submit
 
-        if (isLogin) {
-            // Handle Login
-            try {
+        try {
+            if (isLogin) {
                 await signInWithEmailAndPassword(auth, email, password);
-                router.push('/dashboard'); // FIX: Redirect to dashboard on successful login
-            } catch (error: any) {
-                setError(error.message);
-                console.error('Error logging in:', error);
-            }
-        } else {
-            // Handle Sign Up
-            try {
+            } else {
                 await createUserWithEmailAndPassword(auth, email, password);
-                router.push('/dashboard'); // FIX: Redirect to dashboard on successful sign-up
-            } catch (error: any)
-{
-                setError(error.message);
-                console.error('Error signing up:', error);
             }
+            // The useEffect above will handle the redirect to /dashboard once the user state is updated.
+            // No need to call router.push here.
+        } catch (error: any) {
+            setError(error.message);
+            console.error('Auth Error:', error);
+            setPageLoading(false); // Hide loader on error
         }
     };
+    
+    // Don't render the form if the user is logged in and about to be redirected.
+    if (loading || user) {
+        return null;
+    }
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-8">

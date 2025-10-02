@@ -9,12 +9,14 @@ import OverallAssessmentCard from '@/components/result/OverallAssessmentCard';
 import QuestionCard from '@/components/result/QuestionCard';
 import { EvaluationData } from '@/lib/types';
 import { useAuthContext } from '@/lib/AuthContext';
+import { useEvaluationStore } from '@/lib/store'; // 1. Import the store hook
 import { LogOut, User, Settings, ArrowLeft, Download, Loader } from 'lucide-react';
 
 export default function ResultPage() {
     const params = useParams();
     const router = useRouter();
     const { user, logout } = useAuthContext();
+    const { setPageLoading } = useEvaluationStore(); // 2. Get the action from the store
     const evaluationId = params.evaluationId as string;
 
     const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
@@ -23,6 +25,9 @@ export default function ResultPage() {
     const [isDownloading, setIsDownloading] = useState(false);
 
     useEffect(() => {
+        // Hide loader when this page finishes loading
+        setPageLoading(false);
+
         if (!evaluationId) return;
         const resultDataString = sessionStorage.getItem(evaluationId);
 
@@ -40,9 +45,14 @@ export default function ResultPage() {
         } else {
             setError("No evaluation data found for this ID.");
         }
-    }, [evaluationId]);
+    }, [evaluationId, setPageLoading]);
     
-    // This function calls the server-side API to generate and download the PDF
+    // 3. Create a handler function for navigation
+    const handleBackToDashboard = () => {
+        setPageLoading(true);
+        router.push('/dashboard');
+    };
+
     const handleDownloadReport = async () => {
         if (!evaluationData) {
             alert("Evaluation data is not available to download.");
@@ -62,7 +72,6 @@ export default function ResultPage() {
                 throw new Error(errorData.error || 'Failed to generate PDF.');
             }
 
-            // Create a blob from the PDF stream and trigger a download in the browser
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -99,31 +108,31 @@ export default function ResultPage() {
                     {user.email?.substring(0, 2).toUpperCase()}
                 </button>
                 {isDropdownOpen && (
-                     <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
-                        <div className="py-1" role="none">
-                            <div className="px-4 py-2 border-b">
-                                <p className="text-sm text-gray-700">Signed in as</p>
-                                <p className="truncate text-sm font-medium text-gray-900">{user.email}</p>
+                         <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                            <div className="py-1" role="none">
+                                <div className="px-4 py-2 border-b">
+                                    <p className="text-sm text-gray-700">Signed in as</p>
+                                    <p className="truncate text-sm font-medium text-gray-900">{user.email}</p>
+                                </div>
+                                <a href="#" className="text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm" role="menuitem">
+                                    <User size={16} />
+                                    Profile
+                                </a>
+                                <a href="#" className="text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm" role="menuitem">
+                                    <Settings size={16} />
+                                    Settings
+                                </a>
+                                <button
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => logout().then(() => router.push('/auth'))}
+                                    className="w-full text-left text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm"
+                                    role="menuitem"
+                                >
+                                    <LogOut size={16} />
+                                    Logout
+                                </button>
                             </div>
-                            <a href="#" className="text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm" role="menuitem">
-                                <User size={16} />
-                                Profile
-                            </a>
-                            <a href="#" className="text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm" role="menuitem">
-                                <Settings size={16} />
-                                Settings
-                            </a>
-                            <button
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => logout().then(() => router.push('/auth'))}
-                                className="w-full text-left text-gray-700 hover:bg-gray-100 flex items-center gap-3 px-4 py-2 text-sm"
-                                role="menuitem"
-                            >
-                                <LogOut size={16} />
-                                Logout
-                            </button>
                         </div>
-                    </div>
                 )}
             </div>
         );
@@ -147,7 +156,7 @@ export default function ResultPage() {
                     <div className="flex space-x-2 mt-4 md:mt-0">
                         <button 
                             className="px-4 py-2 text-sm font-semibold bg-white/60 text-slate-800 hover:bg-white rounded-md transition-colors flex items-center gap-2 backdrop-blur-sm shadow-sm border border-white/20 btn" 
-                            onClick={() => router.push('/dashboard')}
+                            onClick={handleBackToDashboard} // 4. Use the new handler
                         >
                             <ArrowLeft size={18} />
                             Evaluate New

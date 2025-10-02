@@ -1,8 +1,7 @@
 // app/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react'; // 1. Import useEffect
 import { useAuthContext } from '@/lib/AuthContext';
 import { useEvaluationStore } from '@/lib/store';
 
@@ -14,7 +13,6 @@ import MentorsWisdom from '@/components/dashboard/MentorsWisdom';
 import PerformanceGauges from '@/components/dashboard/PerformanceGauges';
 import RecentEvaluations from '@/components/dashboard/RecentEvaluations';
 import InProgressCard from '@/components/dashboard/InProgressCard';
-import ResultModal from '@/components/dashboard/ResultModal';
 import { BookOpen, History, BarChart2 } from 'lucide-react';
 
 // New WelcomeHeader component as planned
@@ -43,90 +41,56 @@ const WelcomeHeader = ({ username }: { username: string }) => (
 
 export default function DashboardHomePage() {
     const { user } = useAuthContext();
-    const router = useRouter();
 
     const {
-        evaluationStatus,
-        newEvaluationId,
-        resetEvaluation,
-        isReviewing 
+        isProcessingInBackground,
+        isReviewing,
+        processingState,
+        setPageLoading, // 2. Get the action from the store
     } = useEvaluationStore();
-
-    const [isResultModalOpen, setIsResultModalOpen] = useState(false);
-
-    useEffect(() => {
-        if (evaluationStatus === 'complete' && newEvaluationId) {
-            setIsResultModalOpen(true);
-        }
-    }, [evaluationStatus, newEvaluationId]);
-
-    const handleViewResult = () => {
-        if (newEvaluationId) {
-            router.push(`/result/${newEvaluationId}`);
-            setIsResultModalOpen(false);
-            resetEvaluation();
-        }
-    };
-
-    const handleModalClose = () => {
-        setIsResultModalOpen(false);
-        resetEvaluation();
-    };
     
-    const showInProgress = useEvaluationStore(state => 
-        state.evaluationStatus === 'processing' || 
-        (state.processingState === 'ocr' && !state.isConfirming)
-    );
+    // 3. Add the useEffect to control the loader
+    useEffect(() => {
+        setPageLoading(true);
+        // Hide the loader after a short delay to ensure content is ready
+        const timer = setTimeout(() => {
+            setPageLoading(false);
+        }, 1500); // 1.5 seconds
+
+        return () => clearTimeout(timer); // Cleanup the timer
+    }, [setPageLoading]);
+
+    const showInProgressCard = processingState === 'ocr' || isProcessingInBackground;
 
     const username = user?.email?.split('@')[0] || 'Aspirant';
 
     return (
-        <>
-            <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-                    
-                    {/* --- LEFT COLUMN (WIDER) --- */}
-                    <div className="lg:col-span-3 space-y-8">
-                        {/* 1. Welcome & Quick Actions */}
-                        <WelcomeHeader username={username} />
+        <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+                
+                <div className="lg:col-span-3 space-y-8">
+                    <WelcomeHeader username={username} />
 
-                        {/* CORRECTED LOGIC: Conditionally render the entire block */}
-                        {isReviewing ? (
-                            // If in review mode, only show the ReviewCard
-                            <ReviewCard />
-                        ) : (
-                            // Otherwise, show the normal layout
-                            <>
-                                {showInProgress ? (
-                                    <InProgressCard />
-                                ) : (
-                                    <EvaluateCard />
-                                )}
-                                <PerformanceGauges />
-                            </>
-                        )}
-                    </div>
-
-                    {/* --- RIGHT COLUMN (NARROWER) --- */}
-                    <div className="lg:col-span-2 space-y-8 lg:sticky lg:top-8">
-                        {/* 1. Mentor's Wisdom */}
-                        <MentorsWisdom />
-
-                        {/* 2. Study Streak Calendar */}
-                        <StudyStreakCalendar />
-
-                        {/* 3. Recent Evaluations */}
-                        <RecentEvaluations />
-                    </div>
+                    {isReviewing ? (
+                        <ReviewCard />
+                    ) : (
+                        <>
+                            {showInProgressCard ? (
+                                <InProgressCard />
+                            ) : (
+                                <EvaluateCard />
+                            )}
+                            <PerformanceGauges />
+                        </>
+                    )}
                 </div>
-            </main>
 
-            <ResultModal
-                isOpen={isResultModalOpen}
-                onClose={handleModalClose}
-                onConfirm={handleViewResult}
-                resultText="Your detailed evaluation is complete and ready for review."
-            />
-        </>
+                <div className="lg:col-span-2 space-y-8 lg:sticky lg:top-8">
+                    <MentorsWisdom />
+                    <StudyStreakCalendar />
+                    <RecentEvaluations />
+                </div>
+            </div>
+        </main>
     );
 }

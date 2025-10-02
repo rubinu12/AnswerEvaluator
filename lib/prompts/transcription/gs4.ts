@@ -5,7 +5,7 @@ export const getGS4TranscriptionPrompt = () => {
 
     const jsonStructure = `[
     {
-        "questionNumber": 7,
+        "questionNumber": 1,
         "questionText": "**You are a senior officer in the Ministry of Home Affairs... (long case study paragraph)... (a) Identify the ethical issues involved in this case. (b) What are the options available to you? Evaluate each of these options and choose the one you would adopt, giving reasons.**",
         "userAnswer": "The complete handwritten answer for the case study. If a diagram is present, it must be described in-place, for example: [DIAGRAM: A flowchart illustrating the stakeholder analysis, showing their interests and influence.]",
         "maxMarks": 20

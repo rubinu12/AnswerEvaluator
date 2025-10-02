@@ -3,15 +3,21 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic'; // 1. Import dynamic
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 
 // Import child components
 import DestinationSelector from '@/components/landing/DestinationSelector';
-import LottiePlayer from '@/components/landing/LottiePlayer';
 
 // Import the Lottie animation data directly
 import animationData from '@/public/hero.json';
+
+// 2. Dynamically import the LottiePlayer with SSR turned off
+const LottiePlayer = dynamic(() => import('@/components/landing/LottiePlayer'), {
+    ssr: false,
+});
+
 
 // --- Type Definitions ---
 type Language = 'English' | 'Hindi' | 'Gujarati';
@@ -59,16 +65,10 @@ export default function Hero({ onDestinationSelect }: HeroProps) {
 
   // --- Render Method ---
   return (
-    // This <section> is the root container.
-    // - `w-full h-screen`: This is critical. It makes the section fill the entire viewport.
-    // - `flex items-center`: This vertically centers the content.
-    // - `overflow-hidden`: A safeguard to prevent any unexpected content from causing a scrollbar.
     <section className="w-full h-screen flex items-center justify-center overflow-hidden">
       
-      {/* This div centers the content horizontally and applies a max-width */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
-        {/* Two-column layout that is responsive for mobile vs. desktop */}
         <div className="grid md:grid-cols-2 gap-x-16 gap-y-10 items-center">
           
           {/* Column 1: All textual content and the main button */}

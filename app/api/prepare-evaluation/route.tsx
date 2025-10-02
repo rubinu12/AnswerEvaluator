@@ -98,6 +98,11 @@ export async function POST(req: NextRequest) {
 
     const preparedData = JSON.parse(jsonString);
 
+    // --- VERIFICATION STEP: Log the final data to the terminal ---
+    console.log("--- Full Transcribed Data from Gemini ---");
+    console.log(JSON.stringify(preparedData, null, 2));
+    console.log("-----------------------------------------");
+
     // --- Step 5: Send Structured JSON to Frontend ---
     return NextResponse.json(preparedData);
 

@@ -1,24 +1,37 @@
 // app/api/evaluate/route.tsx
 
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { VertexAI } from '@google-cloud/vertexai';
 import { getPromptForSubject } from '@/lib/prompts';
 
-// --- Client Initialization ---
-function getClients() {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not set in .env.local");
-  }
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-  return { geminiModel };
+// --- Initialize Vertex AI ---
+const vertex_ai = new VertexAI({
+  project: process.env.GOOGLE_PROJECT_ID!,
+  location: 'us-central1',
+});
+
+const geminiModel = vertex_ai.getGenerativeModel({
+  model: 'gemini-2.5-flash-lite',
+});
+
+// --- Helper function to extract JSON from the AI's response ---
+function extractJsonFromText(text: string): string | null {
+    // This regex is robust enough to handle markdown code blocks
+    const markdownMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (markdownMatch && markdownMatch[1]) {
+        return markdownMatch[1].trim();
+    }
+    // Fallback for non-markdown responses
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+        return text.substring(firstBrace, lastBrace + 1);
+    }
+    return null;
 }
 
 // --- Main API Handler ---
 export async function POST(request: Request) {
-  // ... function body remains the same
-  const { geminiModel } = getClients();
-  
   try {
     const { preparedData, subject } = await request.json();
 
@@ -28,18 +41,23 @@ export async function POST(request: Request) {
 
     const evaluationPrompt = getPromptForSubject(subject || 'GS1', preparedData);
     
-    const evaluationResult = await geminiModel.generateContent(evaluationPrompt);
-    const rawResponseText = evaluationResult.response.text();
-    
-    const firstBracketIndex = rawResponseText.indexOf('{');
-    const lastBracketIndex = rawResponseText.lastIndexOf('}');
+    const result = await geminiModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: evaluationPrompt }] }]
+    });
 
-    if (firstBracketIndex === -1 || lastBracketIndex === -1) {
+    const rawResponseText = result.response.candidates?.[0]?.content.parts[0].text;
+
+    if (!rawResponseText) {
+        throw new Error("Received no response text from Gemini for the final evaluation.");
+    }
+
+    const jsonString = extractJsonFromText(rawResponseText);
+    
+    if (!jsonString) {
         console.error("Invalid JSON response from master prompt:", rawResponseText);
         throw new Error("The AI returned an invalid format for the final evaluation.");
     }
 
-    const jsonString = rawResponseText.substring(firstBracketIndex, lastBracketIndex + 1);
     const evaluationJson = JSON.parse(jsonString);
     
     return NextResponse.json(evaluationJson);

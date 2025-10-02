@@ -28,25 +28,20 @@ const EditableQuestionCard = ({
         updateQuestion(index, { ...question, userAnswer: editedAnswer });
         setIsEditing(false);
     };
-    
+
     const handleMarksChange = (marks: number) => {
         updateQuestion(index, { ...question, maxMarks: marks });
     };
 
-    // This function safely renders the formatted text by replacing newlines with <br> tags.
-    const createMarkup = (text: string) => {
-        return { __html: text.replace(/\n/g, '<br />') };
-    };
-
     return (
         <div className="border-b border-slate-200 last:border-b-0">
-            {/* The bolded, truncated question is the button */}
-            <button
+            {/* Header section for collapsing and marks */}
+            <div
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex w-full items-center justify-between p-4 text-left gap-4 hover:bg-slate-50 transition-colors"
+                className="flex w-full items-center justify-between p-4 text-left gap-4 hover:bg-slate-50 transition-colors cursor-pointer"
             >
                 <strong className="font-semibold text-slate-800 truncate flex-1 text-left">
-                    Q{question.questionNumber}: {question.questionText}
+                    Q{question.questionNumber}: {question.questionText.substring(0, 100)}...
                 </strong>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <select
@@ -59,10 +54,11 @@ const EditableQuestionCard = ({
                     </select>
                     <ChevronDown
                         size={20}
-                        className={clsx('text-slate-500 transition-transform', {'rotate-180': isOpen})}
+                        className={clsx('text-slate-500 transition-transform', { 'rotate-180': isOpen })}
                     />
                 </div>
-            </button>
+            </div>
+            {/* Collapsible content area */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
@@ -73,12 +69,12 @@ const EditableQuestionCard = ({
                     >
                         <div className="p-4 bg-slate-50/50">
                             {isEditing ? (
-                                // EDIT MODE: A simple, effective textarea
+                                // EDIT MODE
                                 <div className="bg-white p-2 rounded-md border border-blue-400 shadow-inner">
                                     <textarea
                                         value={editedAnswer}
                                         onChange={(e) => setEditedAnswer(e.target.value)}
-                                        className="w-full text-sm text-slate-700 min-h-[250px] resize-none focus:outline-none"
+                                        className="w-full text-sm text-slate-700 min-h-[300px] resize-none focus:outline-none"
                                     />
                                     <div className="flex justify-end gap-2 mt-2">
                                         <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-xs font-semibold text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-md">Cancel</button>
@@ -86,20 +82,20 @@ const EditableQuestionCard = ({
                                     </div>
                                 </div>
                             ) : (
-                                // VIEW MODE: Beautifully formatted, scrollable, with a hidden scrollbar
+                                // VIEW MODE
                                 <div className="relative group">
-                                    <div className="max-h-[40vh] overflow-y-auto custom-scrollbar pr-4">
-                                        <div
-                                            className="text-sm text-slate-700 whitespace-pre-wrap"
-                                            dangerouslySetInnerHTML={createMarkup(question.userAnswer)}
-                                        />
+                                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-4">
+                                        <div className="text-sm text-slate-800 space-y-4">
+                                            <p className="font-bold">Q: {question.questionText}</p>
+                                            <p className="whitespace-pre-wrap text-slate-700">{question.userAnswer}</p>
+                                        </div>
                                     </div>
                                     <button onClick={() => setIsEditing(true)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 bg-white/50 backdrop-blur-sm border border-slate-200 rounded-md text-xs font-semibold text-slate-600 hover:bg-white flex items-center gap-1">
                                         <Edit3 size={12} /> Edit
                                     </button>
                                 </div>
                             )}
-                             <div className="flex justify-end mt-2">
+                            <div className="flex justify-end mt-2">
                                 <button onClick={() => removeQuestion(index)} className="text-red-500 hover:text-red-700 text-xs font-semibold flex items-center gap-1">
                                     <Trash2 size={14} /> Remove
                                 </button>
@@ -111,7 +107,6 @@ const EditableQuestionCard = ({
         </div>
     );
 };
-
 
 // The main ReviewCard component
 export default function ReviewCard() {
@@ -135,10 +130,10 @@ export default function ReviewCard() {
         const newData = preparedData.filter((_, i) => i !== index);
         const renumberedData = newData.map((q, i) => ({ ...q, questionNumber: i + 1 }));
         setPreparedData(renumberedData);
-    }
-    
+    };
+
     const handleConfirmEvaluation = async () => {
-        setIsReviewing(false); 
+        setIsReviewing(false);
         startEvaluation();
         try {
             const response = await fetch('/api/evaluate', {
@@ -162,40 +157,31 @@ export default function ReviewCard() {
             failEvaluation(err.message);
         }
     };
-    
+
     const handleCancelReview = () => {
         setIsReviewing(false);
         setPreparedData([]);
-    }
+    };
 
     return (
         <>
-            {/* These styles are crucial for the hidden scrollbar */}
             <style jsx global>{`
+                .custom-scrollbar {
+                    scrollbar-width: none; /* For Firefox */
+                    -ms-overflow-style: none; /* For Internet Explorer and Edge */
+                }
                 .custom-scrollbar::-webkit-scrollbar {
-                    width: 8px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: rgba(150, 150, 150, 0.5);
-                    border-radius: 4px;
-                    border: 2px solid transparent;
-                    background-clip: content-box;
-                }
-                .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-                    background: rgba(120, 120, 120, 0.7);
+                    width: 0;
+                    height: 0;
                 }
             `}</style>
-            {/* The min-h-[85vh] class FORCES the card to expand and fill the vertical space */}
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200/60 flex flex-col min-h-[85vh]">
                 <h3 className="text-xl font-bold text-slate-800">Review Your Answer</h3>
                 <p className="text-sm text-gray-500 mt-1 mb-4">
                     The AI's transcription is below. Click "Edit" to make changes.
                 </p>
-                <div className="border rounded-lg overflow-hidden flex-grow">
-                    <div className="h-full overflow-y-auto custom-scrollbar">
+                <div className="border rounded-lg overflow-hidden flex-1 flex flex-col">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {preparedData.map((q, index) => (
                             <EditableQuestionCard
                                 key={index}
