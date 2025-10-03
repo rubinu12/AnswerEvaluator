@@ -1,32 +1,61 @@
 // lib/types.ts
 
-// Represents a single segment in the "Constructed Answer"
-export interface ConstructedAnswerSegment {
-    type: 'user' | 'ai';
-    text: string;
+// --- "Mentor's Pen" Types ---
+export interface RedPenFeedback {
+    originalText: string;
+    comment: string;
 }
 
-// Represents the analysis for a single question or essay
+export interface GreenPenFeedback {
+    locationInAnswer: string;
+    suggestion: string;
+}
+
+export interface MentorsPenData {
+    redPen: RedPenFeedback[];
+    greenPen: GreenPenFeedback[];
+}
+
+// --- New "AI Mentor" Analysis Types ---
+export interface QuestionDeconstruction {
+    coreDemands: {
+        demand: string;
+        userFulfillment: 'Fully Addressed' | 'Partially Addressed' | 'Not Addressed';
+        mentorComment: string;
+    }[];
+    identifiedKeywords: string[];
+}
+
+export interface StructuralAnalysis {
+    introduction: string;
+    body: string;
+    conclusion: string;
+}
+
+export interface StrategicDebrief {
+    modelAnswerStructure: string;
+    contentGaps: string[];
+    toppersKeywords: string[];
+    mentorsFinalVerdict: string;
+}
+
+// Represents the NEW, DETAILED analysis for a single question
 export interface QuestionAnalysis {
     questionNumber: number;
     questionText: string;
     userAnswer: string;
     maxMarks: number;
     score: number;
-    // UPDATED: Added 'Culture' and split 'Ethics' into 'Ethics Theory' and 'Ethics Case Study'
-    // for more precise classification and feedback.
     subject: 'History' | 'Culture' | 'Geography' | 'Society' | 'Polity & Constitution' | 'Social Justice & Governance' | 'International Relations' | 'Economy' | 'Environment' | 'Science & Tech' | 'Security' | 'Ethics Theory' | 'Ethics Case Study';
-    valueAddition: string[];
-    scoreDeductionAnalysis: {
-        points: string;
-        reason: string;
-    }[];
-    strategicNotes: string[];
-    idealAnswer: string; // A single string containing the full, formatted model answer
-    keyPointsToCover: string[]; // A list of essential points, keywords, and data
+    
+    questionDeconstruction: QuestionDeconstruction;
+    structuralAnalysis: StructuralAnalysis;
+    mentorsPen: MentorsPenData;
+    strategicDebrief: StrategicDebrief;
+    idealAnswer: string;
 }
 
-// Represents the overall feedback for the entire paper
+// Represents the overall feedback for the entire paper (RE-INTRODUCED)
 export interface OverallFeedback {
     generalAssessment: string;
     parameters: {
@@ -43,11 +72,11 @@ export interface EvaluationData {
     overallScore: number;
     totalMarks: number;
     submittedOn: string;
-    overallFeedback: OverallFeedback;
+    overallFeedback: OverallFeedback; // It's back
     questionAnalysis: QuestionAnalysis[];
 }
 
-// NEW: Represents the data extracted before sending for full evaluation
+// Represents the data extracted before sending for full evaluation
 export interface PreparedQuestion {
     questionNumber: number;
     questionText: string;
@@ -57,16 +86,7 @@ export interface PreparedQuestion {
 
 // Represents the payload received from the server upon evaluation completion
 export interface EvaluationCompletePayload {
-    analysis: {
-        overallScore: number;
-        totalMarks: number;
-        overallFeedback: OverallFeedback;
-        // This is the corrected part, as you suggested.
-        // It ensures the subject for each question analysis is correctly typed.
-        questionAnalysis?: (Omit<QuestionAnalysis, 'questionText' | 'userAnswer' | 'maxMarks' | 'questionNumber'> & {
-            questionNumber: number;
-        })[];
-    };
+    analysis: Omit<EvaluationData, 'subject' | 'submittedOn'>;
     preparedData: PreparedQuestion[];
     subject: 'GS1' | 'GS2' | 'GS3' | 'GS4' | 'Essay';
 }

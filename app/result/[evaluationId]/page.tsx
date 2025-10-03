@@ -9,14 +9,14 @@ import OverallAssessmentCard from '@/components/result/OverallAssessmentCard';
 import QuestionCard from '@/components/result/QuestionCard';
 import { EvaluationData } from '@/lib/types';
 import { useAuthContext } from '@/lib/AuthContext';
-import { useEvaluationStore } from '@/lib/store'; // 1. Import the store hook
+import { useEvaluationStore } from '@/lib/store';
 import { LogOut, User, Settings, ArrowLeft, Download, Loader } from 'lucide-react';
 
 export default function ResultPage() {
     const params = useParams();
     const router = useRouter();
     const { user, logout } = useAuthContext();
-    const { setPageLoading } = useEvaluationStore(); // 2. Get the action from the store
+    const { setPageLoading } = useEvaluationStore();
     const evaluationId = params.evaluationId as string;
 
     const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
@@ -25,7 +25,6 @@ export default function ResultPage() {
     const [isDownloading, setIsDownloading] = useState(false);
 
     useEffect(() => {
-        // Hide loader when this page finishes loading
         setPageLoading(false);
 
         if (!evaluationId) return;
@@ -47,7 +46,6 @@ export default function ResultPage() {
         }
     }, [evaluationId, setPageLoading]);
     
-    // 3. Create a handler function for navigation
     const handleBackToDashboard = () => {
         setPageLoading(true);
         router.push('/dashboard');
@@ -156,7 +154,7 @@ export default function ResultPage() {
                     <div className="flex space-x-2 mt-4 md:mt-0">
                         <button 
                             className="px-4 py-2 text-sm font-semibold bg-white/60 text-slate-800 hover:bg-white rounded-md transition-colors flex items-center gap-2 backdrop-blur-sm shadow-sm border border-white/20 btn" 
-                            onClick={handleBackToDashboard} // 4. Use the new handler
+                            onClick={handleBackToDashboard}
                         >
                             <ArrowLeft size={18} />
                             Evaluate New
@@ -181,7 +179,8 @@ export default function ResultPage() {
                         <div className="lg:col-span-3 space-y-8">
                             <OverallAssessmentCard feedback={evaluationData.overallFeedback} />
                             {evaluationData.questionAnalysis.map((q, index) => (
-                                <QuestionCard key={index} questionData={q} subject={evaluationData.subject} />
+                                // **THE FIX IS HERE:** Removed the redundant 'subject' prop
+                                <QuestionCard key={index} questionData={q} />
                             ))}
                         </div>
                     </div>
