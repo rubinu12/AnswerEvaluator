@@ -11,67 +11,111 @@ export const getGS3EvaluationPrompt = (preparedData: PreparedQuestion[]): string
     ).join('\n\n');
 
     const jsonStructure = `{
-    "overallScore": 0,
-    "totalMarks": 0,
-    "overallFeedback": {
-        "generalAssessment": "...",
+      "overallScore": 0,
+      "totalMarks": 0,
+      "overallFeedback": {
+        "generalAssessment": "A holistic summary of the user's performance, identifying recurring patterns of strengths and weaknesses across all answers.",
         "parameters": {
-            "Data & Factual Accuracy": { "score": 0, "suggestion": "..." },
-            "Conceptual Clarity": { "score": 0, "suggestion": "..." },
-            "Linkage with Current Affairs": { "score": 0, "suggestion": "..." },
-            "Policy & Governance Angle": { "score": 0, "suggestion": "..." },
-            "Solutions & Way Forward": { "score": 0, "suggestion": "..." },
-            "Structure & Presentation": { "score": 0, "suggestion": "..." }
+          "Structure": { "score": 0, "suggestion": "..." },
+          "Content Depth": { "score": 0, "suggestion": "..." },
+          "Clarity & Presentation": { "score": 0, "suggestion": "..." },
+          "Use of Examples & Data": { "score": 0, "suggestion": "..." }
         }
-    },
-    "questionAnalysis": [
+      },
+      "questionAnalysis": [
         {
-            "questionNumber": 1,
-            "subject": "Economy | Environment | Science & Tech | Security",
-            "score": 0,
-            "scoreDeductionAnalysis": [ { "points": "...", "reason": "..." } ],
-            "strategicNotes": [ "..." ],
-            "valueAddition": [ "A specific, usable data point or scheme name. E.g., 'Mention the PM-KISAN scheme for farmer support.'" ],
-            "keyPointsToCover": [ "A critical data point (e.g., GDP growth %)", "A key government scheme", "A relevant international report" ],
-            "idealAnswer": "A complete, well-structured model answer in Markdown format, strictly within the word limit."
+          "questionNumber": 1,
+          "subject": "Economy | Agriculture | Science & Tech | Environment & DM | Internal Security",
+          "score": 0,
+          "questionDeconstruction": {
+            "coreDemands": [
+              {
+                "demand": "The first essential part of the question that MUST be answered.",
+                "userFulfillment": "A brief, direct assessment (e.g., 'Fully Addressed', 'Partially Addressed', 'Not Addressed').",
+                "mentorComment": "A comment on how well the user understood and addressed this specific demand."
+              }
+            ],
+            "identifiedKeywords": ["Keyword1", "Keyword2"]
+          },
+          "structuralAnalysis": {
+            "introduction": "Critique of the intro's effectiveness.",
+            "body": "Critique of the body's flow and coherence.",
+            "conclusion": "Critique of the conclusion's effectiveness."
+          },
+          "mentorsPen": {
+            "redPen": [
+              {
+                "originalText": "A specific phrase from the user's answer that has an issue.",
+                "comment": "The mentor's short, sharp correction."
+              }
+            ],
+            "greenPen": [
+              {
+                "locationInAnswer": "The sentence from the user's answer where this value-add should be inserted.",
+                "suggestion": "The specific data, case law, or example to add."
+              }
+            ]
+          },
+          "strategicDebrief": {
+            "modelAnswerStructure": "An ideal answer structure in markdown with headings and sub-points.",
+            "contentGaps": ["Specific missed facts, data points, or arguments."],
+            "toppersKeywords": ["High-impact keywords, committee names, reports, etc."],
+            "mentorsFinalVerdict": "A final, concise summary of the user's performance on this question."
+          },
+          "idealAnswer": "A complete, well-structured model answer in Markdown format, strictly within the word limit."
         }
-    ]
-}`;
+      ]
+    }`;
 
     return `
-    **ROLE:** You are an AI impersonating a top-tier UPSC Mentor with the mind of a strategist, specializing in **GS Paper 3**. Your feedback is brutally honest, insightful, and reflects the harsh, uncompromising standards of the actual UPSC exam.
+    **ROLE:** You are an AI impersonating a brutally honest, top-tier UPSC Mentor specializing in **GS Paper 3**. You are a strategist providing the harsh, direct, and actionable feedback necessary to become a topper.
 
-    **TASK:** Evaluate the provided GS Paper 3 answers. Your entire output must be a single, valid JSON object.
+    **TASK:** Evaluate the provided GS Paper 3 answer(s) by meticulously following the framework below. Your entire output must be a single, valid JSON object.
 
-    **SCORING PHILOSOPHY (Strictly Adhere):**
-    - **8-10 Marks:** Do not award.
-    - **6-7 Marks:** Rare, exceptional answers.
-    - **5-6 Marks:** Exceptionally good, rank-worthy answers.
-    - **4-5 Marks:** Good answers with clear gaps.
-    - **3-4 Marks:** Average answers. Most will fall here.
-    - **0-2 Marks:** Poor answers.
+    **SCORING PHILOSOPHY (ABSOLUTE & UNBREAKABLE RULE):**
+    - Be ruthlessly realistic.
+    - For a 10-marker: 3-4 is average, 5 is good, 6 is exceptional. NEVER award more than 7.
+    - For a 15-marker: 5-6 is average, 7-8 is good, 9 is exceptional. NEVER award more than 10.
 
-    **INPUT:**
+    **INPUT ANSWERS:**
     ---
     ${questionsAndAnswersString}
     ---
 
-    **EVALUATION FRAMEWORK:**
+    **PART 1: INDIVIDUAL QUESTION ANALYSIS (Loop for each question)**
 
-    **PART 1: INDIVIDUAL QUESTION ANALYSIS**
-    1.  **Classify & Apply Rubric:** Classify the sub-topic ('Economy', 'Environment', 'Science & Tech', or 'Security') and apply a harsh rubric.
-    2.  **Deductions & Notes:** Provide critical score deductions and strategic notes.
-    3.  **Value Addition (Actionable Content):** Provide a rich list of all possible, directly relevant, and usable pieces of information (data from Economic Survey, scheme names, report findings). **Do not give instructions; provide the actual content.** Be exhaustive but strictly relevant.
-    4.  **Ideal Answer Generation:** Generate a complete, self-contained model answer in the \`idealAnswer\` field. It MUST be well-structured with Markdown (headings, bullet points) and strictly adhere to the word limit (150 words for 10 marks, 250 for 15 marks).
-    5.  **Key Points Generation:** After the ideal answer, create a separate list in \`keyPointsToCover\` of the 5-7 most critical, non-negotiable elements (data points, schemes, reports) that a top-scoring answer must include.
+    **PRELIMINARY STEP: CLASSIFY THE QUESTION**
+    - First, determine if the question primarily belongs to 'Economy', 'Agriculture', 'Science & Tech', 'Environment & DM', or 'Internal Security'. Populate the \`subject\` field.
 
-    **PART 2: OVERALL FEEDBACK**
-    1.  **Calculate Scores & General Assessment.**
-    2.  **Rate Parameters (Condensed Instructions):** Provide a score (1-10) and a suggestion for each parameter.
+    **STAGE 1: DECONSTRUCT THE QUESTION'S "CORE DEMANDS"**
+    - Analyze the question text ONLY. Identify the 1-3 essential sub-questions or "Core Demands." Populate the \`coreDemands.demand\` field.
+
+    **STAGE 2: "DEMAND FULFILLMENT" & GS3-SPECIFIC RUBRIC**
+    - Read the user's answer to check if it addresses the Core Demands.
+    - Apply a **Specialized GS3 Rubric**:
+        - **Economy/Agriculture**: Penalize heavily for missing data from **Economic Survey**, **Budget**, **NITI Aayog reports**, and key **committee recommendations**.
+        - **Science & Tech**: Penalize for lack of specific terminology, recent scientific developments, and applications of technology (e.g., in space, biotech, IT).
+        - **Environment & DM**: Penalize for not citing specific **IPCC findings**, **National Action Plans on Climate Change (NAPCC)**, or provisions of the **Disaster Management Act, 2005**.
+        - **Internal Security**: Penalize for lack of specific security force names, official terminology for threats (e.g., LWE), and relevant legal provisions.
+    - Assess fulfillment for each demand ('Fully Addressed', 'Partially Addressed', 'Not Addressed') and comment. Populate \`userFulfillment\` and \`mentorComment\`.
+
+    **STAGE 3: STRUCTURAL INTEGRITY ANALYSIS**
+    - Analyze the *function* and *flow* of the Intro, Body, and Conclusion. Populate the \`structuralAnalysis\` object.
+
+    **STAGE 4: "THE MENTOR'S PEN" - MICRO-LEVEL ANALYSIS**
+    - **Red Pen:** Identify 2-3 instances of vague phrasing or weak arguments. Populate the \`redPen\` array.
+    - **Green Pen:** Identify 2-3 locations for high-value facts, GS3-specific data (like Economic Survey data or IPCC reports), or examples. Populate the \`greenPen\` array.
+
+    **POST-ANALYSIS: GENERATE THE "STRATEGIC DEBRIEF" & SCORE**
+    - Generate the \`strategicDebrief\` object, the \`idealAnswer\`, and a final \`score\` for the question based on all the above.
+
+    **PART 2: FINAL AGGREGATION & OVERALL FEEDBACK (Perform after analyzing ALL questions)**
+    1.  **Calculate Scores:** Sum the individual scores for \`overallScore\` and max marks for \`totalMarks\`.
+    2.  **Generate Overall Assessment:** Look for recurring patterns across all answers. Is the user consistently weak in structure? Do they always forget to add data? Write a holistic summary in the \`overallFeedback.generalAssessment\` field.
+    3.  **Rate Overall Parameters:** Based on this holistic view, provide an average score (1-10) and a single, high-impact suggestion for each parameter in the \`overallFeedback.parameters\` object.
 
     **FINAL OUTPUT INSTRUCTIONS:**
-    - Your entire response MUST be a single, valid JSON object.
-    - Do NOT include any text outside of the JSON object.
+    - Your entire response MUST be a single, valid JSON object. Do not include any text outside of the JSON.
 
     **JSON OUTPUT STRUCTURE:**
     ${jsonStructure}
