@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { AuthContextProvider } from "@/lib/AuthContext";
-import PageLoader from "@/components/shared/PageLoader"; // 1. Import the PageLoader
+import PageLoader from "@/components/shared/PageLoader";
+import MobileHeader from "@/components/shared/MobileHeader";
+import MobileBottomNav from "@/components/shared/MobileBottomNav";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -23,11 +25,25 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={`${poppins.variable} font-poppins h-full`}>
-        <div className="fixed-background" />
-        
         <AuthContextProvider>
-          {children}
-          {/* 2. Add the PageLoader component here */}
+          {/* Mobile View */}
+          <div className="block md:hidden h-full">
+            <div className="fixed-background" />
+            <div className="relative flex flex-col h-full">
+              <MobileHeader />
+              <main className="flex-1 flex flex-col overflow-y-auto">
+                {children}
+              </main>
+              <MobileBottomNav />
+            </div>
+          </div>
+
+          {/* Desktop View */}
+          <div className="hidden md:block h-full">
+            <div className="fixed-background" />
+            {children}
+          </div>
+          
           <PageLoader /> 
         </AuthContextProvider>
       </body>

@@ -1,4 +1,3 @@
-// app/result/[evaluationId]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,6 +10,95 @@ import { EvaluationData } from '@/lib/types';
 import { useAuthContext } from '@/lib/AuthContext';
 import { useEvaluationStore } from '@/lib/store';
 import { LogOut, User, Settings, ArrowLeft, Download, Loader } from 'lucide-react';
+
+// --- [NEW] Mobile-Specific Components (Placeholders for now) ---
+const MobileView = ({ evaluationData }: { evaluationData: EvaluationData }) => {
+    // We will build this out in the next steps
+    return (
+        <div className="bg-slate-100 min-h-screen">
+            <div className="p-4">
+                <h1 className="text-xl font-bold">Mobile Report</h1>
+                <p className="text-sm text-slate-600">{evaluationData.subject}</p>
+                <div className="mt-4 space-y-4">
+                    <OverallAssessmentCard feedback={evaluationData.overallFeedback} />
+                    {evaluationData.questionAnalysis.map((q, index) => (
+                        <QuestionCard key={index} questionData={q} />
+                    ))}
+                </div>
+            </div>
+            {/* Placeholder for the bottom navigation bar */}
+            <div className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-200 shadow-t-lg flex items-center justify-around">
+                <p>Bottom Nav Placeholder</p>
+            </div>
+        </div>
+    );
+};
+
+// --- [EXISTING] Desktop-Specific Component ---
+const DesktopView = ({ 
+    evaluationData, 
+    handleBackToDashboard, 
+    handleDownloadReport,
+    isDownloading,
+    navLinks,
+    actions
+}: { 
+    evaluationData: EvaluationData;
+    handleBackToDashboard: () => void;
+    handleDownloadReport: () => void;
+    isDownloading: boolean;
+    navLinks: NavLink[];
+    actions: (activeLink: NavLink) => React.ReactNode;
+}) => {
+    return (
+        <div className="min-h-screen">
+            <div className="fixed-background" />
+            <UniversalNavbar navLinks={navLinks} actions={actions} />
+            <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+                <div className="mb-8 flex flex-col md:flex-row justify-between md:items-center">
+                    <div>
+                        <h1 className="text-4xl font-bold font-serif text-slate-900">Evaluation Report</h1>
+                        <p className="mt-1 text-md text-slate-500">
+                            {evaluationData.subject} | Submitted on {evaluationData.submittedOn}
+                        </p>
+                    </div>
+                    <div className="flex space-x-2 mt-4 md:mt-0">
+                        <button 
+                            className="px-4 py-2 text-sm font-semibold bg-white/60 text-slate-800 hover:bg-white rounded-md transition-colors flex items-center gap-2 backdrop-blur-sm shadow-sm border border-white/20 btn" 
+                            onClick={handleBackToDashboard}
+                        >
+                            <ArrowLeft size={18} />
+                            Evaluate New
+                        </button>
+                        <button 
+                            className="px-4 py-2 text-sm font-semibold text-white rounded-md transition-colors flex items-center gap-2 shadow-lg bg-gradient-to-r from-red-400 to-orange-400 hover:from-red-500 hover:to-orange-500 btn" 
+                            onClick={handleDownloadReport}
+                            disabled={isDownloading}
+                        >
+                            {isDownloading ? <Loader size={18} className="animate-spin" /> : <Download size={18} />}
+                            {isDownloading ? 'Downloading...' : 'Download Report'}
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="report-content">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+                        <div className="lg:col-span-1 lg:sticky lg:top-24">
+                            <SidebarNav data={evaluationData} />
+                        </div>
+
+                        <div className="lg:col-span-3 space-y-8">
+                            <OverallAssessmentCard feedback={evaluationData.overallFeedback} />
+                            {evaluationData.questionAnalysis.map((q, index) => (
+                                <QuestionCard key={index} questionData={q} />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
+};
 
 export default function ResultPage() {
     const params = useParams();
@@ -106,7 +194,7 @@ export default function ResultPage() {
                     {user.email?.substring(0, 2).toUpperCase()}
                 </button>
                 {isDropdownOpen && (
-                         <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                        <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                             <div className="py-1" role="none">
                                 <div className="px-4 py-2 border-b">
                                     <p className="text-sm text-gray-700">Signed in as</p>
@@ -139,53 +227,25 @@ export default function ResultPage() {
     if (error) return <div className="min-h-screen flex items-center justify-center text-red-500 bg-gray-50 p-4">{error}</div>;
     if (!evaluationData) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading Evaluation Report...</div>;
 
+    // --- [NEW] The Switcher Logic ---
     return (
-        <div className="min-h-screen">
-            <div className="fixed-background" />
-            <UniversalNavbar navLinks={navLinks} actions={actions} />
-            <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-                <div className="mb-8 flex flex-col md:flex-row justify-between md:items-center">
-                    <div>
-                        <h1 className="text-4xl font-bold font-serif text-slate-900">Evaluation Report</h1>
-                        <p className="mt-1 text-md text-slate-500">
-                           {evaluationData.subject} | Submitted on {evaluationData.submittedOn}
-                        </p>
-                    </div>
-                    <div className="flex space-x-2 mt-4 md:mt-0">
-                        <button 
-                            className="px-4 py-2 text-sm font-semibold bg-white/60 text-slate-800 hover:bg-white rounded-md transition-colors flex items-center gap-2 backdrop-blur-sm shadow-sm border border-white/20 btn" 
-                            onClick={handleBackToDashboard}
-                        >
-                            <ArrowLeft size={18} />
-                            Evaluate New
-                        </button>
-                        <button 
-                            className="px-4 py-2 text-sm font-semibold text-white rounded-md transition-colors flex items-center gap-2 shadow-lg bg-gradient-to-r from-red-400 to-orange-400 hover:from-red-500 hover:to-orange-500 btn" 
-                            onClick={handleDownloadReport}
-                            disabled={isDownloading}
-                        >
-                            {isDownloading ? <Loader size={18} className="animate-spin" /> : <Download size={18} />}
-                            {isDownloading ? 'Downloading...' : 'Download Report'}
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="report-content">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-                        <div className="lg:col-span-1 lg:sticky lg:top-24">
-                            <SidebarNav data={evaluationData} />
-                        </div>
+        <>
+            {/* Desktop View: hidden on small screens, block on medium and larger */}
+            <div className="hidden md:block">
+                <DesktopView 
+                    evaluationData={evaluationData}
+                    handleBackToDashboard={handleBackToDashboard}
+                    handleDownloadReport={handleDownloadReport}
+                    isDownloading={isDownloading}
+                    navLinks={navLinks}
+                    actions={actions}
+                />
+            </div>
 
-                        <div className="lg:col-span-3 space-y-8">
-                            <OverallAssessmentCard feedback={evaluationData.overallFeedback} />
-                            {evaluationData.questionAnalysis.map((q, index) => (
-                                // **THE FIX IS HERE:** Removed the redundant 'subject' prop
-                                <QuestionCard key={index} questionData={q} />
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
+            {/* Mobile View: block on small screens, hidden on medium and larger */}
+            <div className="block md:hidden">
+                <MobileView evaluationData={evaluationData} />
+            </div>
+        </>
     );
 }

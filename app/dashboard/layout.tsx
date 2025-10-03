@@ -1,3 +1,4 @@
+// Dashboard Layout with Authentication and Navbar
 'use client';
 
 import { useEffect, Fragment } from 'react';
@@ -15,10 +16,8 @@ export default function DashboardLayout({
   const { user, loading } = useAuthContext();
   const router = useRouter();
 
-  // --- FIX: The DashboardActions component is now defined inside DashboardLayout ---
-  // This gives it access to the useAuthContext hook.
   const DashboardActions = ({ activeLink }: { activeLink: NavLink }) => {
-    const { logout } = useAuthContext(); // It's safe to call the hook here now
+    const { logout } = useAuthContext(); 
 
     return (
         <>
@@ -120,10 +119,14 @@ export default function DashboardLayout({
 
   return (
     <>
-      <UniversalNavbar
-        navLinks={dashboardNavLinks}
-        actions={(activeLink: NavLink) => <DashboardActions activeLink={activeLink} />}
-      />
+      {/* --- [THE FIX] --- */}
+      {/* This UniversalNavbar will now ONLY be visible on medium screens and larger */}
+      <div className="hidden md:block">
+        <UniversalNavbar
+          navLinks={dashboardNavLinks}
+          actions={(activeLink: NavLink) => <DashboardActions activeLink={activeLink} />}
+        />
+      </div>
       <main>
         {children}
       </main>

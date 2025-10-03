@@ -1,4 +1,3 @@
-// components/dashboard/ReviewCard.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -40,8 +39,9 @@ const EditableQuestionCard = ({
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex w-full items-center justify-between p-4 text-left gap-4 hover:bg-slate-50 transition-colors cursor-pointer"
             >
+                {/* --- [THE FIX] Use the card's index for sequential numbering --- */}
                 <strong className="font-semibold text-slate-800 truncate flex-1 text-left">
-                    Q{question.questionNumber}: {question.questionText.substring(0, 100)}...
+                    Q{index + 1}: {question.questionText.substring(0, 100)}...
                 </strong>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <select
@@ -128,11 +128,16 @@ export default function ReviewCard() {
 
     const removeQuestion = (index: number) => {
         const newData = preparedData.filter((_, i) => i !== index);
+        // We still need to update the questionNumber in the data for when it's saved
         const renumberedData = newData.map((q, i) => ({ ...q, questionNumber: i + 1 }));
         setPreparedData(renumberedData);
     };
 
     const handleConfirmEvaluation = async () => {
+        // Before sending to backend, ensure the data has the correct sequential numbers
+        const correctlyNumberedData = preparedData.map((q, i) => ({ ...q, questionNumber: i + 1 }));
+        setPreparedData(correctlyNumberedData);
+
         setIsReviewing(false);
         startEvaluation();
         try {
@@ -140,7 +145,7 @@ export default function ReviewCard() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    preparedData: preparedData,
+                    preparedData: correctlyNumberedData, // Send the corrected data
                     subject: selectedPaper,
                 }),
             });
@@ -150,7 +155,7 @@ export default function ReviewCard() {
             }
             completeEvaluation({
                 analysis: result,
-                preparedData: preparedData,
+                preparedData: correctlyNumberedData, // Use corrected data for final payload
                 subject: selectedPaper as EvaluationCompletePayload['subject'],
             });
         } catch (err: any) {

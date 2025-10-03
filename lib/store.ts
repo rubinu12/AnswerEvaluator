@@ -25,8 +25,10 @@ interface EvaluationState {
   preparedData: PreparedQuestion[];
   error: string | null;
   isReviewing: boolean;
-  // --- NEW STATE ADDED ---
   isPageLoading: boolean;
+
+  // --- [NEW] STATE FOR MOBILE HEADER ---
+  pageTitle: string;
 }
 
 // Define the actions that can be performed on our state.
@@ -47,8 +49,10 @@ interface EvaluationActions {
   acknowledgeCompletion: () => void;
   startTranscription: () => void;
   cancelTranscription: () => void;
-  // --- NEW ACTION ADDED ---
   setPageLoading: (isLoading: boolean) => void;
+
+  // --- [NEW] ACTION FOR MOBILE HEADER ---
+  setPageTitle: (title: string) => void;
 }
 
 // Create the Zustand store by combining the state and actions.
@@ -66,7 +70,8 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
     preparedData: [],
     error: null,
     isReviewing: false,
-    isPageLoading: false, // Initial state for the page loader
+    isPageLoading: false,
+    pageTitle: 'Dashboard', // Default title
 
     // Actions
     setProcessingState: (state) => set({ processingState: state }),
@@ -175,7 +180,9 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
     startTranscription: () => set({ processingState: 'ocr', error: null }),
     cancelTranscription: () => set({ processingState: 'idle' }),
     
-    // --- NEW ACTION IMPLEMENTATION ---
     setPageLoading: (isLoading) => set({ isPageLoading: isLoading }),
+
+    // --- [NEW] ACTION IMPLEMENTATION ---
+    setPageTitle: (title) => set({ pageTitle: title }),
   }),
 );
