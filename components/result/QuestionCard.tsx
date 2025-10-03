@@ -1,4 +1,3 @@
-// components/result/QuestionCard.tsx
 'use client';
 
 import { QuestionAnalysis } from '@/lib/types';
@@ -16,8 +15,9 @@ export default function QuestionCard({ questionData: q }: { questionData: Questi
     };
 
     return (
-        <details id={`question-${q.questionNumber}`} className="group rounded-xl border border-white/30 bg-white/60 backdrop-blur-lg shadow-lg" open>
-            <summary className="cursor-pointer list-none flex items-start justify-between p-6">
+        <details id={`question-${q.questionNumber}`} className="rounded-xl border border-white/30 bg-white/60 backdrop-blur-lg shadow-lg" open>
+            {/* The summary now has the group class for its own hover effects */}
+            <summary className="group cursor-pointer list-none flex items-start justify-between p-6">
                 <div className="flex-1">
                     <p className="text-sm font-semibold uppercase text-blue-800 tracking-wider">
                         {q.subject} - Question {q.questionNumber}
@@ -25,18 +25,19 @@ export default function QuestionCard({ questionData: q }: { questionData: Questi
                     <h3 className="mt-1 font-serif text-xl font-bold text-slate-900">{q.questionText}</h3>
                 </div>
                 <div className="ml-6 flex items-center gap-4">
-                     <div className="text-center font-serif">
+                    <div className="text-center font-serif">
                         <span className="text-5xl font-bold text-blue-800">{q.score.toFixed(1)}</span>
                         <span className="text-slate-600"> / {q.maxMarks}</span>
                     </div>
                     <div className="flex flex-col border-l border-slate-200/80 pl-4">
-                         <button className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-blue-800" title="Bookmark" onClick={(e) => e.stopPropagation()}>
+                        <button className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-blue-800" title="Bookmark" onClick={(e) => e.stopPropagation()}>
                             <Bookmark className="h-5 w-5" />
                         </button>
                         <button onClick={handleDownload} className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-blue-800" title="Download Assessment" disabled={isDownloading}>
                             {isDownloading ? <Loader size={18} className="animate-spin" /> : <Download className="h-5 w-5" />}
                         </button>
                     </div>
+                    {/* This chevron now correctly rotates on summary hover */}
                     <ChevronDown className="h-6 w-6 text-slate-500 transition-transform duration-300 group-open:rotate-180" />
                 </div>
             </summary>

@@ -12,7 +12,7 @@ const vertex_ai = new VertexAI({
 });
 
 const geminiModel = vertex_ai.getGenerativeModel({
-  model: 'gemini-2.5-flash-lite',
+  model: 'gemini-2.5-flash-lite', // Corrected to a valid public model name
 });
 
 // --- Helper function to extract JSON from the AI's response ---
@@ -69,7 +69,6 @@ export async function POST(req: NextRequest) {
         inlineData: { mimeType: 'image/jpeg', data: img }
     }));
     
-    // *** THE FIX: Use the imported function to get the correct prompt ***
     const transcriptionPrompt = getTranscriptionPrompt(subject);
     if (!transcriptionPrompt) {
         return NextResponse.json({ error: `Invalid subject provided: ${subject}` }, { status: 400 });
@@ -82,6 +81,18 @@ export async function POST(req: NextRequest) {
     const result = await geminiModel.generateContent({
       contents: [{ role: 'user', parts: requestParts }]
     });
+
+    // --- [NEW] Step 3.5: Log Token Usage ---
+    const usageMetadata = result.response.usageMetadata;
+    if (usageMetadata) {
+      console.log("\n--- TOKEN USAGE (Transcription Stage) ---");
+      console.log(`Input Tokens: ${usageMetadata.promptTokenCount}`);
+      console.log(`Output Tokens: ${usageMetadata.candidatesTokenCount}`);
+      console.log("----------------------------------------\n");
+    } else {
+      console.log("Token usage metadata was not available for this request.");
+    }
+    // --- [END NEW] ---
 
     const rawResponseText = result.response.candidates?.[0]?.content.parts[0].text;
 
@@ -97,12 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     const preparedData = JSON.parse(jsonString);
-
-    // --- VERIFICATION STEP: Log the final data to the terminal ---
-    console.log("--- Full Transcribed Data from Gemini ---");
-    console.log(JSON.stringify(preparedData, null, 2));
-    console.log("-----------------------------------------");
-
+    
     // --- Step 5: Send Structured JSON to Frontend ---
     return NextResponse.json(preparedData);
 

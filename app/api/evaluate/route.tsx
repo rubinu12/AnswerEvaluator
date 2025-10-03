@@ -45,6 +45,18 @@ export async function POST(request: Request) {
         contents: [{ role: 'user', parts: [{ text: evaluationPrompt }] }]
     });
 
+    // --- [NEW] Step 3.5: Log Token Usage ---
+    const usageMetadata = result.response.usageMetadata;
+    if (usageMetadata) {
+      console.log("\n--- TOKEN USAGE (Evaluation Stage) ---");
+      console.log(`Input Tokens: ${usageMetadata.promptTokenCount}`);
+      console.log(`Output Tokens: ${usageMetadata.candidatesTokenCount}`);
+      console.log("--------------------------------------\n");
+    } else {
+      console.log("Token usage metadata was not available for this request.");
+    }
+    // --- [END NEW] ---
+
     const rawResponseText = result.response.candidates?.[0]?.content.parts[0].text;
 
     if (!rawResponseText) {
