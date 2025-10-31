@@ -1,7 +1,9 @@
-"use client";
+// components/quiz/ConfirmationModal.tsx
+'use client';
 
 import React from 'react';
-import { useQuizStore } from '@/lib/quizStore'; // 1. Use the new Zustand store
+import { useQuizStore } from '@/lib/quizStore'; // <-- 1. Use Zustand Store
+import { Question } from '@/lib/quizTypes'; // <-- 2. Use correct types
 
 interface ConfirmationModalProps {
     onClose: () => void;
@@ -10,21 +12,27 @@ interface ConfirmationModalProps {
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ onClose, onConfirmErase, onConfirmSave }) => {
-    // 2. Select the necessary state from the store
-    const { questions, userAnswers, bookmarkedQuestions } = useQuizStore();
+    // 3. Get state from Zustand
+    const { questions, userAnswers, bookmarkedQuestions, performanceStats } = useQuizStore();
 
-    // 3. Re-implement the calculation logic directly in the component
-    const correctCount = userAnswers.filter(a => a.isCorrect).length;
-    const incorrectCount = userAnswers.length - correctCount;
-    const unattemptedCount = questions.length - userAnswers.length;
-
+    // 4. Get stats from the 'performanceStats' object (calculated by ReportCard)
+    //    We provide default values in case it's not set yet.
+    const { 
+      correctCount = 0, 
+      incorrectCount = 0, 
+      unattemptedCount = questions.length 
+    } = performanceStats || {}; 
+    
+    // This calculation is still custom to this modal
     const getBookmarkedInUnattemptedOrIncorrect = () => {
         let count = 0;
-        bookmarkedQuestions.forEach(questionId => {
-            const userAnswer = userAnswers.find(ua => ua.questionId === questionId);
-            // If there's no answer OR the answer is incorrect, count it.
-            if (!userAnswer || !userAnswer.isCorrect) {
-                count++;
+        questions.forEach(q => {
+            if (bookmarkedQuestions.has(q.id)) {
+                const userAnswer = userAnswers.find(ua => ua.questionId === q.id);
+                // If unattempted OR incorrect, count it
+                if (!userAnswer || userAnswer.answer !== q.correctAnswer) {
+                    count++;
+                }
             }
         });
         return count;
@@ -32,7 +40,6 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ onClose, onConfir
 
     const bookmarkedCount = getBookmarkedInUnattemptedOrIncorrect();
 
-    // The JSX is preserved from your original component
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg text-center">
@@ -73,7 +80,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ onClose, onConfir
                         Yes, Erase This Result
                     </button>
                 </div>
-                 <button onClick={onClose} className="mt-4 text-sm text-gray-500 hover:underline">
+                <button onClick={onClose} className="mt-4 text-sm text-gray-500 hover:underline">
                     Cancel
                 </button>
             </div>

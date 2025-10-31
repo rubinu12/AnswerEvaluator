@@ -1,192 +1,215 @@
+// lib/quizStore.ts
 import { create } from 'zustand';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from './firebase';
-import { Question, UserAnswer } from './quizTypes';
+import {
+  QuizStore,
+  QuizState,
+  Question,
+  BackendQuestion,
+  UserAnswer,
+  QuizFilter
+} from './quizTypes'; // We use the types from Step 1
+import { auth } from '@/lib/firebase';
+// We cannot use the 'useRouter' hook inside the store.
+// We will handle navigation inside the components themselves.
 
-const SECONDS_PER_QUESTION = 72;
-type QuizMode = 'practice' | 'test' | 'review';
-
-// 1. STATE INTERFACE (includes bookmarks and grouping)
-interface QuizState {
-  questions: Question[];
-  userAnswers: UserAnswer[];
-  currentQuestionInView: number;
-  isLoading: boolean;
-  mode: QuizMode;
-  showReportCard: boolean;
-  currentViewAnswerId: string | null;
-  isPageScrolled: boolean;
-  isGroupingEnabled: boolean; // For subject-wise grouping
-  bookmarkedQuestions: Set<string>; // For bookmarking questions
-  timeLeft: number;
-  initialTime: number;
-  timerInterval: NodeJS.Timeout | null;
-  currentQuizParams: { type: string; filter: string; value: string; } | null;
-}
-
-// 2. ACTIONS INTERFACE (includes bookmarks and grouping)
-interface QuizActions {
-  fetchQuestions: (params: { type: string; filter: string; value: string }) => Promise<void>;
-  handleAnswerSelect: (questionId: string, selectedOptionIndex: number) => void;
-  startTest: () => void;
-  submitTest: () => void;
-  resetTest: () => void;
-  enterReviewMode: () => void;
-  viewAnswer: (questionId: string) => void;
-  closeAnswerView: () => void;
-  setPageScrolled: (isScrolled: boolean) => void;
-  setIsGroupingEnabled: (isGrouping: boolean) => void;
-  toggleBookmark: (questionId: string) => void;
-  setCurrentQuestionInView: (index: number) => void;
-  startTimer: () => void;
-  stopTimer: () => void;
-}
-
-// 3. INITIAL STATE (includes bookmarks and grouping)
-const initialState: QuizState = {
-  questions: [],
-  userAnswers: [],
-  currentQuestionInView: 0,
-  isLoading: true,
-  mode: 'practice',
-  showReportCard: false,
-  currentViewAnswerId: null,
-  isPageScrolled: false,
-  isGroupingEnabled: false,
-  bookmarkedQuestions: new Set(),
-  timeLeft: 0,
-  initialTime: 0,
-  timerInterval: null,
-  currentQuizParams: null,
+// --- Helper: Get Auth Token ---
+// We'll need this for API calls
+const getAuthHeader = async () => {
+  const user = auth.currentUser;
+  if (!user) return null;
+  const token = await user.getIdToken();
+  return { 'Authorization': `Bearer ${token}` };
 };
 
-export const useQuizStore = create<QuizState & QuizActions>((set, get) => ({
+// --- Initial State Definition ---
+// This is the default state when the app loads
+const initialState: QuizState = {
+  // Core Data
+  questions: [],
+  userAnswers: [],
+  
+  // Status
+  isLoading: true,
+  isTestMode: false,
+  showReport: false,
+  showDetailedSolution: false,
+  quizError: null,
+  
+  // Timer
+  timeLeft: 0,
+  totalTime: 0,
+  
+  // UI & Interaction
+  currentQuestionNumberInView: 1,
+  currentViewAnswer: null,
+  isPageScrolled: false,
+  isTopBarVisible: true,
+  
+  // Grouping
+  quizTitle: '',
+  quizGroupBy: null,
+  isGroupingEnabled: false, // Default to false (PYQ style)
+  currentGroupInView: null,
+
+  // Review
+  bookmarkedQuestions: new Set<string>(),
+  markedForReview: new Set<string>(),
+
+  // Notifications
+  toast: { show: false, message: '', type: 'info' },
+  performanceStats: null,
+};
+
+// --- Create the Zustand Store ---
+export const useQuizStore = create<QuizStore>((set, get) => ({
   ...initialState,
 
   // --- ACTIONS ---
 
-  fetchQuestions: async (params) => {
-    set({ ...initialState, isLoading: true, currentQuizParams: params });
-    try {
-      const { type, filter, value } = params;
-      // When fetching by subject, automatically enable grouping
-      const isSubjectBased = filter === 'subject';
-      
-      const questionsRef = collection(db, 'questions');
-      const q = query(
-        questionsRef,
-        where('type', '==', type),
-        where(filter, '==', (filter === 'year' ? parseInt(value) : value.replace(/-/g, ' ')))
-      );
-      const querySnapshot = await getDocs(q);
-      const fetchedQuestions: Question[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedQuestions.push({ id: doc.id, ...doc.data() } as Question);
-      });
-      const calculatedTime = fetchedQuestions.length * SECONDS_PER_QUESTION;
-      set({ 
-        questions: fetchedQuestions, 
-        initialTime: calculatedTime,
-        timeLeft: calculatedTime,
-        isLoading: false,
-        isGroupingEnabled: isSubjectBased, // Correctly sets grouping default
-      });
-    } catch (error) {
-      console.error("Error fetching questions from Firestore:", error);
-      set({ isLoading: false });
-    }
+  // --- Initialization ---
+  loadAndStartQuiz: async (filter: QuizFilter) => {
+    // This is where we will fetch questions from our API
+    // We will implement this in a future feature
+    console.log("loadAndStartQuiz called with filter:", filter);
+    set({ ...initialState, isLoading: true, quizError: null }); // Reset the store
+    
+    // TEMPORARY: Just to see it working, we'll set loading to false
+    // In the next step, we will add the real fetch logic here.
+    setTimeout(() => {
+       set({ isLoading: false });
+       // We'll add a dummy question to test
+       const dummyQuestion: Question = {
+         id: "123", questionNumber: 1, text: "This is a dummy question. Does the UI connect?",
+         options: [
+           { label: "A", text: "Yes" },
+           { label: "B", text: "No" },
+           { label: "C", text: "Maybe" },
+           { label: "D", text: "I don't know" }
+         ],
+         correctAnswer: "A", explanation: "The explanation will go here.",
+         subject: "Polity", topic: "Dummy Topic", exam: "UPSC", year: 2024, examYear: "UPSC-2024"
+       };
+       set({ 
+         questions: [dummyQuestion], 
+         quizTitle: "Test Quiz", 
+         quizGroupBy: 'topic', 
+         isGroupingEnabled: false, // PYQ style
+         totalTime: 120, // 2 minutes
+         timeLeft: 120,
+         isLoading: false, // Make sure loading is false
+       });
+    }, 1500);
   },
 
-  handleAnswerSelect: (questionId, selectedOptionIndex) => {
-    const { mode, questions } = get();
-    if (mode !== 'test') return;
-    const question = questions.find(q => q.id === questionId);
-    if (!question) return;
-    const isCorrect = question.options[selectedOptionIndex].isCorrect;
-    const newAnswer: UserAnswer = { questionId, selectedOption: selectedOptionIndex, isCorrect, timeTaken: 0 };
-    set(state => ({
-      userAnswers: state.userAnswers.find(ua => ua.questionId === questionId)
-        ? state.userAnswers.map(ua => ua.questionId === questionId ? newAnswer : ua)
-        : [...state.userAnswers, newAnswer]
-    }));
-  },
-
+  // --- Quiz Lifecycle ---
   startTest: () => {
-    set(state => ({
-      mode: 'test',
+    // This will run when the "Start Test" button is clicked
+    console.log("startTest action called");
+    set((state) => ({
+      isTestMode: true,
+      showReport: false,
+      showDetailedSolution: false,
       userAnswers: [],
-      timeLeft: state.initialTime,
-      showReportCard: false,
-      currentQuestionInView: 0,
-      currentViewAnswerId: null,
+      markedForReview: new Set<string>(),
+      timeLeft: state.totalTime, // Reset timer to the full amount
     }));
-    get().startTimer();
   },
 
   submitTest: () => {
-    get().stopTimer();
-    set({ mode: 'practice', showReportCard: true });
+    // This will run when the "Submit Test" button is clicked
+    console.log("submitTest action called");
+    set({ isTestMode: false, showReport: true });
+    // We will add logic to calculate results here
   },
   
   resetTest: () => {
-    get().stopTimer();
-    set(initialState);
+    // This will run when "Back to Dashboard" is clicked
+    console.log("resetTest action called");
+    set({ ...initialState, isLoading: false }); // Reset to default
+    // We will call router.push('/dashboard') from the component
   },
 
-  enterReviewMode: () => {
-    set({ showReportCard: false, mode: 'review' });
-  },
-
-  viewAnswer: (questionId) => {
-    set({ currentViewAnswerId: questionId });
-  },
-
-  closeAnswerView: () => {
-    set({ currentViewAnswerId: null });
-  },
-
-  setPageScrolled: (isScrolled) => {
-    set({ isPageScrolled: isScrolled });
-  },
-
-  setIsGroupingEnabled: (isGrouping) => set({ isGroupingEnabled: isGrouping }),
-
-  toggleBookmark: (questionId) => {
-    set(state => {
-      const newBookmarkedQuestions = new Set(state.bookmarkedQuestions);
-      if (newBookmarkedQuestions.has(questionId)) {
-        newBookmarkedQuestions.delete(questionId);
-      } else {
-        newBookmarkedQuestions.add(questionId);
-      }
-      return { bookmarkedQuestions: newBookmarkedQuestions };
+  // --- Answer & Review ---
+  handleAnswerSelect: (questionId: string, answer: string) => {
+    // This runs when a user clicks an answer (A, B, C, D)
+    console.log(`handleAnswerSelect: ${questionId} = ${answer}`);
+    set((state) => {
+      // Find and replace the answer if it already exists
+      const newUserAnswers = state.userAnswers.filter(
+        (ua) => ua.questionId !== questionId
+      );
+      newUserAnswers.push({ questionId, answer });
+      
+      return { userAnswers: newUserAnswers };
     });
   },
 
-  setCurrentQuestionInView: (index) => {
-    set({ currentQuestionInView: index });
+  toggleBookmark: (questionId: string) => {
+    console.log(`toggleBookmark: ${questionId}`);
+    set((state) => {
+      const newBookmarked = new Set(state.bookmarkedQuestions);
+      if (newBookmarked.has(questionId)) {
+        newBookmarked.delete(questionId);
+      } else {
+        newBookmarked.add(questionId);
+      }
+      return { bookmarkedQuestions: newBookmarked };
+    });
   },
 
-  startTimer: () => {
-    const interval = setInterval(() => {
-      set(state => {
-        if (state.timeLeft <= 1) {
-          clearInterval(interval);
-          get().submitTest();
-          return { timeLeft: 0 };
-        }
-        return { timeLeft: state.timeLeft - 1 };
-      });
-    }, 1000);
-    set({ timerInterval: interval });
+  toggleMarkForReview: (questionId: string) => {
+    console.log(`toggleMarkForReview: ${questionId}`);
+    set((state) => {
+      const newMarked = new Set(state.markedForReview);
+      if (newMarked.has(questionId)) {
+        newMarked.delete(questionId);
+      } else {
+        newMarked.add(questionId);
+      }
+      return { markedForReview: newMarked };
+    });
   },
 
-  stopTimer: () => {
-    const { timerInterval } = get();
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      set({ timerInterval: null });
-    }
+  // --- Navigation & UI ---
+  handleDetailedSolution: () => {
+    console.log("handleDetailedSolution action called");
+    set({ showReport: false, showDetailedSolution: true });
+  },
+  viewAnswer: (questionId: string) => {
+    // This is for "Practice Mode" as you described
+    console.log(`viewAnswer: ${questionId}`);
+    set({ currentViewAnswer: questionId });
+  },
+  closeAnswerView: () => {
+    console.log("closeAnswerView action called");
+    set({ currentViewAnswer: null });
+  },
+  setCurrentQuestionNumberInView: (questionNumber: number) => {
+    set({ currentQuestionNumberInView: questionNumber });
+  },
+  setIsPageScrolled: (isScrolled: boolean) => {
+    set({ isPageScrolled: isScrolled });
+  },
+  setIsTopBarVisible: (isVisible: boolean) => {
+    set({ isTopBarVisible: isVisible });
+  },
+  setCurrentGroupInView: (groupName: string | null) => {
+    set({ currentGroupInView: groupName });
+  },
+  setIsGroupingEnabled: (isEnabled: boolean) => {
+    set({ isGroupingEnabled: isEnabled });
+  },
+
+  // --- Timer ---
+  setTimeLeft: (timeLeft: number) => {
+    set({ timeLeft });
+  },
+
+  // --- Notifications ---
+  showToast: (message: string, type: 'info' | 'warning' = 'info') => {
+    set({ toast: { show: true, message, type } });
+  },
+  hideToast: () => {
+    set({ toast: { show: false, message: '', type: 'info' } });
   },
 }));
-

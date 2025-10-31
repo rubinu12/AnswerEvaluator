@@ -1,88 +1,110 @@
+// app/practice/[type]/[filter]/[value]/page.tsx
 'use client';
 
-// [FIX] Import 'use' from React to handle the new params object correctly
-import React, { useEffect, use } from 'react';
+import { useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { useQuizStore } from '@/lib/quizStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { QuizFilter } from '@/lib/quizTypes';
 
-// Import all our refactored components
+// --- Polished UI Components ---
 import Header from '@/components/quiz/Header';
+import DynamicQuizCommandBar from '@/components/quiz/DynamicQuizCommandBar';
 import QuestionColumn from '@/components/quiz/QuestionColumn';
 import AnswerColumn from '@/components/quiz/AnswerColumn';
-import ReportCard from '@/components/quiz/ReportCard';
 import TestStatusBar from '@/components/quiz/TestStatusBar';
+import ReportCard from '@/components/quiz/ReportCard';
 
-interface PracticePageProps {
-  // [FIX] The 'params' prop is now correctly typed as a Promise-like object
-  params: Promise<{
-    type: string;
-    filter: string;
-    value: string;
-  }>;
-}
-
-const LoadingSpinner = () => (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="text-center">
-            <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4 mx-auto"></div>
-            <h2 className="text-xl font-semibold text-gray-700">Preparing Your Quiz...</h2>
-            <p className="text-gray-500">Please wait a moment.</p>
-        </div>
-        <style jsx>{`
-            .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
-            @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        `}</style>
-    </div>
+// --- Placeholders ---
+// We'll replace these with real components later
+const LoadingScreen = () => (
+  <div className="flex items-center justify-center h-screen">
+    <p className="text-2xl">Loading Quiz...</p>
+  </div>
 );
 
-const PracticePage: React.FC<PracticePageProps> = ({ params }) => {
-  // [FIX] Use the 'use' hook to unwrap the params promise
-  const resolvedParams = use(params);
-  const { fetchQuestions, resetTest, isLoading, questions, showReportCard, mode } = useQuizStore();
+const ErrorDisplay = ({ message }: { message: string }) => (
+  <div className="flex items-center justify-center h-screen">
+    <p className="text-2xl text-red-500">{message}</p>
+  </div>
+);
+
+export default function QuizPage() {
+  const params = useParams();
+
+  // 1. Get the state and actions from our Zustand store
+  const {
+    isLoading,
+    quizError,
+    loadAndStartQuiz,
+    isTestMode,
+    showReport,
+  } = useQuizStore();
 
   useEffect(() => {
-    // Now we can safely use the resolved params
-    fetchQuestions(resolvedParams);
-    
-    return () => {
-      resetTest();
-    };
-  // [FIX] The dependency array now uses the resolved params object
-  }, [resolvedParams, fetchQuestions, resetTest]);
+    // 2. Parse the URL parameters to create a filter
+    const filter: QuizFilter = {};
+    const type = params.type as string; // 'subject', 'year', 'topic'
+    const filterKey = params.filter as string; // 'polity', '2023', etc.
+    const value = params.value as string; // 'all' or specific value
 
-  if (isLoading || (questions.length === 0 && !showReportCard)) {
-    return <LoadingSpinner />;
+    // This logic determines what to fetch from the API
+    if (type === 'subject') {
+      filter.subject = filterKey;
+      if (value !== 'all') filter.topic = value;
+    } else if (type === 'year') {
+      filter.exam = filterKey;
+      if (value !== 'all') filter.year = value;
+    } else if (type === 'topic') {
+      filter.topic = filterKey;
+    }
+
+    // 3. Call the action from our store to load the quiz
+    loadAndStartQuiz(filter);
+    
+    // This is a "practice" page, so we set isTestMode to false.
+    // We will handle Test Mode later.
+    useQuizStore.setState({ isTestMode: false });
+
+  }, [params, loadAndStartQuiz]); // Dependencies
+
+  // --- Render based on state ---
+
+  // 4. Handle Loading State
+  if (isLoading) {
+    return <LoadingScreen />;
   }
 
-  return (
-    <div className={`h-screen flex flex-col overflow-hidden bg-gray-50 ${mode === 'test' ? 'pt-16' : ''}`}>
-        {mode === 'test' ? <TestStatusBar /> : <Header />}
-      
-        <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-6 gap-6 overflow-hidden">
-            {/* Question column takes up all available space */}
-            <div className="flex-1 min-w-0 h-full">
-                <QuestionColumn />
-            </div>
-            {/* Answer column has a responsive, non-shrinking width */}
-            <div className="w-full lg:w-72 xl:w-80 flex-shrink-0 h-full">
-                <AnswerColumn />
-            </div>
-        </main>
+  // 5. Handle Error State
+  if (quizError) {
+    return <ErrorDisplay message={quizError.message} />;
+  }
 
-        <AnimatePresence>
-            {showReportCard && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm"
-                >
-                    <ReportCard />
-                </motion.div>
-            )}
-      </AnimatePresence>
+  // 6. Render the Full Quiz UI
+  return (
+    <div className="flex flex-col min-h-screen">
+      {/* The main header (Title, Submit Button) */}
+      <Header />
+
+      {/* The dynamic polished submenu (Shows Topic, Performance, etc.) */}
+      <DynamicQuizCommandBar />
+
+      {/* The blue status bar (Only shows in "Test Mode") */}
+      <TestStatusBar />
+
+      {/* The modal that shows final results */}
+      {showReport && <ReportCard />}
+
+      <main className="flex-1 w-full max-w-full mx-auto">
+        <div className="grid grid-cols-12 h-full">
+          
+          {/* Column 1: The Question List */}
+          <QuestionColumn />
+
+          {/* Column 2: The Answer Palette */}
+          <AnswerColumn />
+          
+        </div>
+      </main>
     </div>
   );
-};
-
-export default PracticePage;
+}

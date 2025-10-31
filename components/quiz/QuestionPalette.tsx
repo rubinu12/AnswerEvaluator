@@ -1,3 +1,4 @@
+// components/quiz/QuestionPalette.tsx
 "use client";
 
 import React, { FC, useEffect, useRef } from 'react';
@@ -8,36 +9,50 @@ interface QuestionPaletteProps {
 }
 
 const QuestionPalette: FC<QuestionPaletteProps> = ({ onClose }) => {
-    // 2. Select all necessary state and actions from the store
-    const { questions, userAnswers, currentQuestionInView, setCurrentQuestionInView } = useQuizStore();
+    // 2. Select all necessary state (using our 1-based number)
+    const { 
+      questions, 
+      userAnswers, 
+      markedForReview, // Added this back
+      currentQuestionNumberInView, // Use 1-based number
+      setCurrentQuestionNumberInView // Use 1-based setter
+    } = useQuizStore();
+    
     const paletteContainerRef = useRef<HTMLDivElement>(null);
 
-    // Synchronized Scrolling Logic (preserved and updated for 0-based index)
+    // 3. Updated to watch the 1-based number
     useEffect(() => {
         if (paletteContainerRef.current) {
-            const activeButton = paletteContainerRef.current.querySelector(`#palette-btn-${currentQuestionInView}`);
+            const activeButton = paletteContainerRef.current.querySelector(
+              `#palette-btn-${currentQuestionNumberInView}` // Find 1-based ID
+            );
             if (activeButton) {
                 activeButton.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
-    }, [currentQuestionInView]);
+    }, [currentQuestionNumberInView]);
 
-    // 3. Updated to work with 0-based index and scroll to the correct card
-    const scrollToQuestion = (questionIndex: number) => {
-        setCurrentQuestionInView(questionIndex);
-        const questionElement = document.getElementById(`question-card-${questionIndex + 1}`);
+    // 4. Updated to take and set the 1-based question number
+    const scrollToQuestion = (questionNumber: number) => {
+        setCurrentQuestionNumberInView(questionNumber); // Set 1-based number
+        const questionElement = document.getElementById(
+          `question-card-${questionNumber}` // Find 1-based card
+        );
         if (questionElement) {
             questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
         onClose(); // Close the palette after selection
     };
 
-    // 4. Refactored to get status based on 0-based index
-    const getStatusClass = (index: number): string => {
-        const questionId = questions[index]?.id;
-        if (currentQuestionInView === index) return 'bg-blue-100 border-blue-500 text-blue-600';
-        // Mark for review logic is removed to match QuestionColumn
-        if (userAnswers.some(a => a.questionId === questionId)) return 'bg-green-100 border-green-300 text-green-700';
+    // 5. Refactored to get status based on 1-based number
+    const getStatusClass = (qNumber: number): string => {
+        const questionId = questions[qNumber - 1]?.id; // Use qNumber-1 to index array
+        if (currentQuestionNumberInView === qNumber) 
+          return 'bg-blue-100 border-blue-500 text-blue-600';
+        if (markedForReview.has(questionId)) // Added this back
+          return 'bg-purple-100 border-purple-300 text-purple-700';
+        if (userAnswers.some(a => a.questionId === questionId)) 
+          return 'bg-green-100 border-green-300 text-green-700';
         return 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50';
     };
 
@@ -51,14 +66,15 @@ const QuestionPalette: FC<QuestionPaletteProps> = ({ onClose }) => {
             >
                 <h3 className="text-md font-semibold text-center text-gray-800 mb-4">All Questions</h3>
                 <div ref={paletteContainerRef} className={`grid ${gridCols} gap-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar`}>
-                    {questions.map((q, index) => (
+                    {/* 6. Looping and passing the 1-based question number */}
+                    {questions.map((q) => (
                         <button
                             key={q.id}
-                            id={`palette-btn-${index}`}
-                            onClick={() => scrollToQuestion(index)}
-                            className={`btn w-12 h-12 flex-shrink-0 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-200 border ${getStatusClass(index)}`}
+                            id={`palette-btn-${q.questionNumber}`}
+                            onClick={() => scrollToQuestion(q.questionNumber)}
+                            className={`btn w-12 h-12 flex-shrink-0 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-200 border ${getStatusClass(q.questionNumber)}`}
                         >
-                            {index + 1}
+                            {q.questionNumber}
                         </button>
                     ))}
                 </div>
