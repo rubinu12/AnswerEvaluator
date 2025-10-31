@@ -23,7 +23,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    // [FIX] Applying our custom 'no-scrollbar' class to the root HTML element
+    <html lang="en" className="h-full no-scrollbar">
+      {/* The body no longer needs the class */}
       <body className={`${poppins.variable} font-poppins h-full`}>
         <AuthContextProvider>
           {/* Mobile View */}
@@ -31,7 +33,8 @@ export default function RootLayout({
             <div className="fixed-background" />
             <div className="relative flex flex-col h-full">
               <MobileHeader />
-              <main className="flex-1 flex flex-col overflow-y-auto">
+              {/* [FIX] Applying the class to the main scrollable area on mobile */}
+              <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar">
                 {children}
               </main>
               <MobileBottomNav />
@@ -39,7 +42,8 @@ export default function RootLayout({
           </div>
 
           {/* Desktop View */}
-          <div className="hidden md:block h-full">
+          {/* [FIX] The desktop view needs a container that can scroll */}
+          <div className="hidden md:block h-full overflow-y-auto no-scrollbar">
             <div className="fixed-background" />
             {children}
           </div>

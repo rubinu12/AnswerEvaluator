@@ -1,13 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useEvaluationStore } from '@/lib/store';
 import { PreparedQuestion, EvaluationCompletePayload } from '@/lib/types';
 import { ChevronDown, Edit3, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
+import { useAuthContext } from '@/lib/AuthContext';
 
-// A final, perfected sub-component for a single question card
+// 1. [NEW] A simple, accurate word counting utility function
+const countWords = (text: string): number => {
+    if (!text) return 0;
+    // This regex splits by spaces and newlines, and filters out empty strings
+    return text.trim().split(/\s+/).filter(Boolean).length;
+};
+
 const EditableQuestionCard = ({
     question,
     index,
@@ -23,6 +30,9 @@ const EditableQuestionCard = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editedAnswer, setEditedAnswer] = useState(question.userAnswer);
 
+    // 2. [NEW] Calculate the word count whenever the edited answer changes
+    const wordCount = useMemo(() => countWords(editedAnswer), [editedAnswer]);
+
     const handleSaveChanges = () => {
         updateQuestion(index, { ...question, userAnswer: editedAnswer });
         setIsEditing(false);
@@ -31,15 +41,18 @@ const EditableQuestionCard = ({
     const handleMarksChange = (marks: number) => {
         updateQuestion(index, { ...question, maxMarks: marks });
     };
+    
+    // Determine the word limit and appropriate color for the counter
+    const wordLimit = question.maxMarks === 10 ? 150 : 250;
+    const wordCountColor = wordCount > wordLimit * 1.1 ? 'text-red-500' : wordCount > wordLimit ? 'text-amber-500' : 'text-slate-500';
+
 
     return (
         <div className="border-b border-slate-200 last:border-b-0">
-            {/* Header section for collapsing and marks */}
             <div
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex w-full items-center justify-between p-4 text-left gap-4 hover:bg-slate-50 transition-colors cursor-pointer"
             >
-                {/* --- [THE FIX] Use the card's index for sequential numbering --- */}
                 <strong className="font-semibold text-slate-800 truncate flex-1 text-left">
                     Q{index + 1}: {question.questionText.substring(0, 100)}...
                 </strong>
@@ -58,7 +71,6 @@ const EditableQuestionCard = ({
                     />
                 </div>
             </div>
-            {/* Collapsible content area */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
@@ -69,20 +81,24 @@ const EditableQuestionCard = ({
                     >
                         <div className="p-4 bg-slate-50/50">
                             {isEditing ? (
-                                // EDIT MODE
                                 <div className="bg-white p-2 rounded-md border border-blue-400 shadow-inner">
                                     <textarea
                                         value={editedAnswer}
                                         onChange={(e) => setEditedAnswer(e.target.value)}
                                         className="w-full text-sm text-slate-700 min-h-[300px] resize-none focus:outline-none"
                                     />
-                                    <div className="flex justify-end gap-2 mt-2">
-                                        <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-xs font-semibold text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-md">Cancel</button>
-                                        <button onClick={handleSaveChanges} className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md">Save Changes</button>
+                                    {/* 3. [NEW] Display the word counter and controls */}
+                                    <div className="flex justify-between items-center gap-2 mt-2">
+                                        <div className={`text-xs font-semibold ${wordCountColor}`}>
+                                            {wordCount} / {wordLimit} words
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-xs font-semibold text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-md">Cancel</button>
+                                            <button onClick={handleSaveChanges} className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md">Save Changes</button>
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
-                                // VIEW MODE
                                 <div className="relative group">
                                     <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-4">
                                         <div className="text-sm text-slate-800 space-y-4">
@@ -108,8 +124,9 @@ const EditableQuestionCard = ({
     );
 };
 
-// The main ReviewCard component
+// The main ReviewCard component (logic remains the same)
 export default function ReviewCard() {
+    const { user, userProfile } = useAuthContext();
     const {
         setIsReviewing,
         preparedData,
@@ -119,6 +136,7 @@ export default function ReviewCard() {
         failEvaluation,
         selectedPaper,
     } = useEvaluationStore();
+    const [error, setError] = useState('');
 
     const updateQuestion = (index: number, updatedQuestion: PreparedQuestion) => {
         const newData = [...preparedData];
@@ -128,37 +146,56 @@ export default function ReviewCard() {
 
     const removeQuestion = (index: number) => {
         const newData = preparedData.filter((_, i) => i !== index);
-        // We still need to update the questionNumber in the data for when it's saved
         const renumberedData = newData.map((q, i) => ({ ...q, questionNumber: i + 1 }));
         setPreparedData(renumberedData);
     };
 
     const handleConfirmEvaluation = async () => {
-        // Before sending to backend, ensure the data has the correct sequential numbers
+        setError('');
+
+        if (!user || !userProfile) {
+            failEvaluation("Authentication error. Please log in again.");
+            return;
+        }
+
+        const evaluationCost = preparedData.length;
+
+        if (userProfile.subscriptionStatus !== 'PREMIUM' && userProfile.subscriptionStatus !== 'ADMIN' && userProfile.remainingEvaluations < evaluationCost) {
+            setError(`You do not have enough evaluations. This requires ${evaluationCost}, but you only have ${userProfile.remainingEvaluations}.`);
+            return;
+        }
+
         const correctlyNumberedData = preparedData.map((q, i) => ({ ...q, questionNumber: i + 1 }));
         setPreparedData(correctlyNumberedData);
 
         setIsReviewing(false);
         startEvaluation();
         try {
+            const idToken = await user.getIdToken();
+
             const response = await fetch('/api/evaluate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
                 body: JSON.stringify({
-                    preparedData: correctlyNumberedData, // Send the corrected data
+                    preparedData: correctlyNumberedData,
                     subject: selectedPaper,
                 }),
             });
+
             const result = await response.json();
             if (!response.ok) {
                 throw new Error(result.error || 'Failed to get final evaluation.');
             }
             completeEvaluation({
                 analysis: result,
-                preparedData: correctlyNumberedData, // Use corrected data for final payload
+                preparedData: correctlyNumberedData,
                 subject: selectedPaper as EvaluationCompletePayload['subject'],
             });
         } catch (err: any) {
+            console.error("CRITICAL ERROR in handleConfirmEvaluation:", err);
             failEvaluation(err.message);
         }
     };
@@ -171,14 +208,8 @@ export default function ReviewCard() {
     return (
         <>
             <style jsx global>{`
-                .custom-scrollbar {
-                    scrollbar-width: none; /* For Firefox */
-                    -ms-overflow-style: none; /* For Internet Explorer and Edge */
-                }
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 0;
-                    height: 0;
-                }
+                .custom-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+                .custom-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
             `}</style>
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200/60 flex flex-col min-h-[85vh]">
                 <h3 className="text-xl font-bold text-slate-800">Review Your Answer</h3>
@@ -198,6 +229,13 @@ export default function ReviewCard() {
                         ))}
                     </div>
                 </div>
+
+                {error && (
+                    <div className="mt-4 p-3 text-center bg-red-100 text-red-700 rounded-lg text-sm font-semibold">
+                        {error}
+                    </div>
+                )}
+
                 <div className="flex space-x-4 mt-6 pt-4 border-t">
                     <button
                         onClick={handleCancelReview}

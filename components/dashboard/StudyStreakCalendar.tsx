@@ -28,23 +28,29 @@ export default function StudyStreakCalendar() {
   const activeDays = [4, 7, 9, 11, 12, 14, 15, 16, 18, 19, 21, 22, 23];
   
   return (
-    <div className="relative bg-white p-6 rounded-2xl shadow-lg border border-gray-200/60 transition-transform duration-300 hover:scale-[1.02]">
+    // [FIX] Padding is now smaller on the smallest screens
+    <div className="relative bg-white p-4 xs:p-6 rounded-2xl shadow-lg border border-gray-200/60 transition-transform duration-300 hover:scale-[1.02]">
       <Star className="absolute -top-3 -right-3 h-8 w-8 text-orange-300" fill="currentColor" />
 
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-red-500">
-          <Flame className="h-6 w-6 text-white" />
+        {/* [FIX] Icon container is slightly smaller on the smallest screens */}
+        <div className="flex h-9 w-9 xs:h-10 xs:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-red-500">
+          <Flame className="h-5 w-5 xs:h-6 xs:w-6 text-white" />
         </div>
-        <h2 className="text-xl font-semibold text-gray-800">Study Streak</h2>
+        {/* [FIX] Header font size is now responsive */}
+        <h2 className="text-lg xs:text-xl font-semibold text-gray-800">Study Streak</h2>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mt-6 text-center">
-        <div className="bg-orange-50/80 p-3 rounded-lg border border-orange-100">
-          <p className="text-3xl font-bold text-orange-500">12</p>
+      {/* [FIX] Reduced gap between stat cards */}
+      <div className="grid grid-cols-2 gap-2 xs:gap-4 mt-6 text-center">
+        {/* [FIX] Reduced padding inside stat cards */}
+        <div className="bg-orange-50/80 p-2 xs:p-3 rounded-lg border border-orange-100">
+          {/* [FIX] Reduced font size of streak number */}
+          <p className="text-2xl xs:text-3xl font-bold text-orange-500">12</p>
           <p className="text-xs text-orange-800/70 font-medium">Current Streak</p>
         </div>
-        <div className="bg-slate-100/80 p-3 rounded-lg border border-slate-200">
-          <p className="text-3xl font-bold text-slate-600">28</p>
+        <div className="bg-slate-100/80 p-2 xs:p-3 rounded-lg border border-slate-200">
+          <p className="text-2xl xs:text-3xl font-bold text-slate-600">28</p>
           <p className="text-xs text-slate-500 font-medium">Longest Streak</p>
         </div>
       </div>
@@ -62,14 +68,18 @@ export default function StudyStreakCalendar() {
           </button>
         </div>
         
-        <div className="grid grid-cols-7 gap-y-2 text-center text-xs text-gray-400 font-medium">
-          <div>Sun</div> <div>Mon</div> <div>Tue</div> <div>Wed</div> <div>Thu</div> <div>Fri</div> <div>Sat</div>
+        {/* [FIX] Reduced gap between calendar day names */}
+        <div className="grid grid-cols-7 gap-x-1 text-center text-xs text-gray-400 font-medium">
+          <div>Su</div> <div>Mo</div> <div>Tu</div> <div>We</div> <div>Th</div> <div>Fr</div> <div>Sa</div>
         </div>
-        <div className="grid grid-cols-7 gap-y-2 mt-2 text-center text-sm">
+        {/* [FIX] Reduced gap between calendar dates */}
+        <div className="grid grid-cols-7 gap-y-2 gap-x-1 mt-2 text-center text-sm">
           {calendarDays.map((day, index) => (
-            <div key={index} className="flex justify-center items-center h-8">
+            // [FIX] Reduced height of the container for each date
+            <div key={index} className="flex justify-center items-center h-7 xs:h-8">
               {day && (
-                <span className={`flex items-center justify-center w-8 h-8 rounded-lg font-semibold
+                // [FIX] Reduced size of the date circle/square itself
+                <span className={`flex items-center justify-center w-7 h-7 xs:w-8 xs:h-8 rounded-lg font-semibold
                   ${activeDays.includes(day) ? 'bg-gradient-to-br from-orange-400 to-red-500 text-white shadow-md' : 'text-gray-600'}
                 `}>
                   {day}

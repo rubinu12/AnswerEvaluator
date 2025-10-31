@@ -16,6 +16,7 @@
     "@headlessui/react": "^2.2.7",
     "@lottiefiles/react-lottie-player": "^3.6.0",
     "firebase": "^12.1.0",
+    "firebase-admin": "^13.5.0",
     "framer-motion": "^12.23.12",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",

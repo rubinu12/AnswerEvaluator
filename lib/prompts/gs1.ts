@@ -12,7 +12,6 @@ export const getGS1EvaluationPrompt = (preparedData: PreparedQuestion[]): string
         `--- QUESTION ${q.questionNumber} (${q.maxMarks} Marks) ---\nQuestion: ${q.questionText}\nAnswer:\n${q.userAnswer}`
     ).join('\n\n');
 
-    // FINAL JSON STRUCTURE with 'overallFeedback' re-introduced.
     const jsonStructure = `{
       "overallScore": 0,
       "totalMarks": 0,
@@ -57,6 +56,12 @@ export const getGS1EvaluationPrompt = (preparedData: PreparedQuestion[]): string
                 "locationInAnswer": "The sentence from the user's answer where this value-add should be inserted.",
                 "suggestion": "The specific data, case law, or example to add."
               }
+            ],
+            "bluePen": [
+              {
+                "appreciatedText": "An excellent, insightful phrase from the user's answer.",
+                "comment": "The mentor's comment on why this point is high-quality."
+              }
             ]
           },
           "strategicDebrief": {
@@ -99,17 +104,41 @@ export const getGS1EvaluationPrompt = (preparedData: PreparedQuestion[]): string
         - **History/Culture**: Penalize for lack of specific dates, figures, chronology, art/architectural terms.
         - **Geography**: Penalize for lack of precise geographical terms, core concepts, and diagrams.
         - **Society**: Penalize for lack of sociological terms, linkage to current events, and data from reports (NFHS, NCRB).
+    - **Appreciate Inter-Subject Linkages**: Actively look for and reward connections (e.g., linking geography to environment, history to culture). This is a key trait of a top answer.
     - Assess fulfillment for each demand ('Fully Addressed', 'Partially Addressed', 'Not Addressed') and comment. Populate \`userFulfillment\` and \`mentorComment\`.
 
     **STAGE 3: STRUCTURAL INTEGRITY ANALYSIS**
     - Analyze the *function* and *flow* of the Intro, Body, and Conclusion. Populate the \`structuralAnalysis\` object.
 
     **STAGE 4: "THE MENTOR'S PEN" - MICRO-LEVEL ANALYSIS**
-    - **Red Pen:** Identify 2-3 instances of vague phrasing or weak arguments. Populate the \`redPen\` array.
-    - **Green Pen:** Identify 2-3 locations for high-value facts, GS1-specific data, or examples. Populate the \`greenPen\` array.
+    
+    --- [CRITICAL INSTRUCTION FOR MENTOR'S PEN] ---
+    1.  **MANDATORY MINIMUMS:** For every question, you **MUST** identify and provide a **minimum of two (2)** \`redPen\` items and a **minimum of two (2)** \`greenPen\` items. If the answer is perfect, find something to improve. Do not leave these arrays with fewer than two items each.
+    2.  **APPRECIATION (Blue Pen):** If you find an excellent inter-subject linkage or a particularly insightful point as identified in STAGE 2, you **MUST** highlight it using the \`bluePen\` array. Provide at least one \`bluePen\` item if a good linkage exists.
+    3.  **EXACT QUOTE RULE:** The value for \`"originalText"\` (redPen), \`"locationInAnswer"\` (greenPen), and **\`"appreciatedText"\` (bluePen)** **MUST BE AN EXACT, VERBATIM, CHARACTER-FOR-CHARACTER SUBSTRING** copied directly from the user's answer. Do not paraphrase.
+    
+    - **GOOD UPSC-LEVEL EXAMPLE (Red Pen):**
+      - User's Answer: "Many reports suggest that the digital divide is a major issue."
+      - Your JSON: \`{ "originalText": "Many reports suggest", "comment": "Vague attribution. Be specific. Name the report, e.g., 'As per the 'India Inequality Report 2022' by Oxfam India...'" }\`
+
+    - **GOOD UPSC-LEVEL EXAMPLE (Green Pen):**
+       - User's Answer: "...improved socio-economic conditions of the people even in rural areas."
+       - Your JSON: \`{ "locationInAnswer": "even in rural areas.", "suggestion": "[+ Add Data: Mention the role of Common Service Centres (CSCs) in delivering G2C services as per the Economic Survey.]" }\`
+
+    - **GOOD UPSC-LEVEL EXAMPLE (Blue Pen):**
+       - User's Answer: "The monsoonal climate not only affects our agriculture but also deeply influences cultural festivals like Onam and Bihu."
+       - Your JSON: \`{ "appreciatedText": "influences cultural festivals like Onam and Bihu", "comment": "Excellent Linkage! Connecting climatology (Geography) directly with cultural practices (Culture) demonstrates a holistic understanding. This is a high-scoring trait." }\`
+
+    - Now, based on these strict rules, populate the \`redPen\`, \`greenPen\`, and \`bluePen\` arrays.
+    --- [END CRITICAL INSTRUCTION] ---
 
     **POST-ANALYSIS: GENERATE THE "STRATEGIC DEBRIEF" & SCORE**
-    - Generate the \`strategicDebrief\` object, the \`idealAnswer\`, and a final \`score\` for the question based on all the above.
+    - Generate the \`strategicDebrief\` object, the \`idealAnswer\`, and a final \`score\` 
+    - **[NEW] WORD LIMIT ENFORCEMENT (CRITICAL):**
+      - For a 10-marker question (\`maxMarks\`=10), the \`idealAnswer\` MUST be between 140 and 160 words.
+      - For a 15-marker question (\`maxMarks\`=15), the \`idealAnswer\` MUST be between 240 and 260 words.
+      - Adhere to this word limit strictly.
+    for the question based on all the above.
 
     **PART 2: FINAL AGGREGATION & OVERALL FEEDBACK (Perform after analyzing ALL questions)**
     1.  **Calculate Scores:** Sum the individual scores for \`overallScore\` and max marks for \`totalMarks\`.

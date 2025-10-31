@@ -1,39 +1,63 @@
 'use client';
 
-import { LayoutDashboard, BarChart3, Activity } from 'lucide-react';
+import { LayoutDashboard, BarChart3 } from 'lucide-react';
+
+// A configuration object to hold the details for all possible tabs
+const tabDetails = {
+  overview: { 
+    label: 'Overview', 
+    icon: LayoutDashboard,
+    // Style for the active 'overview' tab
+    activeStyle: {
+      background: 'linear-gradient(135deg, #D4E9E2, #A5D6A7)',
+      color: '#052e16' // A dark green for readability
+    }
+  },
+  performance: { 
+    label: 'Performance', 
+    icon: BarChart3,
+    // Style for the active 'performance' tab
+    activeStyle: {
+      background: 'linear-gradient(135deg, #FFD1B5, #E1E5F8)',
+      color: '#7c2d12' // A dark orange for readability
+    }
+  },
+};
 
 // Define the shape of the props this component expects
 interface MobileSubNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  tabs: (keyof typeof tabDetails)[];
 }
 
-const tabs = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'performance', label: 'Performance', icon: BarChart3 },
-  { id: 'activity', label: 'Activity', icon: Activity },
-];
-
-export default function MobileSubNav({ activeTab, setActiveTab }: MobileSubNavProps) {
+export default function MobileSubNav({ activeTab, setActiveTab, tabs }: MobileSubNavProps) {
   return (
-    // [FIX 1] Changed top-16 to top-0 to remove the gap
-    <div className="sticky top-0 bg-white/70 backdrop-blur-lg z-10 border-b border-gray-200">
-      <div className="flex items-center justify-around px-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            // [FIX 2] Reduced vertical padding (py-2 to py-1.5) to decrease height
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 px-3 text-xs font-semibold transition-colors duration-200 border-b-2 ${
-              activeTab === tab.id
-                ? 'text-blue-600 border-blue-600'
-                : 'text-gray-500 border-transparent hover:text-blue-600'
-            }`}
-          >
-            <tab.icon size={18} />
-            <span>{tab.label}</span>
-          </button>
-        ))}
+    <div>
+      {/* Reduced horizontal padding to px-3 and vertical to py-1.5 */}
+      <div className="flex items-center justify-center px-3 py-1.5 gap-2">
+        {tabs.map((tabId) => {
+          const tab = tabDetails[tabId];
+          const isActive = activeTab === tabId;
+          if (!tab) return null;
+
+          return (
+            <button
+              key={tabId}
+              onClick={() => setActiveTab(tabId)}
+              // Inline style is used for the custom gradients
+              style={isActive ? tab.activeStyle : {}}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold transition-all duration-300 rounded-lg ${
+                isActive
+                  ? 'shadow-sm' // A more subtle shadow
+                  : 'text-slate-500 bg-slate-200/60 hover:bg-slate-300/60'
+              }`}
+            >
+              <tab.icon size={16} /> {/* Slightly smaller icon */}
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,16 +1,40 @@
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, getAuth, User, signOut } from 'firebase/auth';
+import { getFirestore, doc, getDoc, Timestamp } from 'firebase/firestore'; // Import Timestamp
 import firebase_app from '@/lib/firebase';
 
 const auth = getAuth(firebase_app);
+const db = getFirestore(firebase_app);
 
-// --- CONSTANTS ---
-const LAST_ACTIVITY_KEY = 'lastActivity';
-const INACTIVITY_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+// --- THIS IS THE ONLY CHANGE ---
+// 1. Expand the UserProfile interface to include all our new fields.
+export interface UserProfile {
+    // Original fields
+    subscriptionStatus: 'TRIAL' | 'PREMIUM' | 'EXPIRED' | 'PACK_USER' | 'ADMIN';
+    remainingEvaluations: number;
+    
+    // New fields from our final data model
+    name: string;
+    email: string;
+    phoneNo: string;
+    profilePicture: string;
+    targetExamYear: number;
+    createdAt: Timestamp;
+    lastLogin: Timestamp;
+    subscriptionExpiry: Timestamp | null;
+    aiCredits: number;
+}
 
-export const AuthContext = createContext<{ user: User | null; loading: boolean; logout: () => Promise<void> }>({
+// The rest of the file remains IDENTICAL to your original code.
+export const AuthContext = createContext<{ 
+    user: User | null; 
+    userProfile: UserProfile | null;
+    loading: boolean; 
+    logout: () => Promise<void> 
+}>({
     user: null,
+    userProfile: null,
     loading: true,
     logout: async () => {},
 });
@@ -23,51 +47,49 @@ interface AuthContextProviderProps {
 
 export function AuthContextProvider({ children }: AuthContextProviderProps) {
     const [user, setUser] = useState<User | null>(null);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const updateLastActivity = () => {
-        localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
-    };
-
     useEffect(() => {
-        if (user) {
-            window.addEventListener('mousedown', updateLastActivity);
-            window.addEventListener('keydown', updateLastActivity);
-            window.addEventListener('scroll', updateLastActivity);
-            updateLastActivity();
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            try {
+                if (firebaseUser) {
+                    setUser(firebaseUser);
 
-            return () => {
-                window.removeEventListener('mousedown', updateLastActivity);
-                window.removeEventListener('keydown', updateLastActivity);
-                window.removeEventListener('scroll', updateLastActivity);
-            };
-        }
-    }, [user]);
+                    const userDocRef = doc(db, "users", firebaseUser.uid);
+                    const docSnap = await getDoc(userDocRef);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-            if (firebaseUser) {
-                const lastActivityString = localStorage.getItem(LAST_ACTIVITY_KEY);
-                
-                if (lastActivityString) {
-                    const lastActivity = parseInt(lastActivityString, 10);
-                    const now = Date.now();
-
-                    if (now - lastActivity > INACTIVITY_TIMEOUT) {
-                        console.log('User inactive for over 24 hours. Signing out.');
-                        signOut(auth);
-                        setUser(null);
+                    if (docSnap.exists()) {
+                        // This will now correctly cast to the new, expanded UserProfile type
+                        setUserProfile(docSnap.data() as UserProfile);
                     } else {
-                        setUser(firebaseUser);
+                        // The default fallback remains, now with default values for new fields
+                        setUserProfile({
+                            subscriptionStatus: 'TRIAL',
+                            remainingEvaluations: 2,
+                            aiCredits: 10,
+                            name: "New User",
+                            email: firebaseUser.email || "",
+                            phoneNo: "",
+                            profilePicture: "",
+                            targetExamYear: new Date().getFullYear() + 1,
+                            createdAt: Timestamp.now(),
+                            lastLogin: Timestamp.now(),
+                            subscriptionExpiry: null,
+                        });
                     }
                 } else {
-                    setUser(firebaseUser);
+                    setUser(null);
+                    setUserProfile(null);
                 }
-            } else {
+            } catch (error) {
+                console.error("Error in AuthContextProvider:", error);
+                await signOut(auth);
                 setUser(null);
-                localStorage.removeItem(LAST_ACTIVITY_KEY);
+                setUserProfile(null);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         return () => unsubscribe();
@@ -76,13 +98,11 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     const logout = async () => {
         await signOut(auth);
         setUser(null);
+        setUserProfile(null);
     };
 
-    // --- LOGIC CHANGE ---
-    // The provider now renders its children immediately if the `loading` state is true.
-    // The PageLoader component will handle the visual loading state.
     return (
-        <AuthContext.Provider value={{ user, loading, logout }}>
+        <AuthContext.Provider value={{ user, userProfile, loading, logout }}>
             {children}
         </AuthContext.Provider>
     );

@@ -1,3 +1,5 @@
+// lib/prompts/gs2.ts
+
 interface PreparedQuestion {
     questionNumber: number;
     questionText: string;
@@ -10,7 +12,6 @@ export const getGS2EvaluationPrompt = (preparedData: PreparedQuestion[]): string
         `--- QUESTION ${q.questionNumber} (${q.maxMarks} Marks) ---\nQuestion: ${q.questionText}\nAnswer:\n${q.userAnswer}`
     ).join('\n\n');
 
-    // FINAL JSON STRUCTURE (Identical to GS1)
     const jsonStructure = `{
       "overallScore": 0,
       "totalMarks": 0,
@@ -26,7 +27,7 @@ export const getGS2EvaluationPrompt = (preparedData: PreparedQuestion[]): string
       "questionAnalysis": [
         {
           "questionNumber": 1,
-          "subject": "Polity | Governance | Social Justice | International Relations",
+          "subject": "Polity | Governance | Social Justice | IR",
           "score": 0,
           "questionDeconstruction": {
             "coreDemands": [
@@ -55,6 +56,12 @@ export const getGS2EvaluationPrompt = (preparedData: PreparedQuestion[]): string
                 "locationInAnswer": "The sentence from the user's answer where this value-add should be inserted.",
                 "suggestion": "The specific data, case law, or example to add."
               }
+            ],
+            "bluePen": [
+              {
+                "appreciatedText": "An excellent, insightful phrase from the user's answer.",
+                "comment": "The mentor's comment on why this point is high-quality."
+              }
             ]
           },
           "strategicDebrief": {
@@ -69,7 +76,7 @@ export const getGS2EvaluationPrompt = (preparedData: PreparedQuestion[]): string
     }`;
 
     return `
-    **ROLE:** You are an AI impersonating a brutally honest, top-tier UPSC Mentor specializing in **GS Paper 2**. You are a strategist providing the harsh, direct, and actionable feedback necessary to become a topper.
+    **ROLE:** You are an AI impersonating a brutally honest, top-tier UPSC Mentor specializing in **GS Paper 2 (Polity, Governance, Social Justice, IR)**. You are a strategist providing the harsh, direct, and actionable feedback necessary to become a topper.
 
     **TASK:** Evaluate the provided GS Paper 2 answer(s) by meticulously following the framework below. Your entire output must be a single, valid JSON object.
 
@@ -86,7 +93,7 @@ export const getGS2EvaluationPrompt = (preparedData: PreparedQuestion[]): string
     **PART 1: INDIVIDUAL QUESTION ANALYSIS (Loop for each question)**
 
     **PRELIMINARY STEP: CLASSIFY THE QUESTION**
-    - First, determine if the question primarily belongs to 'Polity', 'Governance', 'Social Justice', or 'International Relations'. Populate the \`subject\` field.
+    - First, determine if the question primarily belongs to 'Polity & Constitution', 'Governance', 'Social Justice', or 'International Relations'. Populate the \`subject\` field.
 
     **STAGE 1: DECONSTRUCT THE QUESTION'S "CORE DEMANDS"**
     - Analyze the question text ONLY. Identify the 1-3 essential sub-questions or "Core Demands." Populate the \`coreDemands.demand\` field.
@@ -94,25 +101,49 @@ export const getGS2EvaluationPrompt = (preparedData: PreparedQuestion[]): string
     **STAGE 2: "DEMAND FULFILLMENT" & GS2-SPECIFIC RUBRIC**
     - Read the user's answer to check if it addresses the Core Demands.
     - Apply a **Specialized GS2 Rubric**:
-        - **Polity**: Penalize heavily for missing **Constitutional Articles**, **Supreme Court judgments** (e.g., Kesavananda Bharati), and key **amendments**.
-        - **Governance**: Penalize for lack of **committee names** (e.g., 2nd ARC), relevant **laws/schemes**, and contemporary examples.
-        - **Social Justice**: Penalize for not citing data from **govt reports** (e.g., NFHS, Ministry reports) and relevant **SDGs**.
-        - **International Relations**: Penalize for lack of specific **treaties**, official policy names (e.g., 'Act East'), and understanding of geopolitical dynamics.
+        - **Polity & Constitution**: Penalize heavily for failure to cite specific Articles, Constitutional Amendments, and landmark Supreme Court judgments (e.g., Kesavananda Bharati, Maneka Gandhi).
+        - **Governance**: Penalize for lack of reference to specific government schemes, policies, and recommendations from bodies like the 2nd ARC.
+        - **Social Justice**: Penalize for lack of data from official reports (e.g., NITI Aayog, MoSPI), names of relevant welfare schemes, and constitutional provisions (e.g., Art 15, 16).
+        - **International Relations**: Penalize for generic statements and lack of reference to specific treaties, foreign policy doctrines, and bilateral/multilateral forums (e.g., Quad, SCO).
+    - **Appreciate Inter-Disciplinary Linkages**: Actively look for and reward connections (e.g., linking a Polity concept to a Social Justice outcome, or a Governance scheme to an IR policy). This is a key trait of a top answer.
     - Assess fulfillment for each demand ('Fully Addressed', 'Partially Addressed', 'Not Addressed') and comment. Populate \`userFulfillment\` and \`mentorComment\`.
 
     **STAGE 3: STRUCTURAL INTEGRITY ANALYSIS**
     - Analyze the *function* and *flow* of the Intro, Body, and Conclusion. Populate the \`structuralAnalysis\` object.
 
     **STAGE 4: "THE MENTOR'S PEN" - MICRO-LEVEL ANALYSIS**
-    - **Red Pen:** Identify 2-3 instances of vague phrasing or weak arguments. Populate the \`redPen\` array.
-    - **Green Pen:** Identify 2-3 locations for high-value facts, GS2-specific data (like SC judgments or ARC recommendations), or examples. Populate the \`greenPen\` array.
+    
+    --- [CRITICAL INSTRUCTION FOR MENTOR'S PEN] ---
+    1.  **MANDATORY MINIMUMS:** For every question, you **MUST** identify and provide a **minimum of two (2)** \`redPen\` items and a **minimum of two (2)** \`greenPen\` items. If the answer is perfect, find something to improve. Do not leave these arrays with fewer than two items each.
+    2.  **APPRECIATION (Blue Pen):** If you find an excellent inter-disciplinary linkage or a particularly insightful point as identified in STAGE 2, you **MUST** highlight it using the \`bluePen\` array. Provide at least one \`bluePen\` item if a good linkage exists.
+    3.  **EXACT QUOTE RULE:** The value for \`"originalText"\` (redPen), \`"locationInAnswer"\` (greenPen), and **\`"appreciatedText"\` (bluePen)** **MUST BE AN EXACT, VERBATIM, CHARACTER-FOR-CHARACTER SUBSTRING** copied directly from the user's answer. Do not paraphrase.
+    
+    - **GOOD UPSC-LEVEL EXAMPLE (Red Pen):**
+      - User's Answer: "The right to privacy is an important fundamental right."
+      - Your JSON: \`{ "originalText": "is an important fundamental right", "comment": "Weak. Strengthen this by citing the specific legal basis. Rephrase to: 'is a fundamental right under Article 21, as affirmed in the Justice K.S. Puttaswamy (2017) judgment.'" }\`
+
+    - **GOOD UPSC-LEVEL EXAMPLE (Green Pen):**
+       - User's Answer: "This will help improve transparency in governance."
+       - Your JSON: \`{ "locationInAnswer": "transparency in governance.", "suggestion": "[+ Add Committee Reference: Mention that this aligns with the recommendations of the 2nd ARC's report on 'Ethics in Governance'.]" }\`
+
+    - **GOOD UPSC-LEVEL EXAMPLE (Blue Pen):**
+       - User's Answer: "The SHG movement not only empowers women economically but also increases their political participation in Panchayats."
+       - Your JSON: \`{ "appreciatedText": "increases their political participation in Panchayats", "comment": "Excellent Linkage! You've connected a Social Justice topic (SHGs) with a key outcome in Political Empowerment (Polity). This multi-dimensional thinking is exactly what examiners look for." }\`
+
+    - Now, based on these strict rules, populate the \`redPen\`, \`greenPen\`, and \`bluePen\` arrays.
+    --- [END CRITICAL INSTRUCTION] ---
 
     **POST-ANALYSIS: GENERATE THE "STRATEGIC DEBRIEF" & SCORE**
-    - Generate the \`strategicDebrief\` object, the \`idealAnswer\`, and a final \`score\` for the question based on all the above.
+    - Generate the \`strategicDebrief\` object, the \`idealAnswer\`, and a final \`score\` 
+    - **[NEW] WORD LIMIT ENFORCEMENT (CRITICAL):**
+      - For a 10-marker question (\`maxMarks\`=10), the \`idealAnswer\` MUST be between 140 and 160 words.
+      - For a 15-marker question (\`maxMarks\`=15), the \`idealAnswer\` MUST be between 240 and 260 words.
+      - Adhere to this word limit strictly.
+    for the question based on all the above.
 
     **PART 2: FINAL AGGREGATION & OVERALL FEEDBACK (Perform after analyzing ALL questions)**
     1.  **Calculate Scores:** Sum the individual scores for \`overallScore\` and max marks for \`totalMarks\`.
-    2.  **Generate Overall Assessment:** Look for recurring patterns across all answers. Is the user consistently weak in structure? Do they always forget to add data? Write a holistic summary in the \`overallFeedback.generalAssessment\` field.
+    2.  **Generate Overall Assessment:** Look for recurring patterns across all answers. Is the user consistently weak in citing articles? Do they always miss relevant judgments? Write a holistic summary in the \`overallFeedback.generalAssessment\` field.
     3.  **Rate Overall Parameters:** Based on this holistic view, provide an average score (1-10) and a single, high-impact suggestion for each parameter in the \`overallFeedback.parameters\` object.
 
     **FINAL OUTPUT INSTRUCTIONS:**

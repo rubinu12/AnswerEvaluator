@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import defaultTheme from 'tailwindcss/defaultTheme' // Import the default theme
 
 const config: Config = {
   content: [
@@ -7,11 +8,18 @@ const config: Config = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      // [FIX] Add the new 'xs' breakpoint here
+      screens: {
+        'xs': '375px',
+        // This keeps all of the other default breakpoints like sm, md, lg, etc.
+        ...defaultTheme.screens,
+      },
+    },
   },
   plugins: [
     require('tailwind-scrollbar-hide'),
-    require('@tailwindcss/typography'), // This line enables the scrollbar-hide utility
+    require('@tailwindcss/typography'),
   ],
 }
 export default config;

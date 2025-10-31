@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import UniversalNavbar, { NavLink } from '@/components/shared/UniversalNavbar';
 import { Search, Bell, User, Settings, LogOut } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
+import PracticeSubNav from '@/components/dashboard/PracticeSubNav'; // Import the new component
 
 export default function DashboardLayout({
   children,
@@ -119,13 +120,12 @@ export default function DashboardLayout({
 
   return (
     <>
-      {/* --- [THE FIX] --- */}
-      {/* This UniversalNavbar will now ONLY be visible on medium screens and larger */}
       <div className="hidden md:block">
         <UniversalNavbar
           navLinks={dashboardNavLinks}
           actions={(activeLink: NavLink) => <DashboardActions activeLink={activeLink} />}
         />
+        <PracticeSubNav /> {/* Added the new sub-navigation component here */}
       </div>
       <main>
         {children}

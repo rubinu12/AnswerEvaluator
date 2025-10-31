@@ -1,27 +1,24 @@
-// components/landing/Testimonials.tsx
-
 'use client';
 import { motion } from 'framer-motion';
-import Image from 'next/image'; // Import the Next.js Image component
+// The Image import is no longer needed
+// import Image from 'next/image';
 
 const testimonials = [
   {
     quote: "The feedback was brutally honest but incredibly helpful. I corrected micro-mistakes I didn't even know I was making. My essay score jumped by 25 marks.",
     author: 'Rohan Sharma',
     credential: 'UPSC Aspirant',
-    avatar: '/avatars/rohan.png', // Example path for avatar image
+    // The 'avatar' property has been removed
   },
   {
     quote: 'As a working professional, time is everything. Getting instant feedback without waiting for a mentor is a game-changer. It’s like having a 24/7 teacher.',
     author: 'Priya Patel',
     credential: 'BPSC Candidate',
-    avatar: '/avatars/priya.png', // Example path for avatar image
   },
   {
     quote: 'I used to struggle with structuring my answers. The AI pointed out exactly where my arguments were weak and how to link paragraphs better. Highly recommend!',
     author: 'Ankit Singh',
     credential: 'University Student',
-    avatar: '/avatars/ankit.png', // Example path for avatar image
   },
 ];
 
@@ -38,12 +35,11 @@ export default function Testimonials() {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { stiffness: 100 } },
+    visible: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 100 } },
   };
 
   return (
-    // Section container with consistent vertical padding
-    <div className="w-full bg-white py-24">
+    <section className="bg-white py-20 sm:py-32">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <h2 className="text-base text-emerald-600 font-semibold tracking-wide uppercase">
@@ -52,7 +48,7 @@ export default function Testimonials() {
           <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
             Trusted by Ambitious Achievers
           </p>
-          <p className="mt-4 max-w-2xl text-xl text-gray-500 mx-auto">
+          <p className="mt-4 max-w-2xl text-lg text-gray-500 mx-auto">
             See how our platform has made a difference in their preparation.
           </p>
         </div>
@@ -67,30 +63,23 @@ export default function Testimonials() {
           {testimonials.map((testimonial, index) => (
             <motion.div
               key={index}
-              className="bg-slate-50 rounded-xl shadow-lg overflow-hidden transition-transform duration-300 hover:-translate-y-2"
+              className="bg-slate-50 rounded-xl shadow-lg overflow-hidden flex flex-col justify-between" // Added flex classes for alignment
               variants={itemVariants}
+              whileHover={{ y: -8, transition: { duration: 0.3 } }}
             >
               <div className="p-8">
-                <p className="text-lg text-gray-700 italic">&ldquo;{testimonial.quote}&rdquo;</p>
+                <p className="text-lg text-gray-700 italic leading-relaxed">&ldquo;{testimonial.quote}&rdquo;</p>
               </div>
-              <div className="bg-gray-100 px-8 py-4 flex items-center">
-                <div className="flex-shrink-0">
-                  {/* You can replace this with an actual Image component if you have avatars */}
-                   <div className="h-12 w-12 rounded-full bg-emerald-200 flex items-center justify-center">
-                     <span className="text-xl font-bold text-emerald-700">
-                       {testimonial.author.charAt(0)}
-                     </span>
-                   </div>
-                </div>
-                <div className="ml-4">
-                  <div className="text-base font-bold text-gray-900">{testimonial.author}</div>
-                  <div className="text-sm text-emerald-600">{testimonial.credential}</div>
-                </div>
+              {/* [FIX] The entire image section has been removed */}
+              <div className="bg-gray-100 px-8 py-4">
+                {/* The text is now directly inside this container */}
+                <div className="text-base font-bold text-gray-900">{testimonial.author}</div>
+                <div className="text-sm font-semibold text-emerald-600">{testimonial.credential}</div>
               </div>
             </motion.div>
           ))}
         </motion.div>
       </div>
-    </div>
+    </section>
   );
 }

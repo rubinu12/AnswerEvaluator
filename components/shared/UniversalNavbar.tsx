@@ -7,10 +7,10 @@ import { usePathname } from 'next/navigation';
 import React from 'react';
 
 export interface NavLink {
-  label: string; // Stays as 'label' for consistency
+  label: string;
   href: string;
   gradient?: string;
-  color?: string; // FIX: Added the optional 'color' property
+  color?: string;
 }
 
 interface UniversalNavbarProps {
@@ -23,12 +23,17 @@ export default function UniversalNavbar({ navLinks, actions }: UniversalNavbarPr
     const pathname = usePathname();
 
     useEffect(() => {
-        const currentActiveLink = navLinks.find(link => pathname.startsWith(link.href));
+        // [FIX] More robust active link detection.
+        // It sorts the links by length descending, so it checks for more specific paths first (e.g., '/features' before '/').
+        const currentActiveLink = [...navLinks]
+            .sort((a, b) => b.href.length - a.href.length)
+            .find(link => pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href)));
+
         setActiveLink(currentActiveLink || navLinks[0]);
     }, [pathname, navLinks]);
 
     if (!activeLink) {
-        return null; // This prevents rendering with a null activeLink
+        return null;
     }
 
     return (
@@ -42,7 +47,7 @@ export default function UniversalNavbar({ navLinks, actions }: UniversalNavbarPr
                         <Link
                             key={link.label}
                             href={link.href}
-                            onClick={() => setActiveLink(link)}
+                            // [FIX] Removed the onClick handler. The useEffect now correctly handles state.
                             className={`relative px-5 py-2 text-sm font-medium transition-colors duration-300
                                 ${activeLink.label === link.label ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'}
                             `}

@@ -1,77 +1,74 @@
 'use client';
 
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Wand2, FileText, ArrowRight } from 'lucide-react';
+import { FileText, BrainCircuit, BarChart2 } from 'lucide-react';
+import Link from 'next/link'; // Import the Link component
 
-// FIX: Using a direct relative path is the most reliable way to import a neighboring component.
-// The error you saw is likely a caching issue with the development server.
-import InteractiveTrialModal from './InteractiveTrialModal';
+// The old modal imports and state management have been removed.
 
 export default function TrialEvaluator() {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+  // All the useState hooks for modals (isSignUpOpen, isEvaluationOpen, etc.) have been removed.
 
-    const steps = [
-        {
-            icon: Upload,
-            title: 'Upload Your Answer',
-            description: 'Snap a picture or upload a PDF of your handwritten answer sheet.',
-        },
-        {
-            icon: Wand2,
-            title: 'AI Magic Happens',
-            description: 'Our engine analyzes handwriting, structure, keywords, and context.',
-        },
-        {
-            icon: FileText,
-            title: 'Get Your Report',
-            description: 'Receive a detailed, actionable report in under 60 seconds.',
-        },
-    ];
+  return (
+    <section id="trial" className="py-20 sm:py-32 bg-slate-50/50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 font-serif">
+            Experience the Future of UPSC Preparation
+          </h2>
+          <p className="mt-4 text-lg text-slate-600 max-w-2xl mx-auto">
+            Our AI, powered by Google's Gemini, provides feedback that is not just accurate, but strategic. See for yourself.
+          </p>
+        </motion.div>
 
-    return (
-        // This container includes the vertical padding 'py-24' for consistent spacing.
-        <div className="w-full bg-slate-50/70 py-24">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-                    Try it to Believe It
-                </h2>
-                <p className="mt-4 text-lg text-gray-500">
-                    Experience the power of our AI evaluator with a free trial. No sign-up required.
-                </p>
-                
-                <div className="mt-12 grid gap-8 md:grid-cols-3">
-                    {steps.map((step, index) => (
-                        <div key={index} className="flex flex-col items-center text-center">
-                            <div className="flex items-center justify-center h-16 w-16 rounded-full bg-emerald-100 text-emerald-600">
-                                <step.icon className="h-8 w-8" />
-                            </div>
-                            <h3 className="mt-5 text-xl font-semibold text-gray-900">{step.title}</h3>
-                            <p className="mt-2 text-base text-gray-500">{step.description}</p>
-                        </div>
-                    ))}
-                </div>
-
-                <div className="mt-12">
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="btn inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-medium rounded-full text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg"
-                    >
-                        Start Your Free Trial
-                        <ArrowRight className="ml-3 h-6 w-6" />
-                    </button>
-                </div>
-            </div>
-            
-            {/* The modal component is included here and controlled by the 'isModalOpen' state */}
-            <InteractiveTrialModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSignUpSuccess={() => {
-                    // You can handle post-signup success logic here, e.g., show a message or close modal
-                    setIsModalOpen(false);
-                }}
-            />
+        {/* --- [THE FIX] --- */}
+        {/* The old button and its complex onClick logic have been replaced with a simple Link */}
+        <div className="mt-10 flex justify-center">
+          <Link
+            href="/auth" // The link now points directly to your main authentication page
+            className="btn text-lg font-semibold text-white bg-slate-800 rounded-lg hover:bg-slate-900 px-8 py-4 transition-transform hover:scale-105"
+          >
+            Get Your 2 Free Evaluations
+          </Link>
         </div>
-    );
+        {/* --- END FIX --- */}
+
+        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+          <div className="flex flex-col items-center">
+            <div className="bg-white p-4 rounded-full shadow-md border border-slate-200/60">
+              <FileText className="h-8 w-8 text-blue-500" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold text-slate-800">Upload Your Answer</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Provide a PDF or image of your handwritten mock answer.
+            </p>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="bg-white p-4 rounded-full shadow-md border border-slate-200/60">
+              <BrainCircuit className="h-8 w-8 text-emerald-500" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold text-slate-800">Receive AI Analysis</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Our AI performs a multi-stage analysis, from structure to content depth.
+            </p>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="bg-white p-4 rounded-full shadow-md border border-slate-200/60">
+              <BarChart2 className="h-8 w-8 text-purple-500" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold text-slate-800">Improve Your Score</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Get actionable feedback and a model answer to elevate your rank.
+            </p>
+          </div>
+        </div>
+      </div>
+      {/* The SignUpModal and EvaluationModal components have been completely removed from this file. */}
+    </section>
+  );
 }

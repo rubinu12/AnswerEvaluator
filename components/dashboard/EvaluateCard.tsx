@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react'; // 1. Import useRef
+import { useState, useRef } from 'react';
 import { ChevronDown, FileUp, Sparkles } from 'lucide-react';
 import { useEvaluationStore } from '@/lib/store';
 
@@ -28,7 +28,6 @@ export default function EvaluateCard() {
     const [error, setError] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     
-    // 2. Create a ref for the file input element
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = (file: File | null) => {
@@ -79,11 +78,14 @@ export default function EvaluateCard() {
     const isButtonDisabled = !selectedFile || !selectedSubject;
 
     return (
-        <div className="relative flex flex-col rounded-2xl bg-white p-8 shadow-lg border border-gray-200/60 transition-transform duration-300 hover:scale-[1.02]">
+        // [FIX] Card padding is now responsive
+        <div className="relative flex flex-col rounded-2xl bg-white p-4 xs:p-6 md:p-8 shadow-lg border border-gray-200/60 transition-transform duration-300 hover:scale-[1.02]">
             <Sparkles className="absolute -top-3 -left-3 h-8 w-8 text-yellow-400" fill="currentColor"/>
+            {/* [FIX] Header now wraps on small screens */}
             <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800">Evaluate New Answer</h2>
+                    {/* [FIX] Responsive font sizes for header */}
+                    <h2 className="text-lg xs:text-xl font-semibold text-gray-800">Evaluate New Answer</h2>
                     <p className="text-sm text-gray-500">Upload your handwritten answer for AI evaluation</p>
                 </div>
                 <div className="relative w-full sm:w-52">
@@ -119,18 +121,19 @@ export default function EvaluateCard() {
                 </div>
             </div>
 
-            {/* 3. The entire dropzone is now clickable */}
+            {/* [FIX] Dropzone is now more compact on smaller screens */}
             <div 
-                className="my-8 flex-grow flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-8 text-center cursor-pointer hover:border-emerald-400 transition-colors"
+                className="my-6 flex-grow flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-4 xs:p-8 text-center cursor-pointer hover:border-emerald-400 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
             >
-                <div className="rounded-full bg-green-100 p-4">
-                    <FileUp className="h-10 w-10 text-green-600" />
+                {/* [FIX] Icon and container are smaller */}
+                <div className="rounded-full bg-green-100 p-3 xs:p-4">
+                    <FileUp className="h-8 w-8 xs:h-10 xs:w-10 text-green-600" />
                 </div>
-                <p className="mt-4 font-semibold text-gray-700 break-all">{selectedFile ? selectedFile.name : 'Upload Answer Sheet'}</p>
-                <p className="mt-1 text-sm text-gray-500">Drag and drop or click to browse</p>
+                 {/* [FIX] Responsive text sizes */}
+                <p className="mt-4 font-semibold text-gray-700 break-all text-sm xs:text-base">{selectedFile ? selectedFile.name : 'Upload Answer Sheet'}</p>
+                <p className="mt-1 text-xs xs:text-sm text-gray-500">Drag and drop or click to browse</p>
                 
-                {/* 4. The hidden input is now linked via the ref */}
                 <input 
                     ref={fileInputRef}
                     id="file-upload" 
@@ -143,7 +146,8 @@ export default function EvaluateCard() {
             {error && (<p className="text-sm text-red-500 mb-4 text-center">{error}</p>)}
             <button
                 onClick={handlePrepareEvaluation}
-                className={`w-full rounded-lg py-3 text-md font-semibold text-white transition-all btn ${isButtonDisabled ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                // [FIX] Button is slightly smaller on small screens
+                className={`w-full rounded-lg py-2.5 xs:py-3 text-sm xs:text-base font-semibold text-white transition-all btn ${isButtonDisabled ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
                 disabled={isButtonDisabled}
             >
                 {selectedSubject ? `Prepare for ${selectedSubject.code}` : 'Select a Subject'}

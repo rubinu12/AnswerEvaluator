@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { PenSquare, ChevronLeft, ChevronRight, Quote, MoreHorizontal, Star } from 'lucide-react';
 
 const wisdoms = [
-  {
+ {
     category: "Answer Writing",
     author: "by Dr. Priya Sharma",
     text: "Structure your answers using the PREP method: Point, Reason, Example, Point. This ensures clarity and comprehensive coverage of the question while maintaining examiner engagement."
@@ -39,22 +39,26 @@ export default function MentorsWisdom() {
   const currentWisdom = wisdoms[currentIndex];
 
   return (
-    <div className="relative bg-white p-8 rounded-2xl shadow-lg border border-gray-200/60">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <div className="bg-gradient-to-br from-emerald-400 to-green-600 text-white rounded-2xl p-3 shadow-lg">
+    // [FIX] Reduced padding on mobile (p-6) and kept larger padding for medium screens and up (md:p-8)
+    <div className="relative bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-gray-200/60">
+      {/* [FIX] Added flex-wrap to allow items to wrap on very small screens */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <div className="bg-gradient-to-br from-emerald-400 to-green-600 text-white rounded-2xl p-3 shadow-lg flex-shrink-0">
             <PenSquare size={28} />
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Mentor's Wisdom</h2>
-            <div className="flex items-center gap-2 mt-1">
+          {/* [FIX] Added min-w-0 to allow text to truncate or wrap properly */}
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-gray-800 truncate">Mentor's Wisdom</h2>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">{currentWisdom.category}</span>
-              <span className="text-sm text-gray-500">{currentWisdom.author}</span>
+              <span className="text-sm text-gray-500 truncate">{currentWisdom.author}</span>
             </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        {/* [FIX] Added flex-shrink-0 to prevent buttons from being squished */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button onClick={handlePrev} className="p-2 rounded-full border border-emerald-200 bg-white/50 hover:bg-emerald-50 btn">
             <ChevronLeft className="h-5 w-5 text-emerald-700" />
           </button>
@@ -64,15 +68,16 @@ export default function MentorsWisdom() {
         </div>
       </div>
 
+      {/* [FIX] Adjusted quote position and size for mobile */}
       <div className="relative mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-6">
-        <Quote className="absolute -top-3 -left-3 h-10 w-10 text-emerald-200" fill="currentColor" />
+        <Quote className="absolute -top-2 -left-2 h-8 w-8 text-emerald-200" fill="currentColor" />
         <p className="text-gray-700 leading-relaxed z-10 relative">
           {currentWisdom.text}
         </p>
         <MoreHorizontal className="absolute bottom-4 right-4 h-5 w-5 text-emerald-400" />
       </div>
 
-      <div className="flex items-center justify-between mt-4">
+      <div className="flex items-center justify-between mt-4 flex-wrap gap-y-2">
         <div className="flex items-center gap-2">
           {wisdoms.map((_, index) => (
             <button

@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { Key, GitBranch, BookOpen, MessageSquare, Target, AlertTriangle, XCircle, Search } from 'lucide-react';
-import type { StrategicDebrief as StrategicDebriefType, MentorsPenData } from '@/lib/types';
+// Make sure BluePenFeedback is imported from your types
+import type { StrategicDebrief as StrategicDebriefType, MentorsPenData, RedPenFeedback, GreenPenFeedback, BluePenFeedback } from '@/lib/types';
 
-// This is the new, combined props interface
+// This is the combined props interface
 interface StrategicDebriefProps {
     debrief: StrategicDebriefType;
     idealAnswer: string;
@@ -14,47 +15,115 @@ interface StrategicDebriefProps {
     mentorsPen: MentorsPenData;
 }
 
-// Tab structure with icons and gradients
+// Tab structure remains the same
 const tabs = [
-    { id: 'annotated', label: 'Mentor\'s Pen', icon: MessageSquare, gradient: 'linear-gradient(to right, #facc15, #eab308)' },
+    { id: 'annotated', label: "Mentor's Pen", icon: MessageSquare, gradient: 'linear-gradient(to right, #facc15, #eab308)' },
     { id: 'structure', label: 'Model Structure', icon: GitBranch, gradient: 'linear-gradient(to right, #60a5fa, #3b82f6)' },
     { id: 'gaps', label: 'Content Gaps', icon: Target, gradient: 'linear-gradient(to right, #f87171, #dc2626)' },
-    { id: 'keywords', label: 'Topper\'s Keywords', icon: Key, gradient: 'linear-gradient(to right, #34d399, #10b981)' },
+    { id: 'keywords', label: "Topper's Keywords", icon: Key, gradient: 'linear-gradient(to right, #34d399, #10b981)' },
     { id: 'ideal', label: 'Ideal Answer', icon: BookOpen, gradient: 'linear-gradient(to right, #c084fc, #a855f7)' },
 ];
 
-// --- ANNOTATED ANSWER LOGIC (FIXED) ---
+// --- The Corrected and Enhanced Parser ---
 const AnnotatedAnswerContent = ({ userAnswer, mentorsPen }: { userAnswer: string; mentorsPen: MentorsPenData; }) => {
-    const buildAnnotatedHtml = () => {
-        let annotatedAnswer = ` ${userAnswer} `;
-        if (mentorsPen?.greenPen) {
-            mentorsPen.greenPen.forEach(item => {
-                const suggestionHtml = `<span class="relative group/suggestion cursor-pointer bg-emerald-100 text-emerald-800 font-semibold p-1 rounded-md">${item.locationInAnswer}<span class="font-bold text-emerald-600">${item.suggestion}</span><div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-sm p-3 text-xs text-white bg-slate-800 rounded-lg shadow-lg opacity-0 group-hover/suggestion:opacity-100 transition-opacity z-10 pointer-events-none prose prose-invert prose-xs"><strong>Value Addition:</strong> ${item.suggestion.replace('[+ Add Mention: ', '').replace(']', '')}</div></span>`;
-                annotatedAnswer = annotatedAnswer.replace(item.locationInAnswer, suggestionHtml);
-            });
-        }
-        if (mentorsPen?.redPen) {
-            mentorsPen.redPen.forEach(item => {
-                const correctionHtml = `<span class="relative group/correction cursor-pointer bg-red-100 text-red-800 underline decoration-red-500 decoration-wavy">${item.originalText}<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-3 text-xs text-white bg-slate-800 rounded-lg shadow-lg opacity-0 group-hover/correction:opacity-100 transition-opacity z-10 pointer-events-none">${item.comment}</div></span>`;
-                const regex = new RegExp(`(?<![=">/])${item.originalText.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}(?![<"'/])`, "g");
-                annotatedAnswer = annotatedAnswer.replace(regex, correctionHtml);
-            });
-        }
-        return { __html: annotatedAnswer.replace(/\n/g, '<br />') };
+    
+    // The Tooltip now supports a 'blue' color
+    const Tooltip = ({ text, color }: { text: string, color: 'red' | 'green' | 'blue' }) => {
+        const colorClasses = {
+            red: 'bg-red-600',
+            green: 'bg-emerald-600',
+            blue: 'bg-sky-600',
+        };
+        return (
+            <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 text-xs text-white ${colorClasses[color]} rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none`}>
+                {text}
+            </div>
+        );
     };
+
+    const annotatedNodes = useMemo(() => {
+        const escapeRegExp = (string: string) => {
+            if (!string) return '';
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        // 1. [FIX] Combine all feedback types, including the new 'bluePen'
+        const allFeedback = [
+            ...(mentorsPen?.redPen?.map(item => ({ ...item, type: 'red', text: item.originalText })) || []),
+            ...(mentorsPen?.greenPen?.map(item => ({ ...item, type: 'green', text: item.locationInAnswer })) || []),
+            ...(mentorsPen?.bluePen?.map(item => ({ ...item, type: 'blue', text: item.appreciatedText })) || [])
+        ].filter(item => item.text && item.text.trim() !== ''); // Ensure items have valid text
+
+        if (allFeedback.length === 0) {
+            return userAnswer.split('\n').map((line, i) => <React.Fragment key={i}>{line}<br /></React.Fragment>);
+        }
+
+        const regex = new RegExp(
+            allFeedback.map(item => `(${escapeRegExp(item.text)})`).join('|'),
+            'g'
+        );
+
+        const parts = userAnswer.split(regex).filter(part => part);
+
+        return parts.map((part, index) => {
+            const feedbackItem = allFeedback.find(item => item.text === part);
+
+            if (feedbackItem) {
+                // Red Pen (Correction)
+                if (feedbackItem.type === 'red') {
+                    return (
+                        <span key={index} className="relative group cursor-pointer bg-red-100 text-red-800 underline decoration-red-500 decoration-wavy">
+                            {part}
+                            <Tooltip text={(feedbackItem as RedPenFeedback).comment} color="red" />
+                        </span>
+                    );
+                }
+                // 2. [FIX] Green Pen (Suggestion) - now correctly uses a tooltip
+                if (feedbackItem.type === 'green') {
+                    return (
+                        <span key={index} className="relative group cursor-pointer bg-emerald-100 text-emerald-800 font-semibold p-1 rounded-md">
+                            {part}
+                            <Tooltip text={(feedbackItem as GreenPenFeedback).suggestion} color="green" />
+                        </span>
+                    );
+                }
+                // 3. [NEW] Blue Pen (Appreciation)
+                if (feedbackItem.type === 'blue') {
+                    return (
+                        <span key={index} className="relative group cursor-pointer bg-sky-100 text-sky-800 font-semibold ring-1 ring-sky-300 rounded p-0.5">
+                            {part}
+                            <Tooltip text={(feedbackItem as BluePenFeedback).comment} color="blue" />
+                        </span>
+                    );
+                }
+            }
+            
+            return part.split('\n').map((line, i, arr) => (
+                <React.Fragment key={`${index}-${i}`}>
+                    {line}
+                    {i < arr.length - 1 && <br />}
+                </React.Fragment>
+            ));
+        });
+    }, [userAnswer, mentorsPen]);
 
     return (
         <div>
-            <div className="text-base text-slate-800 leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={buildAnnotatedHtml()} />
-            <div className="mt-6 text-xs text-gray-500">
+            <div className="text-base text-slate-800 leading-relaxed">
+                {annotatedNodes}
+            </div>
+            {/* 4. [NEW] Updated legend to include the Blue Pen */}
+            <div className="mt-6 text-xs text-gray-500 space-y-1">
                 <p><span className="inline-block w-3 h-3 bg-red-100/70 rounded-sm mr-2 align-middle"></span>Hover over <span className="underline decoration-red-500 decoration-wavy">wavy red text</span> for corrections.</p>
-                <p className="mt-1"><span className="inline-block w-3 h-3 bg-emerald-100/70 rounded-sm mr-2 align-middle"></span><span className="bg-emerald-100/70 font-semibold rounded p-0.5">Green text</span> shows suggested value additions.</p>
+                <p><span className="inline-block w-3 h-3 bg-emerald-100/70 rounded-sm mr-2 align-middle"></span>Hover over <span className="bg-emerald-100/70 font-semibold rounded p-0.5">green text</span> for value-add suggestions.</p>
+                <p><span className="inline-block w-3 h-3 bg-sky-100/70 rounded-sm mr-2 align-middle"></span>Hover over <span className="bg-sky-100/70 font-semibold ring-1 ring-sky-300 rounded p-0.5">blue text</span> for appreciated points & linkages.</p>
             </div>
         </div>
     );
 };
 
 
+// The main StrategicDebriefComponent remains the same, but is included in full
 export default function StrategicDebriefComponent({ debrief, idealAnswer, userAnswer, mentorsPen }: StrategicDebriefProps) {
     const [activeTab, setActiveTab] = useState('annotated');
 
@@ -99,7 +168,6 @@ export default function StrategicDebriefComponent({ debrief, idealAnswer, userAn
                             {debrief.toppersKeywords.map((keyword, i) => (
                                 <a
                                     key={i}
-                                    // --- [FINAL CHANGE] Updated the search query ---
                                     href={`https://www.google.com/search?q=${encodeURIComponent(`give brief info about ${keyword}`)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -121,12 +189,12 @@ export default function StrategicDebriefComponent({ debrief, idealAnswer, userAn
 
     return (
         <div className="rounded-xl border border-gray-200 bg-white shadow-md">
-            <div className="p-1 flex items-center bg-slate-200/60 rounded-t-xl">
+            <div className="p-1 flex items-center bg-slate-200/60 rounded-t-xl overflow-x-auto">
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`relative flex-1 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                        className={`relative flex-1 px-3 py-2 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap ${
                             activeTab === tab.id ? 'text-white' : 'text-slate-600 hover:text-slate-900'
                         }`}
                     >

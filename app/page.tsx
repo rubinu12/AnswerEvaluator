@@ -13,18 +13,13 @@ import TrialEvaluator from '@/components/landing/TrialEvaluator';
 import Testimonials from '@/components/landing/Testimonials';
 import { useAuthContext } from '@/lib/AuthContext';
 import { useEvaluationStore } from '@/lib/store';
-import PageLoader from '@/components/shared/PageLoader';
 
-// Dynamically import the Hero component to prevent SSR issues with its children
 const Hero = dynamic(() => import('@/components/landing/Hero'), {
     ssr: false,
 });
 
-// --- CONSTANTS ---
-const LAST_VISIT_KEY = 'lastVisit';
-const RECENCY_THRESHOLD = 24 * 60 * 60 * 1000; // 24 hours
-
-const MarketingPageContent = () => {
+// --- [RENAMED] Desktop-Specific Marketing Page ---
+const DesktopMarketingPage = () => {
     const [isDestinationSelected, setIsDestinationSelected] = useState(false);
 
     const navLinks: NavLink[] = [
@@ -37,18 +32,19 @@ const MarketingPageContent = () => {
         <>
             <div className="fixed-background"></div>
             <UniversalNavbar
-                navLinks={navLinks}
-                actions={() => (
-                    <>
-                        <Link href="/auth" className="text-sm font-semibold text-gray-600 hover:text-gray-900">
-                            Log In
-                        </Link>
-                        <Link href="/auth" className="btn px-5 py-2 text-sm font-semibold text-white bg-gray-800 rounded-lg hover:bg-gray-900">
-                            Sign Up
-                        </Link>
-                    </>
-                )}
-            />
+    navLinks={navLinks}
+    actions={() => (
+        <>
+            <Link href="/auth" className="text-sm font-semibold text-gray-600 hover:text-gray-900">
+                Log In
+            </Link>
+            {/* [FIX] Add the 'btn' class to the Sign Up link */}
+            <Link href="/auth" className="btn px-5 py-2 text-sm font-semibold text-white bg-gray-800 rounded-lg hover:bg-gray-900">
+                Sign Up
+            </Link>
+        </>
+    )}
+/>
             <main className="relative z-10">
                 <Hero onDestinationSelect={() => setIsDestinationSelected(true)} />
                 {isDestinationSelected && (
@@ -74,6 +70,25 @@ const MarketingPageContent = () => {
     );
 };
 
+// --- [NEW] Mobile-Specific Marketing Page (Placeholder) ---
+const MobileMarketingPage = () => {
+    // We will build the mobile-optimized landing page experience here.
+    return (
+        <div className="h-full flex flex-col">
+             <div className="fixed-background"></div>
+             {/* The mobile experience will not use the UniversalNavbar */}
+             <main className="p-4 text-center flex-grow flex items-center justify-center relative z-10">
+                <div>
+                    <h1 className="text-4xl font-bold text-slate-800">Mobile Page Coming Soon</h1>
+                    <p className="text-slate-600 mt-2">We will design the mobile experience here.</p>
+                </div>
+             </main>
+        </div>
+    );
+};
+
+
+// --- Main Page Component with Switcher Logic ---
 export default function Home() {
     const { user, loading } = useAuthContext();
     const router = useRouter();
@@ -81,39 +96,32 @@ export default function Home() {
     const [showMarketingPage, setShowMarketingPage] = useState(false);
 
     useEffect(() => {
-        // Show the loader immediately while we make a decision
         setPageLoading(true);
-
         if (loading) {
             return;
         }
-
         if (user) {
             router.push('/dashboard');
-            // The loader will be turned off by the dashboard page
-            return;
-        }
-
-        const lastVisit = parseInt(localStorage.getItem(LAST_VISIT_KEY) || '0', 10);
-        const now = Date.now();
-
-        if (lastVisit !== 0 && now - lastVisit < RECENCY_THRESHOLD) {
-            router.push('/auth');
-            // The loader will be turned off by the auth page
         } else {
-            localStorage.setItem(LAST_VISIT_KEY, now.toString());
             setShowMarketingPage(true);
-            setPageLoading(false); // Hide loader to show marketing page
+            setPageLoading(false);
         }
-
     }, [user, loading, router, setPageLoading]);
     
-    // The PageLoader is now in the root layout, so we don't need to return it here.
-    // We simply return the marketing content when it's ready to be shown.
     if (showMarketingPage) {
-        return <MarketingPageContent />;
+        return (
+            <>
+                {/* --- Desktop View --- */}
+                <div className="hidden md:block h-full">
+                    <DesktopMarketingPage />
+                </div>
+                {/* --- Mobile View --- */}
+                <div className="block md:hidden h-full">
+                    <MobileMarketingPage />
+                </div>
+            </>
+        );
     }
-
-    // Return null while redirects are happening. The global PageLoader will cover the screen.
+    
     return null;
 }

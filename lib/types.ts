@@ -11,9 +11,15 @@ export interface GreenPenFeedback {
     suggestion: string;
 }
 
+export interface BluePenFeedback {
+    appreciatedText: string;
+    comment: string;
+}
+
 export interface MentorsPenData {
     redPen: RedPenFeedback[];
     greenPen: GreenPenFeedback[];
+    bluePen: BluePenFeedback[]; // General positive feedback comments
 }
 
 // --- New "AI Mentor" Analysis Types ---

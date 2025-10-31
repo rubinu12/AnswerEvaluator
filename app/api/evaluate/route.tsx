@@ -1,81 +1,118 @@
 // app/api/evaluate/route.tsx
 
 import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
 import { VertexAI } from '@google-cloud/vertexai';
 import { getPromptForSubject } from '@/lib/prompts';
+import { admin, db } from '@/lib/firebase-admin';
+import { DecodedIdToken } from 'firebase-admin/auth';
 
 // --- Initialize Vertex AI ---
 const vertex_ai = new VertexAI({
-  project: process.env.GOOGLE_PROJECT_ID!,
-  location: 'us-central1',
+    project: process.env.GOOGLE_PROJECT_ID!,
+    location: 'us-central1',
 });
 
 const geminiModel = vertex_ai.getGenerativeModel({
-  model: 'gemini-2.5-flash-lite',
+    model: 'gemini-2.5-flash-lite',
 });
 
-// --- Helper function to extract JSON from the AI's response ---
+// --- Helper function (no changes) ---
 function extractJsonFromText(text: string): string | null {
-    // This regex is robust enough to handle markdown code blocks
     const markdownMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-    if (markdownMatch && markdownMatch[1]) {
-        return markdownMatch[1].trim();
-    }
-    // Fallback for non-markdown responses
+    if (markdownMatch && markdownMatch[1]) return markdownMatch[1].trim();
     const firstBrace = text.indexOf('{');
     const lastBrace = text.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-        return text.substring(firstBrace, lastBrace + 1);
-    }
+    if (firstBrace !== -1 && lastBrace > firstBrace) return text.substring(firstBrace, lastBrace + 1);
     return null;
 }
 
-// --- Main API Handler ---
+// --- Main API Handler with Diagnostic Logging ---
 export async function POST(request: Request) {
-  try {
-    const { preparedData, subject } = await request.json();
+    console.log("\n--- [START] /api/evaluate request received ---");
+    let user: DecodedIdToken;
 
-    if (!preparedData || !Array.isArray(preparedData) || preparedData.length === 0) {
-      return NextResponse.json({ error: 'No prepared evaluation data provided.' }, { status: 400 });
+    try {
+        console.log("[1/7] Authenticating user...");
+        const authorization = (await headers()).get('Authorization');
+        if (!authorization?.startsWith('Bearer ')) {
+            console.error("Authentication failed: No token provided.");
+            return NextResponse.json({ error: 'Unauthorized: No token provided.' }, { status: 401 });
+        }
+        const idToken = authorization.split('Bearer ')[1];
+        user = await admin.auth().verifyIdToken(idToken);
+        console.log(`[2/7] User authenticated successfully: ${user.uid}`);
+
+    } catch (error) {
+        console.error("CRITICAL: Authentication error:", error);
+        return NextResponse.json({ error: 'Unauthorized: Invalid token.' }, { status: 401 });
     }
 
-    const evaluationPrompt = getPromptForSubject(subject || 'GS1', preparedData);
-    
-    const result = await geminiModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: evaluationPrompt }] }]
-    });
+    try {
+        const { preparedData, subject } = await request.json();
+        const evaluationCost = preparedData.length;
 
-    // --- [NEW] Step 3.5: Log Token Usage ---
-    const usageMetadata = result.response.usageMetadata;
-    if (usageMetadata) {
-      console.log("\n--- TOKEN USAGE (Evaluation Stage) ---");
-      console.log(`Input Tokens: ${usageMetadata.promptTokenCount}`);
-      console.log(`Output Tokens: ${usageMetadata.candidatesTokenCount}`);
-      console.log("--------------------------------------\n");
-    } else {
-      console.log("Token usage metadata was not available for this request.");
+        if (!preparedData || !Array.isArray(preparedData) || evaluationCost === 0) {
+            console.error("Validation failed: No prepared data.");
+            return NextResponse.json({ error: 'No prepared evaluation data provided.' }, { status: 400 });
+        }
+        console.log(`[3/7] Request validated. Evaluation cost: ${evaluationCost}`);
+
+        const userDocRef = db.collection('users').doc(user.uid);
+
+        console.log("[4/7] Starting Firestore transaction...");
+        await db.runTransaction(async (transaction) => {
+            console.log("  -> Inside transaction: getting user document...");
+            const userDoc = await transaction.get(userDocRef);
+            if (!userDoc.exists) {
+                throw new Error('User profile not found in database.');
+            }
+
+            const profile = userDoc.data();
+            console.log(`  -> User profile found: Status=${profile?.subscriptionStatus}, Remaining=${profile?.remainingEvaluations}`);
+            
+            if (profile?.subscriptionStatus !== 'PREMIUM' && profile?.subscriptionStatus !== 'ADMIN') {
+                if (profile?.remainingEvaluations < evaluationCost) {
+                    throw new Error(`Insufficient evaluations. Required: ${evaluationCost}, Available: ${profile?.remainingEvaluations}`);
+                }
+                console.log(`  -> Decrementing evaluations for user ${user.uid} by ${evaluationCost}`);
+                transaction.update(userDocRef, {
+                    remainingEvaluations: admin.firestore.FieldValue.increment(-evaluationCost)
+                });
+            } else {
+                 console.log(`  -> User is ${profile?.subscriptionStatus}. Skipping decrement.`);
+            }
+        });
+        console.log("[5/7] Firestore transaction successful.");
+
+        const evaluationPrompt = getPromptForSubject(subject || 'GS1', preparedData);
+        
+        console.log("[6/7] Sending request to Gemini AI...");
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: evaluationPrompt }] }]
+        });
+        console.log("[7/7] Received response from Gemini AI.");
+
+        const rawResponseText = result.response.candidates?.[0]?.content.parts[0].text;
+
+        if (!rawResponseText) {
+            throw new Error("AI returned an empty response.");
+        }
+
+        const jsonString = extractJsonFromText(rawResponseText);
+        
+        if (!jsonString) {
+            console.error("CRITICAL: Failed to extract JSON from AI response:", rawResponseText);
+            throw new Error("The AI returned an invalid format.");
+        }
+
+        const evaluationJson = JSON.parse(jsonString);
+        
+        console.log("--- [SUCCESS] Returning final evaluation JSON ---");
+        return NextResponse.json(evaluationJson);
+
+    } catch (error: any) {
+        console.error(`--- [CRITICAL FAILURE] Error in evaluation pipeline for user ${user.uid}:`, error);
+        return NextResponse.json({ error: `An error occurred: ${error.message}` }, { status: 500 });
     }
-    // --- [END NEW] ---
-
-    const rawResponseText = result.response.candidates?.[0]?.content.parts[0].text;
-
-    if (!rawResponseText) {
-        throw new Error("Received no response text from Gemini for the final evaluation.");
-    }
-
-    const jsonString = extractJsonFromText(rawResponseText);
-    
-    if (!jsonString) {
-        console.error("Invalid JSON response from master prompt:", rawResponseText);
-        throw new Error("The AI returned an invalid format for the final evaluation.");
-    }
-
-    const evaluationJson = JSON.parse(jsonString);
-    
-    return NextResponse.json(evaluationJson);
-
-  } catch (error: any) {
-    console.error("Error in evaluation pipeline:", error);
-    return NextResponse.json({ error: `An error occurred: ${error.message}` }, { status: 500 });
-  }
 }

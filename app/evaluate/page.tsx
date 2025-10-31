@@ -25,7 +25,8 @@ export default function NewEvaluationPage() {
   const showInProgressCard = processingState === 'ocr' || isProcessingInBackground;
 
   return (
-    <div className="p-4 md:p-8">
+    // [FIX] Added responsive padding. px-4 for sides, pb-16 for bottom, pt-4 for top.
+    <div className="p-4 md:p-8 pb-16">
       {isReviewing ? (
         <ReviewCard />
       ) : showInProgressCard ? (
