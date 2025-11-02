@@ -4,9 +4,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useQuizStore } from '@/lib/quizStore'; // Our Zustand Store
-import { useAuthContext } from '@/lib/AuthContext'; // <-- 1. CORRECTED: Use useAuthContext
+import { useAuthContext } from '@/lib/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
 import { useRouter } from 'next/navigation';
+// --- 1. IMPORT LUCIDE ICONS ---
+import { LogOut, User, Settings } from 'lucide-react';
 
 const Header = () => {
   const router = useRouter();
@@ -16,7 +18,7 @@ const Header = () => {
     showReport,
     quizTitle,
     quizGroupBy,
-    isTopBarVisible,
+    isTopBarVisible, // This state is from your store and is now being set correctly
     setIsTopBarVisible,
     startTest,
     resetTest,
@@ -24,7 +26,7 @@ const Header = () => {
     // saveTestResult, // We will implement this action later
   } = useQuizStore();
 
-  const { user, logout } = useAuthContext(); // <-- 2. CORRECTED: Use useAuthContext
+  const { user, userProfile, logout } = useAuthContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -57,7 +59,8 @@ const Header = () => {
             onClick={() => setIsModalOpen(true)}
             className="btn px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 flex items-center"
           >
-            <i className="ri-home-4-line mr-2"></i>
+            {/* --- 2. REPLACED ICON --- */}
+            <User className="w-4 h-4 mr-2" />
             Dashboard
           </button>
         </>
@@ -87,25 +90,37 @@ const Header = () => {
     );
   };
 
-  // 3. CORRECTED: Use 'displayName' instead of 'name'
-  const userName = user?.displayName || 'User';
+  const userName = userProfile?.name || user?.displayName || 'User';
+  const userEmail = user?.email || 'No Email';
+  const userRole = userProfile?.subscriptionStatus || 'Member';
 
   return (
     <>
+      {/* --- *** THIS IS THE "PIXEL-PERFECT" FIX *** ---
+        1. Set a fixed height (h-16 or 64px).
+        2. Set `sticky top-0 z-30` to make it stick.
+        3. Use `transform` and `transition-transform` for smooth animation.
+        4. Use `isTopBarVisible` to toggle `translate-y-0` (visible) and `-translate-y-full` (hidden).
+        5. This replaces the old `h-0 opacity-0 -mb-[69px]` logic.
+      */}
       <header
-        className={`relative z-30 flex-shrink-0 bg-white border-b border-gray-200 transition-all duration-300 ${
-          !isTopBarVisible || isTestMode ? 'h-0 opacity-0 -mb-[69px]' : 'h-[69px] opacity-100'
-        }`}
+        className={`sticky top-0 z-30 flex-shrink-0 bg-white border-b border-gray-200 h-16
+          transition-transform duration-300 ease-in-out
+          ${isTopBarVisible && !isTestMode ? 'translate-y-0' : '-translate-y-full'}
+        `}
       >
         <div className="p-4 flex items-center justify-between mx-auto h-full px-6">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" title="Go to Dashboard">
-              <i className="ri-home-4-line text-xl text-gray-600"></i>
+              {/* This is a placeholder icon, you can change it */}
+              <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.25278C12 6.25278 15.5228 3 20 3C23.7279 3 24 8.27208 24 10C24 16 12 21 12 21C12 21 0 16 0 10C0 8.27208 0.272124 3 4 3C8.47715 3 12 6.25278 12 6.25278Z" />
+              </svg>
             </Link>
             <div>
               <h1 className="text-md font-bold text-gray-800">{quizTitle}</h1>
               <p className="text-xs text-gray-500 capitalize">
-                {quizGroupBy === 'examYear'
+                {quizGroupBy === 'topic' // Match logic from your store
                   ? 'Subject Practice'
                   : 'PYQ Practice'}
               </p>
@@ -123,13 +138,12 @@ const Header = () => {
                   <p className="font-semibold text-sm text-gray-800">
                     {userName}
                   </p>
-                  {/* 4. CORRECTED: Hardcode 'Member' for now, as 'role' does not exist */}
                   <p className="text-xs text-gray-500 capitalize">
-                    Member
+                    {userRole}
                   </p>
                 </div>
                 <img
-                  src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  src={userProfile?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(
                     userName
                   )}&background=e8e8e8&color=333`}
                   alt="User Avatar"
@@ -140,23 +154,21 @@ const Header = () => {
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-100">
                   <div className="px-4 py-2 border-b border-gray-100 sm:hidden">
                     <p className="font-bold text-sm truncate">{userName}</p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {user?.email}
-                    </p>
+                    <p className="text-xs text-gray-500 truncate">{userEmail}</p>
                   </div>
+                  {/* --- 3. REPLACED ICONS --- */}
                   <Link
-                    href="/dashboard/settings"
+                    href="/dashboard" // Changed to /dashboard
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
-                    My Profile
+                    <Settings className="w-4 h-4 mr-2 inline" />
+                    Dashboard
                   </Link>
-                  <button className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                    Dark Mode
-                  </button>
                   <button
                     onClick={logout}
                     className="w-full text-left block px-4 py-2 text-sm text-red-700 hover:bg-red-50"
                   >
+                    <LogOut className="w-4 h-4 mr-2 inline" />
                     Logout
                   </button>
                 </div>
@@ -166,20 +178,8 @@ const Header = () => {
         </div>
       </header>
 
-      {/* The show/hide toggle button */}
-      {!isTestMode && (
-         <button
-          onClick={() => setIsTopBarVisible(!isTopBarVisible)}
-          className="fixed top-3.5 right-6 z-[60] text-gray-500 hover:text-gray-800 flex-shrink-0 bg-white rounded-full p-1 border shadow-sm"
-          title={isTopBarVisible ? "Hide header" : "Show header"}
-        >
-          <i
-            className={`ri-arrow-up-s-line text-2xl transition-transform duration-300 ${
-              !isTopBarVisible ? "rotate-180" : ""
-            }`}
-          ></i>
-        </button>
-      )}
+      {/* This toggle button is no longer needed, it was part of the old logic */}
+      {/* <button onClick={() => setIsTopBarVisible(!isTopBarVisible)} ... /> */}
 
       {isModalOpen && (
         <ConfirmationModal
@@ -188,7 +188,6 @@ const Header = () => {
             resetTest();
             router.push('/dashboard');
           }}
-          // onConfirmSave={saveTestResult}
           onConfirmSave={() => alert('Save Result action not implemented yet.')}
         />
       )}
@@ -197,3 +196,4 @@ const Header = () => {
 };
 
 export default Header;
+

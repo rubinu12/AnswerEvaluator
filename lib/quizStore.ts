@@ -4,16 +4,14 @@ import {
   QuizStore,
   QuizState,
   Question,
-  BackendQuestion,
   UserAnswer,
-  QuizFilter
-} from './quizTypes'; // We use the types from Step 1
-import { auth } from '@/lib/firebase';
-// We cannot use the 'useRouter' hook inside the store.
-// We will handle navigation inside the components themselves.
+  QuizFilter,
+  QuizError
+} from './quizTypes'; // We use our existing types
+import { auth } from '@/lib/firebase'; // We need this for the auth token
 
 // --- Helper: Get Auth Token ---
-// We'll need this for API calls
+// This is necessary to call our secure API
 const getAuthHeader = async () => {
   const user = auth.currentUser;
   if (!user) return null;
@@ -68,42 +66,67 @@ export const useQuizStore = create<QuizStore>((set, get) => ({
 
   // --- Initialization ---
   loadAndStartQuiz: async (filter: QuizFilter) => {
-    // This is where we will fetch questions from our API
-    // We will implement this in a future feature
-    console.log("loadAndStartQuiz called with filter:", filter);
     set({ ...initialState, isLoading: true, quizError: null }); // Reset the store
     
-    // TEMPORARY: Just to see it working, we'll set loading to false
-    // In the next step, we will add the real fetch logic here.
-    setTimeout(() => {
-       set({ isLoading: false });
-       // We'll add a dummy question to test
-       const dummyQuestion: Question = {
-         id: "123", questionNumber: 1, text: "This is a dummy question. Does the UI connect?",
-         options: [
-           { label: "A", text: "Yes" },
-           { label: "B", text: "No" },
-           { label: "C", text: "Maybe" },
-           { label: "D", text: "I don't know" }
-         ],
-         correctAnswer: "A", explanation: "The explanation will go here.",
-         subject: "Polity", topic: "Dummy Topic", exam: "UPSC", year: 2024, examYear: "UPSC-2024"
-       };
-       set({ 
-         questions: [dummyQuestion], 
-         quizTitle: "Test Quiz", 
-         quizGroupBy: 'topic', 
-         isGroupingEnabled: false, // PYQ style
-         totalTime: 120, // 2 minutes
-         timeLeft: 120,
-         isLoading: false, // Make sure loading is false
-       });
-    }, 1500);
+    try {
+      // 1. Get the auth token
+      const headers = await getAuthHeader();
+      if (!headers) {
+        throw new Error('User is not authenticated.');
+      }
+
+      // 2. Build the query string
+      const params = new URLSearchParams();
+      if (filter.subject) params.append('subject', filter.subject);
+      if (filter.topic) params.append('topic', filter.topic);
+      if (filter.year) params.append('year', filter.year);
+      if (filter.exam) params.append('exam', filter.exam);
+
+      // 3. Call our new API endpoint
+      const response = await fetch(`/api/quizzes?${params.toString()}`, {
+        method: 'GET',
+        headers: headers,
+      });
+
+      if (!response.ok) {
+        // Handle server errors (e.g., 404 Not Found, 500)
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch questions.');
+      }
+
+      // 4. Get the real data
+      const { questions, quizTitle, totalTime } = await response.json();
+
+      if (!questions || questions.length === 0) {
+        throw new Error("No questions were found for your selection.");
+      }
+
+      // 5. Load the "brain" with real data
+      set({
+        questions,
+        quizTitle,
+        totalTime,
+        timeLeft: totalTime,
+        quizGroupBy: 'topic', // You can customize this
+        isGroupingEnabled: !!filter.subject, // Enable grouping if by subject
+        isLoading: false,
+      });
+
+    } catch (error: any) {
+      console.error("Error loading quiz:", error);
+      let errorType: QuizError['type'] = 'generic';
+      if (error.message.includes('authenticated')) {
+        errorType = 'auth';
+      }
+      set({ 
+        isLoading: false, 
+        quizError: { message: error.message, type: errorType }
+      });
+    }
   },
 
   // --- Quiz Lifecycle ---
   startTest: () => {
-    // This will run when the "Start Test" button is clicked
     console.log("startTest action called");
     set((state) => ({
       isTestMode: true,
@@ -111,30 +134,25 @@ export const useQuizStore = create<QuizStore>((set, get) => ({
       showDetailedSolution: false,
       userAnswers: [],
       markedForReview: new Set<string>(),
-      timeLeft: state.totalTime, // Reset timer to the full amount
+      timeLeft: state.totalTime,
     }));
   },
 
   submitTest: () => {
-    // This will run when the "Submit Test" button is clicked
     console.log("submitTest action called");
     set({ isTestMode: false, showReport: true });
     // We will add logic to calculate results here
   },
   
   resetTest: () => {
-    // This will run when "Back to Dashboard" is clicked
     console.log("resetTest action called");
-    set({ ...initialState, isLoading: false }); // Reset to default
-    // We will call router.push('/dashboard') from the component
+    set({ ...initialState, isLoading: false }); 
   },
 
   // --- Answer & Review ---
   handleAnswerSelect: (questionId: string, answer: string) => {
-    // This runs when a user clicks an answer (A, B, C, D)
     console.log(`handleAnswerSelect: ${questionId} = ${answer}`);
     set((state) => {
-      // Find and replace the answer if it already exists
       const newUserAnswers = state.userAnswers.filter(
         (ua) => ua.questionId !== questionId
       );
@@ -176,7 +194,6 @@ export const useQuizStore = create<QuizStore>((set, get) => ({
     set({ showReport: false, showDetailedSolution: true });
   },
   viewAnswer: (questionId: string) => {
-    // This is for "Practice Mode" as you described
     console.log(`viewAnswer: ${questionId}`);
     set({ currentViewAnswer: questionId });
   },

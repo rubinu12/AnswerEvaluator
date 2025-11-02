@@ -15,7 +15,6 @@ import TestStatusBar from '@/components/quiz/TestStatusBar';
 import ReportCard from '@/components/quiz/ReportCard';
 
 // --- Placeholders ---
-// We'll replace these with real components later
 const LoadingScreen = () => (
   <div className="flex items-center justify-center h-screen">
     <p className="text-2xl">Loading Quiz...</p>
@@ -31,7 +30,6 @@ const ErrorDisplay = ({ message }: { message: string }) => (
 export default function QuizPage() {
   const params = useParams();
 
-  // 1. Get the state and actions from our Zustand store
   const {
     isLoading,
     quizError,
@@ -41,13 +39,11 @@ export default function QuizPage() {
   } = useQuizStore();
 
   useEffect(() => {
-    // 2. Parse the URL parameters to create a filter
     const filter: QuizFilter = {};
-    const type = params.type as string; // 'subject', 'year', 'topic'
-    const filterKey = params.filter as string; // 'polity', '2023', etc.
-    const value = params.value as string; // 'all' or specific value
+    const type = params.type as string;
+    const filterKey = params.filter as string;
+    const value = params.value as string;
 
-    // This logic determines what to fetch from the API
     if (type === 'subject') {
       filter.subject = filterKey;
       if (value !== 'all') filter.topic = value;
@@ -58,52 +54,47 @@ export default function QuizPage() {
       filter.topic = filterKey;
     }
 
-    // 3. Call the action from our store to load the quiz
     loadAndStartQuiz(filter);
-    
-    // This is a "practice" page, so we set isTestMode to false.
-    // We will handle Test Mode later.
     useQuizStore.setState({ isTestMode: false });
+  }, [params, loadAndStartQuiz]);
 
-  }, [params, loadAndStartQuiz]); // Dependencies
-
-  // --- Render based on state ---
-
-  // 4. Handle Loading State
   if (isLoading) {
     return <LoadingScreen />;
   }
 
-  // 5. Handle Error State
   if (quizError) {
     return <ErrorDisplay message={quizError.message} />;
   }
 
-  // 6. Render the Full Quiz UI
+  // --- *** THE "PIXEL-PERFECT" LAYOUT FIX IS HERE *** ---
+  // This layout matches the original rootrise/app/quiz/page.tsx
+  // It uses flex-col and overflow-hidden to constrain the height.
+
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* The main header (Title, Submit Button) */}
+    <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
       <Header />
-
-      {/* The dynamic polished submenu (Shows Topic, Performance, etc.) */}
       <DynamicQuizCommandBar />
-
-      {/* The blue status bar (Only shows in "Test Mode") */}
       <TestStatusBar />
 
-      {/* The modal that shows final results */}
       {showReport && <ReportCard />}
 
-      <main className="flex-1 w-full max-w-full mx-auto">
-        <div className="grid grid-cols-12 h-full">
-          
-          {/* Column 1: The Question List */}
+      {/* This <main> tag is the key.
+        - flex-1: takes up all remaining vertical space
+        - overflow-hidden: STOPS its children from growing past it
+        - flex-col lg:flex-row: sets the layout for the two columns
+      */}
+      <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-6 gap-6 overflow-hidden">
+        
+        {/* Column 1: Question List Wrapper */}
+        <div className="flex-1 min-w-0 h-full">
           <QuestionColumn />
-
-          {/* Column 2: The Answer Palette */}
-          <AnswerColumn />
-          
         </div>
+
+        {/* Column 2: Answer Palette Wrapper */}
+        <div className="hidden lg:block w-full lg:w-80 xl:w-96 h-full flex-shrink-0">
+          <AnswerColumn />
+        </div>
+
       </main>
     </div>
   );

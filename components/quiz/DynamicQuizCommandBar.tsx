@@ -10,6 +10,7 @@ import PerformanceAnalyticsBar from './PerformanceAnalyticsBar';
 import { useRouter } from 'next/navigation';
 
 // This is the component for the group navigation links (for subject-wise practice)
+// This is YOUR component, restored.
 const GroupNavigation = () => {
   // 3. Get ALL data from our Zustand store
   const {
@@ -102,6 +103,7 @@ const DynamicQuizCommandBar: React.FC = () => {
     isGroupingEnabled,
     questions,
     currentQuestionNumberInView,
+    isTopBarVisible, // --- 1. GET isTopBarVisible ---
   } = useQuizStore();
 
   // Determine the currently visible question to pass to the TopicFocusBar
@@ -115,26 +117,30 @@ const DynamicQuizCommandBar: React.FC = () => {
 
   let content = null;
   
-  // 1. In Test Mode, render nothing.
+  // This is YOUR original logic, restored.
   if (isTestMode) {
     return null;
   }
-
-  // 2. In Review/Evaluation Mode (after test), render the performance analytics.
   if (showReport || showDetailedSolution) {
     content = <PerformanceAnalyticsBar />;
   }
-  // 3. In Practice Mode, decide which bar to show.
   else if (isGroupingEnabled) {
-    // For subject-wise practice, show group navigation.
     content = <GroupNavigation />;
   } else {
-    // For year-wise practice (or ungrouped), show the topic context.
     content = <TopicFocusBar currentQuestion={currentQuestion} />;
   }
   
+  // --- 2. THIS IS THE "PIXEL-PERFECT" FIX ---
+  // We use `isTopBarVisible` to slide this bar *down* into view
+  // It is sticky at `top-0` with a lower `z-index` (20)
+  // When the main header (z-30) slides up, this slides down to take its place.
   return (
-    <div className="sticky top-0 bg-white/80 backdrop-blur-sm border-b border-gray-200 z-20">
+    <div 
+      className={`sticky top-0 bg-white/80 backdrop-blur-sm border-b border-gray-200 z-20
+        transition-transform duration-300 ease-in-out
+        ${isTopBarVisible ? '-translate-y-full' : 'translate-y-0'}
+      `}
+    >
       <div className="flex items-center justify-between max-w-full mx-auto px-6 h-[52px] gap-4">
         {content}
       </div>
@@ -143,3 +149,4 @@ const DynamicQuizCommandBar: React.FC = () => {
 };
 
 export default DynamicQuizCommandBar;
+

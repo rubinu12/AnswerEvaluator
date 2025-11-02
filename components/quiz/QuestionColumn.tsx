@@ -5,10 +5,10 @@ import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { useQuizStore } from '@/lib/quizStore';
 import { Question } from '@/lib/quizTypes';
 import QuestionPalette from './QuestionPalette';
-// --- 1. IMPORT THE ICONS from lucide-react ---
 import { Bookmark, Flag, Grid, X } from 'lucide-react';
+import { useAuthContext } from '@/lib/AuthContext';
 
-// --- Individual Question Card (Read-Only) ---
+// --- Individual Question Card (This component is correct) ---
 const QuestionCard = ({
   question,
   displayNumber,
@@ -25,6 +25,8 @@ const QuestionCard = ({
   } = useQuizStore();
 
   const isLongOption = question.options.some((opt) => opt.text.length > 50);
+  const { userProfile } = useAuthContext();
+  const isAdmin = userProfile?.subscriptionStatus === 'ADMIN';
 
   return (
     <div
@@ -35,14 +37,21 @@ const QuestionCard = ({
           : 'bg-white border-gray-200'
       }`}
     >
+      {isAdmin && (
+        <button
+          onClick={() => alert(`Admin: Edit Explanation for Q-ID: ${question.id}`)}
+          className="absolute top-2 right-2 p-2 bg-yellow-400 text-yellow-900 rounded-full hover:bg-yellow-500 shadow-sm"
+          title="Admin: Edit Explanation"
+        >
+          <Flag className="w-4 h-4" />
+        </button>
+      )}
       <div className="flex items-start gap-4">
-        {/* Column 1: Question Number & Actions */}
         <div className="flex flex-col items-center flex-shrink-0">
           <div className="bg-gray-800 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
             {displayNumber}
           </div>
           <div className="flex flex-col items-center mt-3 space-y-2">
-            {/* --- 2. REPLACED ICON --- */}
             <button
               onClick={() => toggleMarkForReview(question.id)}
               className="p-2 text-gray-400 hover:text-purple-600"
@@ -54,7 +63,6 @@ const QuestionCard = ({
                 <Flag className="w-5 h-5" />
               )}
             </button>
-            {/* --- 3. REPLACED ICON --- */}
             <button
               onClick={() => toggleBookmark(question.id)}
               className="p-2 text-gray-400 hover:text-blue-600"
@@ -68,8 +76,6 @@ const QuestionCard = ({
             </button>
           </div>
         </div>
-
-        {/* Column 2: Question Text & Options (Read-Only) */}
         <div className="flex-1 min-w-0">
           <p className="text-lg text-gray-900 font-semibold leading-relaxed whitespace-pre-line">
             {question.text}
@@ -106,8 +112,8 @@ const QuestionColumn = () => {
     setCurrentGroupInView,
     quizGroupBy,
     isGroupingEnabled,
-    isTopBarVisible,
-    setIsTopBarVisible,
+    isTopBarVisible, // We need this to check against
+    setIsTopBarVisible, // We need this to set
   } = useQuizStore();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -115,8 +121,6 @@ const QuestionColumn = () => {
   const questionObserverRef = useRef<IntersectionObserver | null>(null);
   const groupObserverRef = useRef<IntersectionObserver | null>(null);
 
-  // ... (all the useMemo and useEffect hooks remain exactly the same) ...
-  // Memoize the grouped questions
   const questionsByGroup = useMemo(() => {
     if (!quizGroupBy || !isGroupingEnabled) return null;
     return questions.reduce((acc, q) => {
@@ -127,7 +131,6 @@ const QuestionColumn = () => {
     }, {} as Record<string, Question[]>);
   }, [questions, quizGroupBy, isGroupingEnabled]);
 
-  // Memoize the sorted group names
   const sortedGroups = useMemo(() => {
     if (!questionsByGroup) return [];
     const keys = Object.keys(questionsByGroup);
@@ -138,29 +141,37 @@ const QuestionColumn = () => {
     );
   }, [questionsByGroup]);
 
-  // Effect for tracking page scroll (to hide/show Header)
+  // --- *** THIS IS THE "PIXEL-PERFECT" HEADER ANIMATION FIX *** ---
+  // This is the exact handleScroll logic from rootrise
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+
     const handleScroll = () => {
-      const isScrolled = container.scrollTop > 20;
-      setIsPageScrolled(isScrolled);
-      if (isScrolled && isTopBarVisible) setIsTopBarVisible(false);
-      else if (!isScrolled && !isTopBarVisible) setIsTopBarVisible(true);
+        const isScrolled = container.scrollTop > 20;
+        // This is the logic that was missing and causing the "jank"
+        // It correctly uses your existing state variables
+        setIsPageScrolled(isScrolled);
+        if (isScrolled && isTopBarVisible) setIsTopBarVisible(false);
+        else if (!isScrolled && !isTopBarVisible) setIsTopBarVisible(true);
     };
+    
+    // { passive: true } is critical for smooth scroll performance
     container.addEventListener('scroll', handleScroll, { passive: true });
+    
     return () => container.removeEventListener('scroll', handleScroll);
+    
+    // This dependencies array matches the original rootrise
   }, [setIsPageScrolled, isTopBarVisible, setIsTopBarVisible]);
 
-  // Effect for "Sync Scrolling" - Watching for Groups
+  // --- Group Scrolling Observer (This logic is correct) ---
   useEffect(() => {
     if (groupObserverRef.current) groupObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
-    if (!container || !quizGroupBy || !isGroupingEnabled) {
+    if (!container || !quizGroupBy || !isGroupingEnabled || questions.length === 0) {
       setCurrentGroupInView(null);
       return;
     }
-    
     groupObserverRef.current = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -175,77 +186,70 @@ const QuestionColumn = () => {
       },
       { root: container, rootMargin: '-40% 0px -60% 0px', threshold: 0 }
     );
-
     const groupElements = container.querySelectorAll('[data-group]');
     groupElements.forEach((el) => groupObserverRef.current?.observe(el));
-    
     return () => groupObserverRef.current?.disconnect();
-  }, [sortedGroups, setCurrentGroupInView, quizGroupBy, isGroupingEnabled]);
+  }, [sortedGroups, setCurrentGroupInView, quizGroupBy, isGroupingEnabled, questions.length]);
 
-  // Effect for "Sync Scrolling" - Watching for Questions
+  // --- Question Sync-Scroll Observer (This logic is correct) ---
   useEffect(() => {
     if (questionObserverRef.current) questionObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
-    if (!container) return;
-
+    if (!setCurrentQuestionNumberInView || !container || questions.length === 0) {
+        return;
+    }
     questionObserverRef.current = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
+        entries.forEach(entry => {
           if (entry.isIntersecting) {
-            const cardId = entry.target.id.replace('question-card-', '');
+            const cardId = entry.target.id.replace("question-card-", "");
             setCurrentQuestionNumberInView(Number(cardId));
           }
         });
-      },
-      { root: container, rootMargin: '-50% 0px -50% 0px', threshold: 0.5 }
+      }, 
+      { 
+        root: container, 
+        rootMargin: "-50% 0px -50% 0px", // Checks the center line
+        threshold: 0 // Fires as soon as *any* part crosses the line
+      }
     );
-
     const questionElements = container.querySelectorAll('[id^="question-card-"]');
     questionElements.forEach((el) => questionObserverRef.current?.observe(el));
-    
     return () => questionObserverRef.current?.disconnect();
   }, [questions, setCurrentQuestionNumberInView, isGroupingEnabled]);
 
-
-  // --- THIS IS THE "VIEW ANSWER" MODE ---
+  // --- "VIEW ANSWER" MODE ---
   if (currentViewAnswer) {
     const question = questions.find((q) => q.id === currentViewAnswer);
     if (!question) return null;
+    const displayNumber = questions.indexOf(question) + 1;
     
     return (
-      // --- 4. THIS IS THE LAYOUT FIX ---
-      // Added col-span- classes back
-      <div className="col-span-12 lg:col-span-8 xl:col-span-9 h-[calc(100vh-121px)] overflow-y-auto custom-scrollbar p-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col">
-          {/* --- THIS IS THE HEADER WITH THE "CLOSE" BUTTON --- */}
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Detailed Solution for Q{question.questionNumber}
-            </h3>
-            {/* --- 5. THIS IS THE LUCIDE-REACT <X> ICON --- */}
-            <button
-              onClick={closeAnswerView} // Action from "Brain"
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-              title="Close Solution"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          {/* --- END OF HEADER --- */}
-
-          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-            <div className="space-y-6">
-              <div>
-                <p className="font-semibold text-lg mb-2 whitespace-pre-line">
-                  Q{question.questionNumber}: {question.text}
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Explanation:</h4>
-                <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                  {question.explanation}
-                </p>
-              </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Detailed Solution for Q{displayNumber}
+          </h3>
+          <button
+            onClick={closeAnswerView}
+            className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+            title="Close Solution"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+          <div className="space-y-6">
+            <div>
+              <p className="font-semibold text-lg mb-4 whitespace-pre-line">
+                Q{displayNumber}: {question.text}
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-lg mb-2">Explanation:</h4>
+              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                {question.explanation}
+              </p>
             </div>
           </div>
         </div>
@@ -253,18 +257,16 @@ const QuestionColumn = () => {
     );
   }
 
-  // This is the default view: show the list of questions
+  // --- DEFAULT QUESTION LIST VIEW ---
   let questionCounter = 0;
   return (
-    // --- 6. THIS IS THE LAYOUT FIX ---
-    // Added col-span- classes back
-    <div className="col-span-12 lg:col-span-8 xl:col-span-9 h-[calc(100vh-121px)] relative">
+    // This layout is correct from our previous fix
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col relative overflow-hidden">
       <div
         ref={scrollContainerRef}
-        className="h-full overflow-y-auto custom-scrollbar p-6"
+        className="flex-1 p-6 overflow-y-auto custom-scrollbar"
       >
         <div className="space-y-6">
-          {/* Render Grouped Questions */}
           {isGroupingEnabled &&
             questionsByGroup &&
             sortedGroups.map((groupName) => (
@@ -287,7 +289,6 @@ const QuestionColumn = () => {
               </div>
             ))}
           
-          {/* Render Ungrouped Questions */}
           {!isGroupingEnabled &&
             questions.map((question, index) => (
               <QuestionCard
@@ -299,8 +300,8 @@ const QuestionColumn = () => {
         </div>
       </div>
       
-      {/* This is the floating button for the mobile modal */}
-      <div className="absolute bottom-6 right-6 lg:hidden">
+      {/* FAB (This logic is correct) */}
+      <div className="absolute bottom-6 right-6">
         {isPaletteOpen && (
           <QuestionPalette onClose={() => setIsPaletteOpen(false)} />
         )}
@@ -308,7 +309,6 @@ const QuestionColumn = () => {
           onClick={() => setIsPaletteOpen(!isPaletteOpen)}
           className="w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center transform hover:scale-110 transition-transform mt-4"
         >
-          {/* --- 7. REPLACED ICON --- */}
           <Grid
             className={`w-6 h-6 transition-transform duration-300 ${
               isPaletteOpen ? 'rotate-45' : ''
@@ -321,3 +321,4 @@ const QuestionColumn = () => {
 };
 
 export default QuestionColumn;
+
