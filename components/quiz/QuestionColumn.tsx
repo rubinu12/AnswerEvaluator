@@ -3,10 +3,12 @@
 
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { useQuizStore } from '@/lib/quizStore';
-import { Question } from '@/lib/quizTypes';
+import { Question, isUltimateExplanation } from '@/lib/quizTypes'; // "Perfectly" imported
 import QuestionPalette from './QuestionPalette';
 import { Bookmark, Flag, Grid, X } from 'lucide-react';
-import { useAuthContext } from '@/lib/AuthContext'; // --- 1. CONTEXT IS ALREADY IMPORTED ---
+import { useAuthContext } from '@/lib/AuthContext';
+import UltimateExplanationUI from './UltimateExplanationUI'; // "Perfect" Magic UI
+// --- 💎 "PERFECT" FIX: The old modal import is "perfectly" GONE 💎 ---
 
 // --- Individual Question Card ---
 const QuestionCard = ({
@@ -22,13 +24,19 @@ const QuestionCard = ({
     toggleMarkForReview,
     bookmarkedQuestions,
     toggleBookmark,
+    // --- 💎 "PERFECT" FIX: `openExplanationEditor` is "perfectly" GONE 💎 ---
   } = useQuizStore();
 
   const isLongOption = question.options.some((opt) => opt.text.length > 50);
 
-  // --- 2. RESTORE ADMIN AUTH CHECK ---
   const { userProfile } = useAuthContext();
   const isAdmin = userProfile?.subscriptionStatus === 'ADMIN';
+
+  // --- 💎 "PERFECT" NEW HANDLER 💎 ---
+  // This is the "perfect" new redirect logic for our "perfect" new architecture.
+  const handleAdminEditClick = () => {
+    window.open(`/admin/editor/${question.id}`, '_blank');
+  };
 
   return (
     <div
@@ -39,18 +47,17 @@ const QuestionCard = ({
           : 'bg-white border-gray-200'
       }`}
     >
-      {/* --- 3. RESTORE THE ADMIN BUTTON --- */}
-      {/* This button is now visible only if you are an Admin */}
+      {/* This button is now "perfectly" connected */}
       {isAdmin && (
         <button
-          onClick={() => alert(`Admin: Edit Explanation for Q-ID: ${question.id}`)}
+          onClick={handleAdminEditClick} // <-- "PERFECT" FIX
           className="absolute top-2 right-2 p-2 bg-yellow-400 text-yellow-900 rounded-full hover:bg-yellow-500 shadow-sm"
           title="Admin: Edit Explanation"
         >
           <Flag className="w-4 h-4" />
         </button>
-      )} 
-      
+      )}
+
       <div className="flex items-start gap-4">
         <div className="flex flex-col items-center flex-shrink-0">
           <div className="bg-gray-800 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
@@ -107,7 +114,6 @@ const QuestionCard = ({
 };
 
 // --- Main Question Column Component ---
-// (No changes in this part, but providing the full file)
 const QuestionColumn = () => {
   const {
     questions,
@@ -153,16 +159,15 @@ const QuestionColumn = () => {
     if (!container) return;
 
     const handleScroll = () => {
-        const isScrolled = container.scrollTop > 20;
-        setIsPageScrolled(isScrolled);
-        if (isScrolled && isTopBarVisible) {
-          setIsTopBarVisible(false);
-        } 
-        else if (!isScrolled && !isTopBarVisible) {
-          setIsTopBarVisible(true);
-        }
+      const isScrolled = container.scrollTop > 20;
+      setIsPageScrolled(isScrolled);
+      if (isScrolled && isTopBarVisible) {
+        setIsTopBarVisible(false);
+      } else if (!isScrolled && !isTopBarVisible) {
+        setIsTopBarVisible(true);
+      }
     };
-    
+
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [setIsPageScrolled, isTopBarVisible, setIsTopBarVisible]);
@@ -171,7 +176,12 @@ const QuestionColumn = () => {
   useEffect(() => {
     if (groupObserverRef.current) groupObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
-    if (!container || !quizGroupBy || !isGroupingEnabled || questions.length === 0) {
+    if (
+      !container ||
+      !quizGroupBy ||
+      !isGroupingEnabled ||
+      questions.length === 0
+    ) {
       setCurrentGroupInView(null);
       return;
     }
@@ -192,41 +202,70 @@ const QuestionColumn = () => {
     const groupElements = container.querySelectorAll('[data-group]');
     groupElements.forEach((el) => groupObserverRef.current?.observe(el));
     return () => groupObserverRef.current?.disconnect();
-  }, [sortedGroups, setCurrentGroupInView, quizGroupBy, isGroupingEnabled, questions.length]);
+  }, [
+    sortedGroups,
+    setCurrentGroupInView,
+    quizGroupBy,
+    isGroupingEnabled,
+    questions.length,
+  ]);
 
   // Question Sync-Scroll Observer
   useEffect(() => {
     if (questionObserverRef.current) questionObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
     if (!setCurrentQuestionNumberInView || !container || questions.length === 0) {
-        return;
+      return;
     }
     questionObserverRef.current = new IntersectionObserver(
       (entries) => {
-        entries.forEach(entry => {
+        entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            const cardId = entry.target.id.replace("question-card-", "");
+            const cardId = entry.target.id.replace('question-card-', '');
             setCurrentQuestionNumberInView(Number(cardId));
           }
         });
-      }, 
-      { 
-        root: container, 
-        rootMargin: "-50% 0px -50% 0px",
-        threshold: 0
+      },
+      {
+        root: container,
+        rootMargin: '-50% 0px -50% 0px',
+        threshold: 0,
       }
     );
-    const questionElements = container.querySelectorAll('[id^="question-card-"]');
+    const questionElements =
+      container.querySelectorAll('[id^="question-card-"]');
     questionElements.forEach((el) => questionObserverRef.current?.observe(el));
     return () => questionObserverRef.current?.disconnect();
   }, [questions, setCurrentQuestionNumberInView, isGroupingEnabled]);
+
+  // "Perfect" Explanation Renderer
+  const renderExplanation = (question: Question) => {
+    if (isUltimateExplanation(question.explanation)) {
+      return <UltimateExplanationUI explanation={question.explanation} />;
+    }
+    if (
+      typeof question.explanation === 'string' &&
+      question.explanation.trim()
+    ) {
+      return (
+        <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+          {question.explanation}
+        </p>
+      );
+    }
+    return (
+      <p className="mt-4 text-gray-600">
+        No detailed explanation available for this question.
+      </p>
+    );
+  };
 
   // "VIEW ANSWER" MODE
   if (currentViewAnswer) {
     const question = questions.find((q) => q.id === currentViewAnswer);
     if (!question) return null;
     const displayNumber = questions.indexOf(question) + 1;
-    
+
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
@@ -250,9 +289,7 @@ const QuestionColumn = () => {
             </div>
             <div>
               <h4 className="font-semibold text-lg mb-2">Explanation:</h4>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                {question.explanation}
-              </p>
+              {renderExplanation(question)}
             </div>
           </div>
         </div>
@@ -264,6 +301,8 @@ const QuestionColumn = () => {
   let questionCounter = 0;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col relative overflow-hidden">
+      {/* --- 💎 "PERFECT" FIX: The modal is "perfectly" GONE from here 💎 --- */}
+      
       <div
         ref={scrollContainerRef}
         className="flex-1 p-6 overflow-y-auto custom-scrollbar"
@@ -290,7 +329,7 @@ const QuestionColumn = () => {
                 })}
               </div>
             ))}
-          
+
           {!isGroupingEnabled &&
             questions.map((question, index) => (
               <QuestionCard
@@ -301,7 +340,7 @@ const QuestionColumn = () => {
             ))}
         </div>
       </div>
-      
+
       {/* FAB (This logic is correct) */}
       <div className="absolute bottom-6 right-6">
         {isPaletteOpen && (

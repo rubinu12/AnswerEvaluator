@@ -63,17 +63,18 @@ function transformFirestoreDocToQuestion(
     }
     
     return {
-        id: docId,
-        questionNumber: index + 1,
-        text: docData.questionText,
-        options: frontendOptions,
-        correctAnswer: correctAnswer,
-        explanation: explanationData, // Pass the explanation data
-        subject: docData.subject,
-        topic: docData.topic,
-        exam: docData.exam || 'UPSC', // Default
-        year: docData.year,
-        examYear: docData.examYear || `${docData.exam || 'UPSC'}-${docData.year}`,
+      id: docId,
+      questionNumber: index + 1,
+      text: docData.questionText,
+      questionType: 'SingleChoice',
+      options: frontendOptions,
+      correctAnswer: correctAnswer,
+      explanation: explanationData, // Pass the explanation data
+      subject: docData.subject,
+      topic: docData.topic,
+      exam: docData.exam || 'UPSC', // Default
+      year: docData.year,
+      examYear: docData.examYear || `${docData.exam || 'UPSC'}-${docData.year}`,
     };
 }
 

@@ -7,7 +7,8 @@ import {
   Question,
   UserAnswer,
   QuizFilter,
-  QuizError
+  QuizError,
+  UltimateExplanation, // <-- Import our new type
 } from './quizTypes'; // We use our existing types
 import { auth } from '@/lib/firebase'; // We need this for the auth token
 
@@ -16,32 +17,33 @@ const getAuthHeader = async () => {
   const user = auth.currentUser;
   if (!user) return null;
   const token = await user.getIdToken();
-  return { 'Authorization': `Bearer ${token}` };
+  return { Authorization: `Bearer ${token}` };
 };
 
 // --- Initial State Definition ---
+// This uses your 129-line file as the base, so it's "perfect"
 const initialState: QuizState = {
   // Core Data
   questions: [],
   userAnswers: [],
-  
+
   // Status
   isLoading: true,
   isTestMode: false,
   showReport: false,
   showDetailedSolution: false,
   quizError: null,
-  
+
   // Timer
   timeLeft: 0,
   totalTime: 0,
-  
+
   // UI & Interaction
   currentQuestionNumberInView: 1,
   currentViewAnswer: null,
   isPageScrolled: false,
   isTopBarVisible: true,
-  
+
   // Grouping
   quizTitle: '',
   quizGroupBy: null,
@@ -54,6 +56,10 @@ const initialState: QuizState = {
 
   // Notifications
   toast: { show: false, message: '', type: 'info' },
+  
+  // --- 💎 "PERFECT" ADMIN STATE 💎 ---
+  editingQuestionId: null,
+
   performanceStats: null,
 };
 
@@ -68,9 +74,9 @@ export const useQuizStore = create<QuizStore>()(
       loadAndStartQuiz: async (filter: QuizFilter) => {
         // WIPE PREVIOUS SESSION
         useQuizStore.persist.clearStorage();
-        
-        set({ ...initialState, isLoading: true, quizError: null }); 
-        
+
+        set({ ...initialState, isLoading: true, quizError: null });
+
         try {
           const headers = await getAuthHeader();
           if (!headers) {
@@ -93,14 +99,50 @@ export const useQuizStore = create<QuizStore>()(
             throw new Error(errorData.message || 'Failed to fetch questions.');
           }
 
-          const { questions, quizTitle, totalTime } = await response.json();
+          // Fetch raw questions
+          const { questions: rawQuestions, quizTitle, totalTime } = await response.json();
 
-          if (!questions || questions.length === 0) {
-            throw new Error("No questions were found for your selection.");
+          if (!rawQuestions || rawQuestions.length === 0) {
+            throw new Error('No questions were found for your selection.');
           }
 
+          // --- 💎 "PERFECT" TYPE-SAFETY FIX 💎 ---
+          // This is where we fix the bug. We process the raw backend data
+          // into our strict `Question` interface.
+          const processedQuestions: Question[] = rawQuestions.map((q: any, index: number) => {
+            
+            // 1. Determine the explanation
+            //    The new `explanation` field (which can be an object) takes precedence.
+            //    If it's missing, fall back to the old `explanationText` string.
+            const explanationContent: string | UltimateExplanation = 
+              q.explanation || q.explanationText || '';
+
+            return {
+              ...q,
+              id: q._id, // Ensure `id` is set from `_id`
+              questionNumber: index + 1, // Assign a question number
+              text: q.questionText,
+              
+              // 2. Set default questionType if missing from old data
+              questionType: q.questionType || 'SingleChoice', 
+              
+              // 3. Unify explanation field
+              explanation: explanationContent,
+              
+              // 4. Build options array (this was in your old code)
+              options: [
+                { label: 'A', text: q.optionA },
+                { label: 'B', text: q.optionB },
+                { label: 'C', text: q.optionC },
+                { label: 'D', text: q.optionD },
+              ],
+              correctAnswer: q.correctOption,
+            };
+          });
+          // --- 💎 END OF FIX 💎 ---
+
           set({
-            questions,
+            questions: processedQuestions,
             quizTitle,
             totalTime,
             timeLeft: totalTime,
@@ -221,6 +263,31 @@ export const useQuizStore = create<QuizStore>()(
       hideToast: () => {
         set({ toast: { show: false, message: '', type: 'info' } });
       },
+
+      // --- 💎 "PERFECT" ADMIN ACTIONS 💎 ---
+      // These actions now match lib/quizTypes.ts "perfectly"
+      openExplanationEditor: (questionId: string) => {
+        console.log(`openExplanationEditor: ${questionId}`);
+        set({ editingQuestionId: questionId });
+      },
+
+      closeExplanationEditor: () => {
+        console.log('closeExplanationEditor');
+        set({ editingQuestionId: null });
+      },
+
+      updateQuestionExplanation: (
+        questionId: string,
+        newExplanation: UltimateExplanation
+      ) => {
+        console.log(`updateQuestionExplanation: ${questionId}`);
+        set((state) => ({
+          questions: state.questions.map((q) =>
+            q.id === questionId ? { ...q, explanation: newExplanation } : q
+          ),
+          editingQuestionId: null,
+        }));
+      },
     }),
     {
       name: 'quiz-session', // Name of the item in localStorage
@@ -238,10 +305,6 @@ export const useQuizStore = create<QuizStore>()(
         },
         // reviver is used when LOADING (parse)
         reviver: (key, value) => {
-          // --- THIS IS THE FIX ---
-          // We cast `value` to `any` here to tell TypeScript
-          // that we know what we are doing and to allow access
-          // to `_type` and `value`.
           if (typeof value === 'object' && value !== null && (value as any)._type === 'Set') {
             return new Set((value as any).value);
           }
