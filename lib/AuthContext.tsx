@@ -1,3 +1,4 @@
+// lib/AuthContext.tsx
 'use client';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, getAuth, User, signOut } from 'firebase/auth';

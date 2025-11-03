@@ -6,9 +6,9 @@ import { useQuizStore } from '@/lib/quizStore';
 import { Question } from '@/lib/quizTypes';
 import QuestionPalette from './QuestionPalette';
 import { Bookmark, Flag, Grid, X } from 'lucide-react';
-import { useAuthContext } from '@/lib/AuthContext';
+import { useAuthContext } from '@/lib/AuthContext'; // --- 1. CONTEXT IS ALREADY IMPORTED ---
 
-// --- Individual Question Card (This component is correct) ---
+// --- Individual Question Card ---
 const QuestionCard = ({
   question,
   displayNumber,
@@ -25,6 +25,8 @@ const QuestionCard = ({
   } = useQuizStore();
 
   const isLongOption = question.options.some((opt) => opt.text.length > 50);
+
+  // --- 2. RESTORE ADMIN AUTH CHECK ---
   const { userProfile } = useAuthContext();
   const isAdmin = userProfile?.subscriptionStatus === 'ADMIN';
 
@@ -37,6 +39,8 @@ const QuestionCard = ({
           : 'bg-white border-gray-200'
       }`}
     >
+      {/* --- 3. RESTORE THE ADMIN BUTTON --- */}
+      {/* This button is now visible only if you are an Admin */}
       {isAdmin && (
         <button
           onClick={() => alert(`Admin: Edit Explanation for Q-ID: ${question.id}`)}
@@ -45,7 +49,8 @@ const QuestionCard = ({
         >
           <Flag className="w-4 h-4" />
         </button>
-      )}
+      )} 
+      
       <div className="flex items-start gap-4">
         <div className="flex flex-col items-center flex-shrink-0">
           <div className="bg-gray-800 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
@@ -102,6 +107,7 @@ const QuestionCard = ({
 };
 
 // --- Main Question Column Component ---
+// (No changes in this part, but providing the full file)
 const QuestionColumn = () => {
   const {
     questions,
@@ -112,8 +118,8 @@ const QuestionColumn = () => {
     setCurrentGroupInView,
     quizGroupBy,
     isGroupingEnabled,
-    isTopBarVisible, // We need this to check against
-    setIsTopBarVisible, // We need this to set
+    isTopBarVisible,
+    setIsTopBarVisible,
   } = useQuizStore();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -124,7 +130,7 @@ const QuestionColumn = () => {
   const questionsByGroup = useMemo(() => {
     if (!quizGroupBy || !isGroupingEnabled) return null;
     return questions.reduce((acc, q) => {
-      const groupKey = String(q[quizGroupBy] || 'Uncategorized');
+      const groupKey = String(q[quizGroupBy] || 'UncategorZzed');
       if (!acc[groupKey]) acc[groupKey] = [];
       acc[groupKey].push(q);
       return acc;
@@ -141,30 +147,27 @@ const QuestionColumn = () => {
     );
   }, [questionsByGroup]);
 
-  // --- *** THIS IS THE "PIXEL-PERFECT" HEADER ANIMATION FIX *** ---
-  // This is the exact handleScroll logic from rootrise
+  // Header "driver" logic
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
         const isScrolled = container.scrollTop > 20;
-        // This is the logic that was missing and causing the "jank"
-        // It correctly uses your existing state variables
         setIsPageScrolled(isScrolled);
-        if (isScrolled && isTopBarVisible) setIsTopBarVisible(false);
-        else if (!isScrolled && !isTopBarVisible) setIsTopBarVisible(true);
+        if (isScrolled && isTopBarVisible) {
+          setIsTopBarVisible(false);
+        } 
+        else if (!isScrolled && !isTopBarVisible) {
+          setIsTopBarVisible(true);
+        }
     };
     
-    // { passive: true } is critical for smooth scroll performance
     container.addEventListener('scroll', handleScroll, { passive: true });
-    
     return () => container.removeEventListener('scroll', handleScroll);
-    
-    // This dependencies array matches the original rootrise
   }, [setIsPageScrolled, isTopBarVisible, setIsTopBarVisible]);
 
-  // --- Group Scrolling Observer (This logic is correct) ---
+  // Group Scrolling Observer
   useEffect(() => {
     if (groupObserverRef.current) groupObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
@@ -191,7 +194,7 @@ const QuestionColumn = () => {
     return () => groupObserverRef.current?.disconnect();
   }, [sortedGroups, setCurrentGroupInView, quizGroupBy, isGroupingEnabled, questions.length]);
 
-  // --- Question Sync-Scroll Observer (This logic is correct) ---
+  // Question Sync-Scroll Observer
   useEffect(() => {
     if (questionObserverRef.current) questionObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
@@ -209,8 +212,8 @@ const QuestionColumn = () => {
       }, 
       { 
         root: container, 
-        rootMargin: "-50% 0px -50% 0px", // Checks the center line
-        threshold: 0 // Fires as soon as *any* part crosses the line
+        rootMargin: "-50% 0px -50% 0px",
+        threshold: 0
       }
     );
     const questionElements = container.querySelectorAll('[id^="question-card-"]');
@@ -218,7 +221,7 @@ const QuestionColumn = () => {
     return () => questionObserverRef.current?.disconnect();
   }, [questions, setCurrentQuestionNumberInView, isGroupingEnabled]);
 
-  // --- "VIEW ANSWER" MODE ---
+  // "VIEW ANSWER" MODE
   if (currentViewAnswer) {
     const question = questions.find((q) => q.id === currentViewAnswer);
     if (!question) return null;
@@ -257,10 +260,9 @@ const QuestionColumn = () => {
     );
   }
 
-  // --- DEFAULT QUESTION LIST VIEW ---
+  // DEFAULT QUESTION LIST VIEW
   let questionCounter = 0;
   return (
-    // This layout is correct from our previous fix
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col relative overflow-hidden">
       <div
         ref={scrollContainerRef}
@@ -321,4 +323,3 @@ const QuestionColumn = () => {
 };
 
 export default QuestionColumn;
-

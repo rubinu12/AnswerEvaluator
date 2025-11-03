@@ -2,23 +2,21 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useQuizStore } from '@/lib/quizStore'; // <-- 1. Use Zustand Store
+import { useQuizStore } from '@/lib/quizStore'; // <-- Use Zustand Store
 
 // Import the specialized bar components
 import TopicFocusBar from '@/components/quiz/TopicFocusBar';
 import PerformanceAnalyticsBar from './PerformanceAnalyticsBar';
 import { useRouter } from 'next/navigation';
 
-// This is the component for the group navigation links (for subject-wise practice)
-// This is YOUR component, restored.
+// This component for group navigation is unchanged internally
 const GroupNavigation = () => {
-  // 3. Get ALL data from our Zustand store
   const {
     questions,
     quizGroupBy,
     isGroupingEnabled,
     setIsGroupingEnabled,
-    currentGroupInView, // We'll use this to highlight the active group
+    currentGroupInView,
   } = useQuizStore();
 
   const sortedGroups = useMemo(() => {
@@ -28,7 +26,6 @@ const GroupNavigation = () => {
     ) as (string | number)[];
     if (groups.length === 0) return [];
     
-    // Sort logic: Years descending, Topics ascending
     const isNumeric = !isNaN(Number(groups[0]));
     return groups.sort((a, b) =>
       isNumeric
@@ -44,7 +41,6 @@ const GroupNavigation = () => {
     }
   };
 
-  // The ToggleSwitch component, moved here to be self-contained
   const ToggleSwitch = ({
     enabled,
     onChange,
@@ -67,6 +63,9 @@ const GroupNavigation = () => {
   );
 
   return (
+    // --- THIS IS THE "PIXEL-PERFECT" FIX ---
+    // This div no longer has any animation or position classes.
+    // It's now flexible and fills the space given by the parent.
     <div className="flex items-center justify-between w-full h-full">
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className="text-xs font-semibold text-gray-600">Group:</span>
@@ -95,7 +94,6 @@ const GroupNavigation = () => {
 
 // The main controller component
 const DynamicQuizCommandBar: React.FC = () => {
-  // 4. Get all data from our Zustand store
   const {
     isTestMode,
     showReport,
@@ -103,50 +101,27 @@ const DynamicQuizCommandBar: React.FC = () => {
     isGroupingEnabled,
     questions,
     currentQuestionNumberInView,
-    isTopBarVisible, // --- 1. GET isTopBarVisible ---
   } = useQuizStore();
 
-  // Determine the currently visible question to pass to the TopicFocusBar
   const currentQuestion = useMemo(() => {
     if (questions.length > 0 && currentQuestionNumberInView > 0) {
-      // Adjust for 0-based index
       return questions[currentQuestionNumberInView - 1];
     }
     return null;
   }, [questions, currentQuestionNumberInView]);
 
-  let content = null;
-  
-  // This is YOUR original logic, restored.
+  // The logic for *what* to show is unchanged
   if (isTestMode) {
     return null;
   }
   if (showReport || showDetailedSolution) {
-    content = <PerformanceAnalyticsBar />;
+    return <PerformanceAnalyticsBar />;
   }
-  else if (isGroupingEnabled) {
-    content = <GroupNavigation />;
-  } else {
-    content = <TopicFocusBar currentQuestion={currentQuestion} />;
+  if (isGroupingEnabled) {
+    return <GroupNavigation />;
   }
   
-  // --- 2. THIS IS THE "PIXEL-PERFECT" FIX ---
-  // We use `isTopBarVisible` to slide this bar *down* into view
-  // It is sticky at `top-0` with a lower `z-index` (20)
-  // When the main header (z-30) slides up, this slides down to take its place.
-  return (
-    <div 
-      className={`sticky top-0 bg-white/80 backdrop-blur-sm border-b border-gray-200 z-20
-        transition-transform duration-300 ease-in-out
-        ${isTopBarVisible ? '-translate-y-full' : 'translate-y-0'}
-      `}
-    >
-      <div className="flex items-center justify-between max-w-full mx-auto px-6 h-[52px] gap-4">
-        {content}
-      </div>
-    </div>
-  );
+  return <TopicFocusBar currentQuestion={currentQuestion} />;
 };
 
 export default DynamicQuizCommandBar;
-
