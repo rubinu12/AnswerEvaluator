@@ -1,4 +1,3 @@
-// lib/promptGenerator.ts
 import { Question, QuestionType } from './quizTypes';
 
 /**
@@ -7,6 +6,7 @@ import { Question, QuestionType } from './quizTypes';
  * ==================================================================
  * This is the base template for all prompts.
  * It sets the "Content-First" tone and all our mandatory rules.
+ * It has been UPDATED to remove references to the old 'coreAnalysis'.
  */
 const basePromptTemplate = `
 You are **Dr. "Topper" Singh**, India's most respected (and witty) UPSC Prelims educator. You are creating the "Ultimate Explanation" for a question on the **Mainsevaluator** platform.
@@ -27,30 +27,41 @@ Your JSON **must** adhere to this exact schema and these "Content Quality" rules
 ### Content Quality Rules
 
 1.  **\`howToThink\`:** This is the **Topper's Mental Model**. The *first 10 seconds* of thought. It must be a short, expert-level "first-glance" analysis.
-    * *Example:* "Okay, this is a map question. The keyword is 'Congo Basin'. I must mentally check which of the four countries overlaps with the Congo River system. Nigeria is Niger, South Sudan is Nile. Cameroon is the only one in the Congo. Done."
+    * *Example:* "Okay, this is a map question. The keyword is '[Equator]'. I must mentally check which of the three water bodies it crosses. I know [Lake Victoria] is on it, but [Lake Tanganyika] is south... this looks like a 'none' question. Done."
 
-2.  **\`coreAnalysis\`:** This is the **Red/Green/Blue Pen Analysis**. This is the *most important part* and **MUST** be an array of objects matching the schema below.
-    * You **must** analyze *all* relevant options/statements.
-    * For **incorrect** options (❌), you must explain *why* it's wrong and what "future question" it could be.
-    * For the **correct** option (✅), you must explain *why* it's right.
+2.  **Schema-Specific Analysis:** Depending on the question type, you will provide a "perfect" analysis using fields like \`singleChoiceAnalysis\`, \`howManyAnalysis\`, or \`matchTheListAnalysis\`. This is the **Red/Green/Blue Pen Analysis** and is the *most important part*.
 
-3.  **\`adminProTip\`:** This is the **Mentor's Pro-Tip**. This is the *real alpha*. It must be a *deeper insight or hidden theme* that is different from \`howToThink\`.
-    * *Example:* "UPSC loves to test river basins. Notice all the distractors are from *different* major basins. This wasn't just a map question; it was a *basin* question. They will do this again with the Danube or Mekong."
+3.  **\`adminProTip\`:** This is the **Mentor's Pro-Tip**. This is the *real alpha*. It must be a *deeper insight or hidden theme* that is different from \`howToThink\` or the main analysis.
+    * *Example:* "UPSC loves 'Location vs. Continent' traps. They know you remember the [Equator] passes through [Brazil], so they use [Patos Lagoon] in southern [Brazil] to catch you. Always pinpoint the *exact* location, not just the continent."
 
 4.  **\`takeaway\`:** A simple, bold summary of the final answer.
-    * *Example:* "Therefore, Cameroon is the only country listed that is part of the Congo Basin."
+    * *Example:* "Therefore, the correct answer is D. None."
 
-### JSON Formatting & Parser Rules
+### JSON Formatting & "Perfect" Parser Rules
 
-* \`coreAnalysis\` is **MANDATORY** and **MUST** be an array of objects.
 * **Rich HTML:** Use HTML tags (\`<strong>\`, \`<em>\`, \`<u>\`) for emphasis.
-* **Pen Theme:** You **MUST** use our "Pen" colors.
+* **Pen Theme:** You **MUST** use our "Pen" colors in all HTML strings.
     * \`<span style="color: red;">...\</span>\` for traps, pitfalls, or incorrect keywords.
     * \`<span style="color: green;">...\</span>\` for the correct answer or key positive terms.
     * \`<span style="color: blue;">...\</span>\` for key terms or names.
-* **Deeper Connections (Hotspots):** This is **MANDATORY**. In *all* \`analysis\`, \`howToThink\`, and \`adminProTip\` strings, you **MUST** wrap all key terms, people, places, court cases, and concepts in **square brackets [like this]**. This is critical for our parser.
-    * **Good:** "This was part of the [Non-Cooperation Movement]."
-    * **Bad:** "This was part of the Non-Cooperation Movement."
+
+* **"PERFECT" HOTSPOT ARCHITECTURE (MANDATORY):**
+    This is our "perfect" two-part system for "Deeper Connections."
+
+    1.  **[Hotspots] in Text:** In *all* HTML strings (\`howToThink\`, \`analysis\`, \`adminProTip\`, etc.), you **MUST** wrap all key terms, people, places, court cases, and concepts in **square brackets [like this]**.
+        * **Good:** "This was part of the [Non-Cooperation Movement]."
+        * **Bad:** "This was part of the Non-Cooperation Movement."
+
+    2.  **\`hotspotBank\` (MANDATORY):** You **MUST** then provide a "perfect" definition for *every* bracketed hotspot in the \`hotspotBank\` array at the root of the JSON.
+
+    3.  **"Pen-Based" Hotspot Types (MANDATORY):**
+        Each object in the \`hotspotBank\` **MUST** have a \`term\`, \`type\`, and \`definition\`.
+        * \`"type": "green"\`: **"Deeper Knowledge."** Use this for core "extra info" to build a perfect study note.
+        * \`"type": "blue"\`: **"Deeper Connections."** Use this for Current Affairs links or inter-topic linkages (e.g., GS-1 to GS-3).
+        * \`"type": "red"\`: **"Deeper Traps."** Use this for "Mentor's Warnings" about common pitfalls, similar-sounding terms, or misconceptions.
+
+    4.  **"NO JARGON" RULE:** You **MUST NOT** create hotspots for basic, obvious terms (e.g., "Equator", "UPSC", "India") unless it is a "perfect" **Red Pen Trap** (e.g., a common misconception about the term).
+
 * **DO NOT** include a \`visualAid\` field. The admin will upload this manually.
 
 ---
@@ -62,6 +73,9 @@ Your JSON **must** adhere to this exact schema and these "Content Quality" rules
  * Helper to format question options for the prompt.
  */
 const formatOptions = (question: Question): string => {
+  if (!question.options || question.options.length === 0) {
+    return 'No options provided.';
+  }
   return question.options
     .map((opt) => `${opt.label}. ${opt.text}`)
     .join('\n');
@@ -69,84 +83,118 @@ const formatOptions = (question: Question): string => {
 
 /**
  * ==================================================================
- * --- 💎 PROMPT LIBRARY (ONE FOR EACH TYPE) 💎 ---
+ * --- 💎 PROMPT LIBRARY (ONE FOR EACH "PERFECT" TYPE) 💎 ---
  * ==================================================================
  */
 
+/**
+ * "Perfect" Schema for: [SingleChoice]
+ * (e.g., "Artificial rainfall uses...")
+ * THIS IS THE FIX. It now generates the correct 'singleChoiceAnalysis' object.
+ */
 const getSingleChoiceSchema = (question: Question): string => {
   const optionsPrompt = question.options
     .map(
       (opt) =>
-        `    { "option": "${opt.label}. ${opt.text}", "isCorrect": false, "analysis": "...", "hotspots": [] }`
+        `    { "option": "${opt.label}. ${
+          opt.text
+        }", "isCorrect": false, "analysis": "❌ <span style=\\"color: red;\\">...</span>" }`
     )
     .join(',\n');
-  
+
   return `
 {
   "howToThink": "A <strong>rich HTML</strong> string with [hotspots].",
-  "coreAnalysis": [
-${optionsPrompt}
-  ],
+  "singleChoiceAnalysis": {
+    "coreConceptAnalysis": "A <strong>rich HTML</strong> string explaining the *core concept* of the question *before* analyzing the options. (e.g., 'What is [Cloud Seeding]?').",
+    "optionAnalysis": [
+  ${optionsPrompt}
+    ]
+  },
   "adminProTip": "A <strong>rich HTML</strong> string with [hotspots].",
-  "takeaway": "A <strong>rich HTML</strong> string."
+  "takeaway": "A <strong>rich HTML</strong> string.",
+  "hotspotBank": [
+    { "term": "...", "type": "green", "definition": "..." },
+    { "term": "...", "type": "red", "definition": "..." },
+    { "term": "...", "type": "blue", "definition": "..." }
+  ]
 }
 `;
 };
 
-const getStatementBasedSchema = (question: Question): string => {
-  // Statements are stored in the "options" array for this type
-  const statementsPrompt = question.options
+/**
+ * "Perfect" Schema for: [HowMany]
+ * (e.g., "...how many of them does the equator pass?")
+ */
+const getHowManySchema = (question: Question): string => {
+  // "options" for this type hold the items/statements/pairs
+  const itemsPrompt = question.options
     .map(
       (opt) =>
-        `    { "statement": "${opt.text}", "isCorrect": false, "analysis": "...", "hotspots": [] }`
+        `    { "item": "${
+          opt.text
+        }", "isCorrect": false, "analysis": "❌ <span style=\\"color: red;\\">...</span>" }`
     )
     .join(',\n');
 
   return `
 {
   "howToThink": "A <strong>rich HTML</strong> string with [hotspots].",
-  "coreAnalysis": [
-${statementsPrompt}
-  ],
+  "howManyAnalysis": {
+    "itemAnalysis": [
+  ${itemsPrompt}
+    ],
+    "conclusion": {
+      "countSummary": "A <strong>rich HTML</strong> string summarizing the count. (e.g., 'So, out of the three water bodies, <span style=\\"color: red;\\"><strong>zero (0)</strong></span> pass through the [Equator].')",
+      "optionAnalysis": "A <strong>rich HTML</strong> string analyzing the final options. (e.g., 'Based on this: A. Only one: ❌, B. Only two: ❌, D. None: ✅')"
+    }
+  },
   "adminProTip": "A <strong>rich HTML</strong> string with [hotspots].",
-  "takeaway": "A <strong>rich HTML</strong> string."
+  "takeaway": "A <strong>rich HTML</strong> string.",
+  "hotspotBank": [
+    { "term": "...", "type": "green", "definition": "..." },
+    { "term": "...", "type": "red", "definition": "..." },
+    { "term": "...", "type": "blue", "definition": "..." }
+  ]
 }
 `;
 };
 
-const getHowManyPairsSchema = (question: Question): string => {
-  // Pairs are stored in the "options" array for this type
-  const pairsPrompt = question.options
-    .map(
-      (opt) =>
-        `    { "pair": "${opt.text}", "isCorrect": false, "analysis": "...", "hotspots": [] }`
-    )
-    .join(',\n');
-
-  return `
-{
-  "howToThink": "A <strong>rich HTML</strong> string with [hotspots].",
-  "coreAnalysis": [
-${pairsPrompt}
-  ],
-  "adminProTip": "A <strong>rich HTML</strong> string with [hotspots].",
-  "takeaway": "A <strong>rich HTML</strong> string."
-}
-`;
-};
-
+/**
+ * "Perfect" Schema for: [MatchTheList]
+ * (e.g., "List I vs List II")
+ */
 const getMatchTheListSchema = (question: Question): string => {
-  // We provide a generic schema as the lists are in the questionText
   const schema = `
 {
-  "howToThink": "A <strong>rich HTML</strong> string with [hotspots].",
-  "coreAnalysis": [
-    { "list1_item": "A. ...", "list2_item": "1. ...", "analysis": "This is a correct match because...", "hotspots": [] },
-    { "list1_item": "B. ...", "list2_item": "2. ...", "analysis": "This is a correct match because...", "hotspots": [] },
-    { "list1_item": "C. ...", "list2_item": "3. ...", "analysis": "This is a correct match because...", "hotspots": [] }
-  ],
+  "howToThink": "A <strong>rich HTML</strong> string with [hotspots]. (e.g., 'Okay, a Match question. I'll check each item from List I and find its correct match from List II.')",
+  "matchTheListAnalysis": {
+    "correctMatches": [
+      {
+        "itemA": "List I: Item A",
+        "correctMatchB": "List II: Item 3",
+        "analysis": "✅ <span style=\\"color: green;\\">Correctly Matched.</span> A <strong>detailed HTML analysis</strong> of why Item A matches Item 3, full of [hotspots]."
+      },
+      {
+        "itemA": "List I: Item B",
+        "correctMatchB": "List II: Item 1",
+        "analysis": "✅ <span style=\\"color: green;\\">Correctly Matched.</span> A <strong>detailed HTML analysis</strong> of why Item B matches Item 1, full of [hotspots]."
+      },
+      {
+        "itemA": "List I: Item C",
+        "correctMatchB": "List II: Item 2",
+        "analysis": "✅ <span style=\\"color: green;\\">Correctly Matched.</span> A <strong>detailed HTML analysis</strong> of why Item C matches Item 2, full of [hotspots]."
+      }
+    ],
+    "conclusion": "A <strong>rich HTML</strong> string summarizing the final code. (e.g., 'Based on our matching, the correct code is A-3, B-1, C-2. Therefore, option (C) is the correct answer.')"
+  },
   "adminProTip": "A <strong>rich HTML</strong> string with [hotspots].",
-  "takeaway": "A <strong>rich HTML</strong> string."
+  "takeaway": "A <strong>rich HTML</strong> string.",
+  "hotspotBank": [
+    { "term": "...", "type": "green", "definition": "..." },
+    { "term": "...", "type": "red", "definition": "..." },
+    { "term": "...", "type": "blue", "definition": "..." }
+  ]
 }
 `;
   return schema;
@@ -156,7 +204,6 @@ const getMatchTheListSchema = (question: Question): string => {
  * ==================================================================
  * --- 💎 THE MAIN EXPORTED FUNCTION 💎 ---
  * ==================================================================
- * This is what our new Admin Page will call.
  */
 export const generateDetailedPrompt = (
   question: Question,
@@ -165,22 +212,24 @@ export const generateDetailedPrompt = (
   let schemaDefinition = '';
   const questionOptions = formatOptions(question);
 
-  // Use the ADMIN-SELECTED type, not the one from the question object
+  // Use the ADMIN-SELECTED type
   switch (selectedType) {
     case 'SingleChoice':
       schemaDefinition = getSingleChoiceSchema(question);
       break;
+
+    // Map all old types to our new "HowMany" schema
     case 'StatementBased':
-      schemaDefinition = getStatementBasedSchema(question);
-      break;
     case 'HowManyPairs':
-      schemaDefinition = getHowManyPairsSchema(question);
+    case 'HowMany':
+      schemaDefinition = getHowManySchema(question);
       break;
+
     case 'MatchTheList':
       schemaDefinition = getMatchTheListSchema(question);
       break;
+
     default:
-      // Fallback to SingleChoice if type is unknown
       schemaDefinition = getSingleChoiceSchema(question);
   }
 

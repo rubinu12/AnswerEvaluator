@@ -1,75 +1,83 @@
-// components/quiz/UltimateExplanationUI.tsx
+'use client';
+
 import React from 'react';
 import {
   UltimateExplanation,
-  CoreAnalysisStatement,
-  CoreAnalysisOption,
-  CoreAnalysisPair,
-  CoreAnalysisMatch,
-  CoreAnalysisItem,
   Hotspot,
 } from '@/lib/quizTypes';
-import {
-  Eye,
-  Pencil,
-  Link,
-  Lightbulb,
-  Presentation,
-  CheckCircle2,
-  XCircle,
-  Map,
-  Video,
-} from 'lucide-react';
-import HotspotTooltip from './HotspotTooltip';
-
-interface UltimateExplanationUIProps {
-  explanation: UltimateExplanation;
-}
+import HotspotTooltip from './HotspotTooltip'; // We import your Radix tooltip
+import { Eye, Pencil, Lightbulb, Presentation, Map, Video, Link, CheckCircle2, XCircle } from 'lucide-react';
 
 /**
- * This helper function renders text that includes both rich HTML
- * and our [Hotspot] tags.
+ * A new helper component that parses the editor's HTML and
+ * wraps the hotspot spans with our Radix Tooltip component.
  */
-const renderRichTextWithHotspots = (
-  text: string,
-  hotspots: Hotspot[] = []
-): React.ReactNode => {
-  if (!text) return null; // Handle empty text
-  if (!hotspots || hotspots.length === 0) {
-    return <span dangerouslySetInnerHTML={{ __html: text }} />;
+const RenderWithRadixHotspots = ({
+  html,
+  hotspotBank,
+}: {
+  html: string;
+  hotspotBank: Hotspot[];
+}) => {
+  if (!html) return null;
+  if (!hotspotBank || hotspotBank.length === 0) {
+    // No hotspots, just render the HTML
+    return (
+      <div
+        className="prose prose-sm sm:prose-base max-w-none text-gray-700 leading-relaxed"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
   }
 
-  const hotspotTerms = hotspots.map((h) => h.term);
-  const regex = new RegExp(`(${hotspotTerms.map(t => `\\[${t}\\]`).join('|')})`, 'g');
-  const parts = text.split(regex);
+  // This regex splits the HTML string by our hotspot spans, but *keeps* the spans
+  // This finds `<span class="hotspot-mark" ...>...</span>`
+  const regex = /(<span class="hotspot-mark"[^>]*>.*?<\/span>)/g;
+  const parts = html.split(regex);
 
   return (
-    <>
+    <div className="prose prose-sm sm:prose-base max-w-none text-gray-700 leading-relaxed">
       {parts.map((part, index) => {
-        const matchingHotspot = hotspots.find(h => `[${h.term}]` === part);
+        if (part.startsWith('<span class="hotspot-mark"')) {
+          // This part is a hotspot span. We need to parse it.
+          // Extract the text *inside* the span
+          const termMatch = part.match(/>(.*?)</);
+          const term = termMatch ? termMatch[1] : '';
+          
+          // Find the matching definition from the bank
+          const hotspot = hotspotBank.find((h) => h.term === term);
 
-        if (matchingHotspot) {
-          return (
-            <HotspotTooltip
-              key={`${matchingHotspot.term}-${index}`}
-              hotspot={matchingHotspot}
-            >
-              {matchingHotspot.term}
-            </HotspotTooltip>
-          );
+          if (hotspot) {
+            // Wrap the raw HTML span in our Radix Tooltip component
+            // The Radix component will use the span as its `children` (the trigger)
+            return (
+              <HotspotTooltip key={index} hotspot={hotspot}>
+                <span dangerouslySetInnerHTML={{ __html: part }} />
+              </HotspotTooltip>
+            );
+          }
         }
-
-        return (
-          <span key={index} dangerouslySetInnerHTML={{ __html: part }} />
-        );
+        
+        // This part is just normal text
+        return <span key={index} dangerouslySetInnerHTML={{ __html: part }} />;
       })}
-    </>
+    </div>
   );
 };
 
-const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
+/**
+ * This is the main component to display the "Ultimate Explanation"
+ * to the student. It is now upgraded to our "Master Plan" schema
+ * and uses the Radix-based HotspotTooltip.
+ */
+const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
   explanation,
 }) => {
+  // All useState and hover logic has been REMOVED.
+  // The HotspotTooltip component (via RenderWithRadixHotspots) now handles all hover logic.
+
+  const hotspotBank = explanation.hotspotBank || [];
+
   // --- 1. Topper's Mental Model ---
   const renderMentalModel = () => (
     <div className="mb-6">
@@ -77,95 +85,24 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
         <Eye className="w-6 h-6 mr-2 text-blue-600" />
         Topper's Mental Model
       </h2>
-      <div className="text-gray-700 text-lg leading-relaxed prose">
-        {renderRichTextWithHotspots(explanation.howToThink)}
+      <div className="text-lg">
+        <RenderWithRadixHotspots
+          html={explanation.howToThink}
+          hotspotBank={hotspotBank}
+        />
       </div>
     </div>
   );
 
-  // --- 2. Core Analysis (The "Universal" Renderer) ---
-  const renderCoreAnalysisItem = (item: CoreAnalysisItem, index: number) => {
-    // ==================================================================
-    // --- THIS IS THE "BULLETPROOF" UI FIX ---
-    // If a string or null somehow gets here, we skip it.
-    // ==================================================================
-    if (typeof item !== 'object' || item === null) {
-      return null;
-    }
-
-    // A. For Statement, Option, or HowManyPairs
-    if ('isCorrect' in item) {
-      const { isCorrect, analysis, hotspots } = item;
-      let itemText = '';
-      if ('statement' in item) itemText = (item as CoreAnalysisStatement).statement;
-      if ('option' in item) itemText = (item as CoreAnalysisOption).option;
-      if ('pair' in item) itemText = (item as CoreAnalysisPair).pair;
-
-      return (
-        <div
-          key={index}
-          className={`border-l-4 ${
-            isCorrect ? 'border-green-500' : 'border-red-500'
-          } bg-gray-50 p-4 rounded-r-lg`}
-        >
-          <h3
-            className={`text-lg font-semibold ${
-              isCorrect ? 'text-green-600' : 'text-red-600'
-            } flex items-start`}
-          >
-            <span className="mr-2 pt-1 flex-shrink-0">
-              {isCorrect ? (
-                <CheckCircle2 className="w-5 h-5" />
-              ) : (
-                <XCircle className="w-5 h-5" />
-              )}
-            </span>
-            <span className="leading-relaxed">
-              {renderRichTextWithHotspots(itemText, hotspots)}
-            </span>
-          </h3>
-          <div className="text-gray-700 mt-1 pl-7 leading-relaxed prose">
-            {renderRichTextWithHotspots(analysis, hotspots)}
-          </div>
-        </div>
-      );
-    }
-
-    // B. For MatchTheList
-    if ('list1_item' in item) {
-      const { list1_item, list2_item, analysis, hotspots } =
-        item as CoreAnalysisMatch;
-      return (
-        <div
-          key={index}
-          className="border-l-4 border-blue-500 bg-gray-50 p-4 rounded-r-lg"
-        >
-          <h3 className="text-lg font-semibold text-blue-700 flex items-center">
-            <Link className="w-5 h-5 mr-2 flex-shrink-0 text-blue-500" />
-            <span className="font-medium text-gray-800">
-              {renderRichTextWithHotspots(list1_item, hotspots)}
-            </span>
-            <span className="mx-2 font-light text-blue-600">➔</span>
-            <span className="font-medium text-gray-800">
-              {renderRichTextWithHotspots(list2_item, hotspots)}
-            </span>
-          </h3>
-          <div className="text-gray-700 mt-2 pl-7 leading-relaxed prose">
-            {renderRichTextWithHotspots(analysis, hotspots)}
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
+  // --- 2. Core Analysis (New "Master Plan" Renderer) ---
   const renderCoreAnalysis = () => {
-    // This check is now safe.
-    if (
-      !explanation.coreAnalysis ||
-      !Array.isArray(explanation.coreAnalysis) ||
-      explanation.coreAnalysis.length === 0
-    ) {
+    // Check for *any* of our new analysis blocks
+    const hasAnalysis =
+      explanation.singleChoiceAnalysis ||
+      explanation.howManyAnalysis ||
+      explanation.matchTheListAnalysis;
+
+    if (!hasAnalysis) {
       return null;
     }
 
@@ -176,7 +113,148 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
           Core Analysis
         </h2>
         <div className="space-y-4">
-          {explanation.coreAnalysis.map(renderCoreAnalysisItem)}
+          
+          {/* --- SingleChoice Analysis --- */}
+          {explanation.singleChoiceAnalysis && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-700">Core Concept</h4>
+                <RenderWithRadixHotspots
+                  html={explanation.singleChoiceAnalysis.coreConceptAnalysis}
+                  hotspotBank={hotspotBank}
+                />
+              </div>
+              <div className="space-y-3">
+                {explanation.singleChoiceAnalysis.optionAnalysis.map(
+                  (opt, index) => (
+                    <div
+                      key={index}
+                      className={`border-l-4 ${
+                        opt.isCorrect ? 'border-green-500' : 'border-red-500'
+                      } bg-gray-50 p-4 rounded-r-lg`}
+                    >
+                      <h3 className="text-lg font-semibold flex items-start">
+                        <span className="mr-2 pt-1 flex-shrink-0">
+                          {opt.isCorrect ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-red-600" />
+                          )}
+                        </span>
+                        {/* We render the option text as HTML since it might be styled */}
+                        <span
+                          className="leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: opt.option }}
+                        />
+                      </h3>
+                      <div className="mt-1 pl-7">
+                        <RenderWithRadixHotspots
+                          html={opt.analysis}
+                          hotspotBank={hotspotBank}
+                        />
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- HowMany Analysis --- */}
+          {explanation.howManyAnalysis && (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-700">Item-by-Item Analysis</h4>
+                {explanation.howManyAnalysis.itemAnalysis.map((item, index) => (
+                  <div
+                    key={index}
+                    className={`border-l-4 ${
+                      item.isCorrect ? 'border-green-500' : 'border-red-500'
+                    } bg-gray-50 p-4 rounded-r-lg`}
+                  >
+                    <h3 className="text-lg font-semibold flex items-start">
+                      <span className="mr-2 pt-1 flex-shrink-0">
+                        {item.isCorrect ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <XCircle className="w-5 h-5 text-red-600" />
+                        )}
+                      </span>
+                      {/* We render the item text as HTML since it might be styled */}
+                      <span
+                        className="leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: item.item }}
+                      />
+                    </h3>
+                    <div className="mt-1 pl-7">
+                      <RenderWithRadixHotspots
+                        html={item.analysis}
+                        hotspotBank={hotspotBank}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-700">Conclusion</h4>
+                <RenderWithRadixHotspots
+                  html={explanation.howManyAnalysis.conclusion.countSummary}
+                  hotspotBank={hotspotBank}
+                />
+                <RenderWithRadixHotspots
+                  html={explanation.howManyAnalysis.conclusion.optionAnalysis}
+                  hotspotBank={hotspotBank}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* --- MatchTheList Analysis --- */}
+          {explanation.matchTheListAnalysis && (
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-semibold text-gray-700">Correct Match Analysis</h4>
+                <div className="space-y-3">
+                  {explanation.matchTheListAnalysis.correctMatches.map(
+                    (match, index) => (
+                      <div
+                        key={index}
+                        className="border-l-4 border-blue-500 bg-gray-50 p-4 rounded-r-lg"
+                      >
+                        <h3 className="text-lg font-semibold text-blue-700 flex items-center">
+                          <Link className="w-5 h-5 mr-2 flex-shrink-0 text-blue-500" />
+                          <span
+                            className="font-medium text-gray-800"
+                            dangerouslySetInnerHTML={{ __html: match.itemA }}
+                          />
+                          <span className="mx-2 font-light text-blue-600">➔</span>
+                          {/* --- FIXED: Errors 1 & 2 --- */}
+                          <span
+                            className="font-medium text-gray-800"
+                            dangerouslySetInnerHTML={{ __html: match.correctMatchB }}
+                          ></span>
+                        </h3>
+                        <div className="text-gray-700 mt-2 pl-7">
+                          <RenderWithRadixHotspots
+                            html={match.analysis}
+                            hotspotBank={hotspotBank}
+                          />
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-700">Conclusion</h4>
+                <RenderWithRadixHotspots
+                  html={explanation.matchTheListAnalysis.conclusion}
+                  hotspotBank={hotspotBank}
+                />
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     );
@@ -188,9 +266,10 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
           <Map className="w-6 h-6 mr-2 text-blue-600" />
-          Geographic Context
+          Visual Aid
         </h2>
         <div className="border rounded-lg overflow-hidden shadow-sm bg-gray-50 p-2">
+          {/* --- FIXED: Errors 3 & 4 --- */}
           <img
             src={explanation.visualAid.url}
             alt={explanation.visualAid.caption || 'Visual Aid'}
@@ -212,10 +291,13 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
         <div className="bg-blue-50 border border-blue-200 text-blue-800 p-5 rounded-lg shadow-sm">
           <h2 className="text-xl font-bold text-blue-900 mb-2 flex items-center">
             <Lightbulb className="w-6 h-6 mr-2" />
-            Admin Pro-Tip
+            Mentor's Pro-Tip
           </h2>
-          <div className="text-lg leading-relaxed prose">
-            {renderRichTextWithHotspots(explanation.adminProTip)}
+          <div className="text-lg">
+            <RenderWithRadixHotspots
+              html={explanation.adminProTip}
+              hotspotBank={hotspotBank}
+            />
           </div>
         </div>
       </div>
@@ -228,8 +310,11 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
         <Presentation className="w-6 h-6 mr-2 text-blue-600" />
         The Takeaway
       </h2>
-      <div className="text-gray-700 text-lg leading-relaxed prose">
-        {renderRichTextWithHotspots(explanation.takeaway)}
+      <div className="text-lg">
+        <RenderWithRadixHotspots
+          html={explanation.takeaway}
+          hotspotBank={hotspotBank}
+        />
       </div>
       <button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-all">
         <Video className="w-5 h-5 mr-2" />
@@ -245,6 +330,11 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
 
   return (
     <div className="w-full bg-white">
+      {/* The HotspotTooltip component is no longer rendered here at the top.
+        It is now rendered *inside* RenderWithRadixHotspots,
+        wrapping only the specific text that needs it.
+      */}
+
       {renderMentalModel()}
       
       {coreAnalysisNode && <hr className="border-gray-200 my-6" />}
@@ -263,3 +353,4 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
 };
 
 export default UltimateExplanationUI;
+

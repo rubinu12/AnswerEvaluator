@@ -1,190 +1,278 @@
-// app/admin/editor/[questionId]/CommandCenter.tsx
 'use client';
 
-import React, { useState } from 'react';
-import { Question, QuestionType, UltimateExplanation, isUltimateExplanation } from '@/lib/quizTypes';
+import React from 'react';
+import {
+  Question,
+  QuestionType,
+  UltimateExplanation,
+  Hotspot,
+} from '@/lib/quizTypes';
 import { generateDetailedPrompt } from '@/lib/promptGenerator';
-import { Copy, Wand2, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
+// --- Props updated to match page.tsx ---
 interface CommandCenterProps {
   question: Question;
-  initialExplanation: UltimateExplanation | null;
-  onParse: (explanation: UltimateExplanation) => void;
+  questionType: QuestionType;
+  setQuestionType: React.Dispatch<React.SetStateAction<QuestionType>>;
+  currentPrompt: string;
+  setCurrentPrompt: React.Dispatch<React.SetStateAction<string>>;
+  rawAiResponse: string;
+  setRawAiResponse: React.Dispatch<React.SetStateAction<string>>;
+  setExplanation: (exp: UltimateExplanation) => void;
 }
 
-const CommandCenter: React.FC<CommandCenterProps> = ({ 
-  question, 
-  initialExplanation,
-  onParse
-}) => {
-  const [selectedType, setSelectedType] = useState<QuestionType>(question.questionType);
-  const [generatedPrompt, setGeneratedPrompt] = useState('');
-  const [rawJson, setRawJson] = useState(
-    initialExplanation 
-      ? JSON.stringify(initialExplanation, null, 2) 
-      : ''
-  );
-  const [error, setError] = useState<string | null>(null);
+/**
+ * ==================================================================
+ * --- 💎 HOTSPOT HTML CONVERTER 💎 ---
+ * ==================================================================
+ * This is our new function to convert [brackets] from the AI
+ * into the <span> tags our editor and UI expect.
+ */
+const convertBracketsToSpans = (
+  html: string,
+  hotspotBank: Hotspot[]
+): string => {
+  if (!html || !hotspotBank) return html;
 
-  const questionTypes: QuestionType[] = [
-    'SingleChoice',
-    'StatementBased',
-    'HowManyPairs',
-    'MatchTheList',
-  ];
+  let processedHtml = html;
+  for (const hotspot of hotspotBank) {
+    // Create a RegExp to find the [term]
+    // We escape special regex characters in the term
+    const escapedTerm = hotspot.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\[${escapedTerm}\\]`, 'g');
 
+    // Replace it with our editor-compatible HTML span
+    const replacement = `<span class="hotspot-mark" data-type="${hotspot.type}">${hotspot.term}</span>`;
+    processedHtml = processedHtml.replace(regex, replacement);
+  }
+  return processedHtml;
+};
+// --- End of new function ---
+
+export default function CommandCenter({
+  question,
+  questionType,
+  setQuestionType,
+  currentPrompt,
+  setCurrentPrompt,
+  rawAiResponse,
+  setRawAiResponse,
+  setExplanation,
+}: CommandCenterProps) {
+  // --- Prompt Generation ---
   const handleGeneratePrompt = (type: QuestionType) => {
-    setSelectedType(type);
-    const prompt = generateDetailedPrompt(question, type);
-    setGeneratedPrompt(prompt);
-  };
-
-  const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(generatedPrompt);
-    // You can add a toast here
-  };
-  
-  /**
-   * ==================================================================
-   * --- 💎 OUR "ROBUST PARSER" (V1 - STRICT) 💎 ---
-   * ==================================================================
-   * This is the "perfect" parser we designed. It is strict and
-   * gives you a clear error if the AI messes up.
-   */
-  const handleParseAndEdit = () => {
-    setError(null);
-    let parsed: any;
-    
+    setQuestionType(type);
     try {
-      if (rawJson.trim() === '') {
-        throw new Error('Pasted JSON cannot be empty.');
-      }
-      parsed = JSON.parse(rawJson);
-    } catch (e: any) {
-      console.error('JSON Parse Error:', e);
-      setError(`JSON Parse Error: ${e.message}`);
-      return;
+      const prompt = generateDetailedPrompt(question, type);
+      setCurrentPrompt(prompt);
+      toast.success(`Prompt for "${type}" generated!`);
+    } catch (error) {
+      console.error('Prompt generation error:', error);
+      toast.error('Failed to generate prompt.');
     }
-
-    // --- Strict Validation (as we agreed) ---
-    if (!parsed.howToThink || !parsed.takeaway) {
-      setError('JSON is missing required fields (howToThink, takeaway).');
-      return;
-    }
-    
-    if (!Array.isArray(parsed.coreAnalysis)) {
-      setError('The `coreAnalysis` field is missing or is not an array.');
-      return;
-    }
-    
-    // Check *inside* the array for the bug that crashed us
-    for (let i = 0; i < parsed.coreAnalysis.length; i++) {
-      const item = parsed.coreAnalysis[i];
-      if (typeof item !== 'object' || item === null) {
-        setError(`Error in \`coreAnalysis\` item ${i}: Item is not an object (e.g., it's a string). Please fix the JSON.`);
-        return;
-      }
-    }
-    
-    // --- Validation Passed ---
-    // We create the full object (visualAid is null for now)
-    const explanation: UltimateExplanation = {
-      howToThink: parsed.howToThink,
-      coreAnalysis: parsed.coreAnalysis,
-      adminProTip: parsed.adminProTip || '',
-      takeaway: parsed.takeaway,
-      visualAid: initialExplanation?.visualAid || null, // Preserve existing visual aid
-    };
-    
-    // Send the "perfect" data up to the parent page
-    onParse(explanation);
   };
 
+  // --- "Strict & Robust Parser" Logic ---
+
+  /**
+   * This is our new "Master Plan" validator.
+   */
+  const validateNewSchema = (data: any): data is UltimateExplanation => {
+    if (!data || typeof data !== 'object') {
+      console.error('Validation failed: Not an object.');
+      return false;
+    }
+    const hasCommonFields =
+      'howToThink' in data &&
+      'adminProTip' in data &&
+      'takeaway' in data &&
+      'hotspotBank' in data &&
+      Array.isArray(data.hotspotBank);
+
+    if (!hasCommonFields) {
+      console.error('Validation failed: Missing common fields.');
+      return false;
+    }
+
+    const hasOneAnalysisBlock =
+      ('singleChoiceAnalysis' in data &&
+        typeof data.singleChoiceAnalysis === 'object') ||
+      ('howManyAnalysis' in data &&
+        typeof data.howManyAnalysis === 'object') ||
+      ('matchTheListAnalysis' in data &&
+        typeof data.matchTheListAnalysis === 'object');
+
+    if (!hasOneAnalysisBlock) {
+      console.error('Validation failed: Missing analysis block.');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleParse = () => {
+    if (!rawAiResponse.trim()) {
+      toast.error('Paste JSON response from AI first.');
+      return;
+    }
+
+    let parsedData: any;
+    try {
+      parsedData = JSON.parse(rawAiResponse);
+    } catch (error: any) {
+      console.error('JSON Parse Error:', error);
+      toast.error(`Invalid JSON: ${error.message}`);
+      return;
+    }
+
+    // Use our new "Master Plan" validator
+    if (validateNewSchema(parsedData)) {
+      // --- THIS IS THE NEW CONVERSION STEP ---
+      // We take the valid JSON and "upgrade" its HTML
+      const bank = parsedData.hotspotBank || [];
+      const processedExplanation: UltimateExplanation = {
+        ...parsedData,
+        howToThink: convertBracketsToSpans(parsedData.howToThink, bank),
+        adminProTip: convertBracketsToSpans(parsedData.adminProTip, bank),
+        takeaway: convertBracketsToSpans(parsedData.takeaway, bank),
+        // We also convert the analysis blocks
+        singleChoiceAnalysis: parsedData.singleChoiceAnalysis
+          ? {
+              ...parsedData.singleChoiceAnalysis,
+              coreConceptAnalysis: convertBracketsToSpans(
+                parsedData.singleChoiceAnalysis.coreConceptAnalysis,
+                bank
+              ),
+              optionAnalysis:
+                parsedData.singleChoiceAnalysis.optionAnalysis.map(
+                  (opt: any) => ({
+                    ...opt,
+                    analysis: convertBracketsToSpans(opt.analysis, bank),
+                  })
+                ),
+            }
+          : undefined,
+        howManyAnalysis: parsedData.howManyAnalysis
+          ? {
+              ...parsedData.howManyAnalysis,
+              itemAnalysis: parsedData.howManyAnalysis.itemAnalysis.map(
+                (item: any) => ({
+                  ...item,
+                  analysis: convertBracketsToSpans(item.analysis, bank),
+                })
+              ),
+              conclusion: {
+                countSummary: convertBracketsToSpans(
+                  parsedData.howManyAnalysis.conclusion.countSummary,
+                  bank
+                ),
+                optionAnalysis: convertBracketsToSpans(
+                  parsedData.howManyAnalysis.conclusion.optionAnalysis,
+                  bank
+                ),
+              },
+            }
+          : undefined,
+        matchTheListAnalysis: parsedData.matchTheListAnalysis
+          ? {
+              ...parsedData.matchTheListAnalysis,
+              correctMatches:
+                parsedData.matchTheListAnalysis.correctMatches.map(
+                  (match: any) => ({
+                    ...match,
+                    analysis: convertBracketsToSpans(match.analysis, bank),
+                  })
+                ),
+              conclusion: convertBracketsToSpans(
+                parsedData.matchTheListAnalysis.conclusion,
+                bank
+              ),
+            }
+          : undefined,
+      };
+      // --- END OF CONVERSION ---
+
+      setExplanation(processedExplanation);
+      toast.success('AI Response Parsed! Loading workspace...');
+    } else {
+      toast.error(
+        'Parse Error: JSON is invalid or missing required fields.'
+      );
+    }
+  };
+
+  // --- Render ---
   return (
-    <div className="bg-white shadow-lg rounded-lg border border-gray-200">
-      <div className="p-4 border-b">
-        <h2 className="text-xl font-semibold">Row 1: Command Center</h2>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Column 1: Generate Prompt */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Column 1.1: Generate Prompt</h3>
+        <p className="text-sm text-gray-600">
+          Select the question type to generate the "Dr. Topper Singh" prompt.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {/* Buttons now set parent state */}
+          <button
+            onClick={() => handleGeneratePrompt('SingleChoice')}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              questionType === 'SingleChoice'
+                ? 'bg-blue-600 text-white shadow'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            [SingleChoice]
+          </button>
+          <button
+            onClick={() => handleGeneratePrompt('HowMany')}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              questionType === 'HowMany' ||
+              questionType === 'StatementBased' ||
+              questionType === 'HowManyPairs'
+                ? 'bg-green-600 text-white shadow'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            [HowMany]
+          </button>
+          <button
+            onClick={() => handleGeneratePrompt('MatchTheList')}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              questionType === 'MatchTheList'
+                ? 'bg-purple-600 text-white shadow'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            [MatchTheList]
+          </button>
+        </div>
+        <textarea
+          readOnly
+          value={currentPrompt} // Controlled by parent
+          className="w-full h-48 p-2 border rounded-md bg-gray-100 text-sm"
+          placeholder="Click a button above to generate the prompt..."
+        />
       </div>
-      
-      {/* --- YOUR "TWO-COLUMN" LAYOUT FOR ROW 1 --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-        
-        {/* --- COLUMN 1.1: GENERATE PROMPT --- */}
-        <div className="p-6 border-r border-gray-200">
-          <label className="text-lg font-semibold">
-            1. Generate Prompt
-          </label>
-          <p className="text-sm text-gray-500 mt-1 mb-4">
-            Select the question type to generate the "perfect" prompt.
-          </p>
-          
-          <div className="flex flex-wrap gap-2 mb-4">
-            {questionTypes.map((type) => (
-              <button
-                key={type}
-                onClick={() => handleGeneratePrompt(type)}
-                className={`btn text-sm px-3 py-1 rounded-full ${
-                  selectedType === type
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-          
-          <textarea
-            readOnly
-            value={generatedPrompt || 'Click a type button to generate the prompt...'}
-            className="w-full h-64 p-2 border border-gray-300 rounded-md shadow-sm font-mono text-xs custom-scrollbar"
-          />
-          <button
-            onClick={handleCopyToClipboard}
-            disabled={!generatedPrompt}
-            className="btn bg-white text-gray-700 font-semibold px-4 py-2 rounded-lg border flex items-center gap-2 mt-2 w-full justify-center disabled:opacity-50"
-          >
-            <Copy className="w-4 h-4" />
-            Copy Prompt
-          </button>
-        </div>
-        
-        {/* --- COLUMN 1.2: PASTE & PARSE --- */}
-        <div className="p-6">
-          <label className="text-lg font-semibold" htmlFor="json-input">
-            2. Paste Gemini's Response
-          </label>
-          <p className="text-sm text-gray-500 mt-1 mb-4">
-            Paste the raw JSON from the AI here.
-          </p>
-          
-          <textarea
-            id="json-input"
-            value={rawJson}
-            onChange={(e) => setRawJson(e.target.value)}
-            placeholder="Paste the JSON from Gemini here..."
-            className="w-full h-64 p-2 border border-gray-300 rounded-md shadow-sm font-mono text-xs custom-scrollbar"
-          />
-          <button
-            onClick={handleParseAndEdit}
-            disabled={!rawJson}
-            className="btn bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg shadow-md w-full flex items-center gap-2 mt-2 justify-center disabled:opacity-50"
-          >
-            <Wand2 className="w-4 h-4" />
-            Parse & Edit in Workspace
-          </button>
-          
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm font-medium flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
-        </div>
-        
+
+      {/* Column 2: Paste & Parse */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Column 1.2: Paste & Parse</h3>
+        <p className="text-sm text-gray-600">
+          Paste the raw JSON response from the AI here.
+        </p>
+        <textarea
+          value={rawAiResponse} // Controlled by parent
+          onChange={(e) => setRawAiResponse(e.target.value)} // Update parent
+          className="w-full h-48 p-2 border rounded-md text-sm"
+          placeholder="Paste raw JSON here..."
+        />
+        <button
+          onClick={handleParse}
+          className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          Parse & Edit in Workspace
+        </button>
       </div>
     </div>
   );
-};
-
-export default CommandCenter;
+}

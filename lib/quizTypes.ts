@@ -19,8 +19,7 @@ export type BackendQuestion = {
   exam?: string;
   examYear?: string; // This is a composite key we create
   
-  // --- 💎 1. UPGRADE: ADDING NEW FIELDS TO BACKEND TYPE 💎 ---
-  // We add our new types here.
+  // --- 💎 UPGRADE: NEW FIELDS 💎 ---
   questionType?: QuestionType; // Optional for backward compatibility
   explanation?: string | UltimateExplanation; // This will replace explanationText
 };
@@ -33,11 +32,10 @@ export interface Question {
   options: { label: string; text: string }[];
   correctAnswer: string;
   
-  // --- 💎 2. UPGRADE: MODIFYING EXPLANATION FIELD 💎 ---
-  // This will now hold either the old string OR our new object.
+  // --- 💎 UPGRADE: EXPLANATION FIELD 💎 ---
   explanation: string | UltimateExplanation;
   
-  // --- 💎 3. UPGRADE: ADDING QUESTION TYPE 💎 ---
+  // --- 💎 UPGRADE: QUESTION TYPE 💎 ---
   questionType: QuestionType; // We will default to 'SingleChoice' if missing
 
   year?: number;
@@ -131,7 +129,8 @@ export interface QuizState {
   // Notifications & Stats
   toast: ToastState;
   
-  // --- 💎 4. UPGRADE: ADDING ADMIN MODAL STATE 💎 ---
+  // --- 💎 "SCRAPPED" MODAL STATE 💎 ---
+  // This is for the old "cramped" modal we "scrapped"
   editingQuestionId: string | null;
 
   performanceStats: PerformanceStats | null;
@@ -169,7 +168,7 @@ export interface QuizActions {
   showToast: (message: string, type: 'info' | 'warning') => void;
   hideToast: () => void;
   
-  // --- 💎 5. UPGRADE: ADDING ADMIN MODAL ACTIONS 💎 ---
+  // --- 💎 "SCRAPPED" MODAL ACTIONS 💎 ---
   openExplanationEditor: (questionId: string) => void;
   closeExplanationEditor: () => void;
   updateQuestionExplanation: (
@@ -186,82 +185,106 @@ export interface QuizActions {
 export type QuizStore = QuizState & QuizActions;
 
 // ==================================================================
-// --- 💎 6. ADDING NEW "ULTIMATE EXPLANATION" TYPES 💎 ---
-// These are all the new types we designed together.
+// --- 💎 6. "PERFECTED" ULTIMATE EXPLANATION TYPES 💎 ---
+// These are our new "Master Plan" types, "perfectly" upgraded.
 // ==================================================================
 
-// Defines the 4 types of questions our app supports
+/**
+ * Defines the 4 types of questions our app supports.
+ * "PERFECT" FIX 2: Added 'HowMany' to the union.
+ */
 export type QuestionType =
   | 'SingleChoice' // 4 options, 1 correct (A, B, C, D)
-  | 'StatementBased' // 2-4 statements, "How many" (Only 1, Only 2, etc.)
-  | 'HowManyPairs' // 3-4 pairs, "How many *pairs* are correct"
+  | 'StatementBased' // Kept for mapping, maps to 'HowMany'
+  | 'HowManyPairs' // Kept for mapping, maps to 'HowMany'
+  | 'HowMany' // Our new "perfect" general type for "how many..." questions
   | 'MatchTheList'; // List I vs List II (A-1, B-2, C-3)
 
-// A single hotspot (text or text + image)
+/**
+ * "Perfected" Pen-Based Hotspot.
+ * This "perfectly" matches our new "Master Plan".
+ */
 export type Hotspot = {
-  term: string; // The term that is highlighted
-  explanation: string; // The text explanation (can be rich HTML)
-  handwrittenNoteUrl?: string; // Optional URL to the admin's handwritten note image
+  term: string; // The bracketed [term]
+  type: 'green' | 'blue' | 'red'; // Our "Pen-Based" types
+  definition: string; // The HTML explanation for the hover-card
 };
 
-// Base for all core analysis items
-interface CoreAnalysisItemBase {
-  analysis: string; // Rich text (HTML) analysis
-  hotspots?: Hotspot[]; // Hotspots *within* this analysis text
-}
-
-// Type 1: StatementBased ("How many are correct?")
-export interface CoreAnalysisStatement extends CoreAnalysisItemBase {
-  statement: string; // The text of the statement (can be rich HTML)
-  isCorrect: boolean;
-}
-
-// Type 2: SingleChoice ("Congo Basin")
-export interface CoreAnalysisOption extends CoreAnalysisItemBase {
-  option: string; // e.g., "(a) Cameroon"
-  isCorrect: boolean;
-}
-
-// Type 3: HowManyPairs ("Ports")
-export interface CoreAnalysisPair extends CoreAnalysisItemBase {
-  pair: string; // e.g., "1. Kamarajar Port: First major port..."
-  isCorrect: boolean;
-}
-
-// Type 4: MatchTheList ("Texts & Authors")
-export interface CoreAnalysisMatch extends CoreAnalysisItemBase {
-  list1_item: string; // e.g., "A. Ashtadhyayi"
-  list2_item: string; // e.g., "3. Panini"
-  // isCorrect is implied, as we only show correct matches
-}
-
-// A discriminated union of all possible analysis types
-export type CoreAnalysisItem =
-  | CoreAnalysisStatement
-  | CoreAnalysisOption
-  | CoreAnalysisPair
-  | CoreAnalysisMatch;
-
-// The visual aid (map, diagram)
+/**
+ * The visual aid (map, diagram)
+ */
 export type VisualAid = {
   type: 'image' | 'video';
   url: string; // URL to the image/video
   caption?: string;
 };
 
-// The complete JSON structure for the "Ultimate Explanation"
+// --- "Perfect" Schema-Specific Analysis Types ---
+// We have "scrapped" the old "cramped" CoreAnalysisItem types.
+
+/**
+ * "Perfect" Schema for: [SingleChoice]
+ */
+export type SingleChoiceAnalysis = {
+  coreConceptAnalysis: string; // Rich HTML
+  optionAnalysis: {
+    option: string; // e.g., "(a) Silver Iodide..."
+    isCorrect: boolean;
+    analysis: string; // Rich HTML
+  }[];
+};
+
+/**
+ * "Perfect" Schema for: [HowMany]
+ */
+export type HowManyAnalysis = {
+  itemAnalysis: {
+    item: string; // e.g., "1. Lake Tanganyika"
+    isCorrect: boolean;
+    analysis: string; // Rich HTML
+  }[];
+  conclusion: {
+    countSummary: string; // Rich HTML
+    optionAnalysis: string; // Rich HTML
+  };
+};
+
+/**
+ * "Perfect" Schema for: [MatchTheList]
+ */
+export type MatchTheListAnalysis = {
+  correctMatches: {
+    itemA: string; // e.g., "List I: Item A"
+    correctMatchB: string; // e.g., "List II: Item 3"
+    analysis: string; // Rich HTML
+  }[];
+  conclusion: string; // Rich HTML
+};
+
+/**
+* The "Perfect" Ultimate Explanation JSON structure.
+* This is the "masterpiece" object our "Strict & Robust Parser" will
+* validate and our "WYSIWYG Workspace" will edit.
+*/
 export type UltimateExplanation = {
   howToThink: string; // Rich HTML
   
-  // coreAnalysis is optional to make our parser "robust"
-  coreAnalysis?: CoreAnalysisItem[]; 
-  
-  visualAid?: VisualAid | null;
-  adminProTip?: string; // Rich HTML
+  // --- "Perfect" Schemas (Only ONE will be present) ---
+  singleChoiceAnalysis?: SingleChoiceAnalysis;
+  howManyAnalysis?: HowManyAnalysis;
+  matchTheListAnalysis?: MatchTheListAnalysis;
+
+  // --- "Perfect" Common Fields ---
+  adminProTip: string; // Rich HTML
   takeaway: string; // Rich HTML
+  visualAid?: VisualAid | null;
+  hotspotBank?: Hotspot[];
 };
 
-// Helper type guard to check if an explanation is the new Ultimate type
+/**
+ * "Perfect" Helper type guard to check if an explanation
+ * is our new Ultimate type.
+ */
 export const isUltimateExplanation = (
   explanation: string | UltimateExplanation | undefined
 ): explanation is UltimateExplanation => {
@@ -269,7 +292,7 @@ export const isUltimateExplanation = (
     typeof explanation === 'object' &&
     explanation !== null &&
     'howToThink' in explanation &&
-    // We only check for the bare minimum, as `coreAnalysis` is optional
-    'takeaway' in explanation 
+    'adminProTip' in explanation &&
+    'takeaway' in explanation
   );
 };

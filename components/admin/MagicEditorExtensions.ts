@@ -1,143 +1,127 @@
 // components/admin/MagicEditorExtensions.ts
-'use client';
 
-import { Editor } from '@tiptap/react';
-import { StarterKit } from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import {TextStyle} from '@tiptap/extension-text-style';
+// --- Imports from your original file ---
+import StarterKit from '@tiptap/starter-kit';
+import { Link } from '@tiptap/extension-link';
 import { Color } from '@tiptap/extension-color';
-import Link from '@tiptap/extension-link';
-// --- "PERFECT" FIX 1: Rename the "logic" import ---
-import TiptapFloatingMenu from '@tiptap/extension-floating-menu'; 
-import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  Palette,
-  Link as LinkIcon,
-  Image as ImageIcon,
-  LucideProps,
-} from 'lucide-react';
-import React from 'react';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Underline } from '@tiptap/extension-underline';
+import { Highlight } from '@tiptap/extension-highlight'; // This will now work after the npm install
+import { Subscript } from '@tiptap/extension-subscript';
+import { Superscript } from '@tiptap/extension-superscript';
+import { FontFamily } from '@tiptap/extension-font-family';
+// --- FIXED: Removed the './fontSize' import ---
 
-// --- "PERFECT" TIPTAP EXTENSIONS ---
+// --- NEW HOTSPOT MARK (PHASE 3) ---
+import { Mark, mergeAttributes, MarkType } from '@tiptap/core';
+// We also need these types for our (upcoming) button logic
+import { Editor } from '@tiptap/react';
 
 /**
- * This is the "perfect" list of all extensions our editor will use.
- * It "perfectly" matches the npm packages we installed.
+ * Our custom Tiptap Mark for "Hotspots".
+ * This allows us to "mark" text with a data-type, which we
+ * can then style with CSS and make interactive.
  */
-export const tiptapExtensions = [
-  StarterKit.configure({
-    heading: false,
-    blockquote: false,
-    bulletList: false,
-    orderedList: false,
-    codeBlock: false,
-    horizontalRule: false,
+export const HotspotMark = Mark.create({
+  name: 'hotspot',
+
+  // This allows us to store the 'type' (red/green/blue)
+  addAttributes() {
+    return {
+      type: {
+        default: 'green',
+        parseHTML: (element) => element.getAttribute('data-type'),
+        renderHTML: (attributes) => ({
+          'data-type': attributes.type,
+        }),
+      },
+    };
+  },
+
+  // This defines how the mark is parsed from HTML
+  parseHTML() {
+    return [
+      {
+        tag: 'span[data-type]',
+      },
+    ];
+  },
+
+  // This defines how the mark is rendered back to HTML
+  renderHTML({ HTMLAttributes }) {
+    // We add a 'hotspot-mark' class for styling and click detection
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, { class: 'hotspot-mark' }),
+      0,
+    ];
+  },
+
+  // --- FIXED: Removed the broken `addCommands` block entirely ---
+  // We will use the built-in `editor.commands.toggleMark()`
+  // in the MagicEditor component itself.
+});
+// --- END OF NEW HOTSPOT MARK ---
+
+// Tiptap Extensions
+const starterKit = StarterKit.configure({
+  bulletList: {
+    HTMLAttributes: {
+      class: 'list-disc list-outside leading-3 -mt-2',
+    },
+  },
+  orderedList: {
+    HTMLAttributes: {
+      class: 'list-decimal list-outside leading-3 -mt-2',
+    },
+  },
+  listItem: {
+    HTMLAttributes: {
+      class: 'leading-normal -mb-2',
+    },
+  },
+  blockquote: {
+    HTMLAttributes: {
+      class: 'border-l-4 border-gray-300 pl-4',
+    },
+  },
+  codeBlock: {
+    HTMLAttributes: {
+      class: 'rounded-sm bg-gray-100 p-5 font-mono font-medium',
+    },
+  },
+  code: {
+    HTMLAttributes: {
+      class: 'rounded-md bg-gray-200 px-1.5 py-1 font-mono font-medium',
+      spellcheck: 'false',
+    },
+  },
+  horizontalRule: false,
+  dropcursor: {
+    color: '#DBEAFE',
+    width: 4,
+  },
+  gapcursor: false,
+});
+
+// This is the final, correct extensions array
+export const extensions = [
+  starterKit,
+  Link.configure({
+    HTMLAttributes: {
+      class:
+        'text-blue-600 underline underline-offset-2 hover:text-blue-700 transition-colors cursor-pointer',
+    },
   }),
-  Underline,
   TextStyle,
   Color,
-  Link.configure({
-    openOnClick: false,
-    autolink: false,
+  Underline,
+  Highlight.configure({
+    multicolor: true,
   }),
-  // --- "PERFECT" FIX 2: Use the "perfectly" renamed extension ---
-  TiptapFloatingMenu, 
-];
-
-// --- "PERFECT" TOOLBAR CONFIGURATION ---
-
-// This defines the "perfect" shape for our toolbar buttons
-export interface ToolbarButton {
-  id: string;
-  label: string;
-  icon: React.ElementType<LucideProps>;
-  onClick: (editor: Editor) => void;
-  isActive: (editor: Editor) => boolean;
-  color?: string; 
-}
-
-/**
- * This is the "perfect" function that powers our floating toolbar.
- * It "perfectly" implements every button we designed.
- */
-export const getToolbarButtons = (
-  editor: Editor,
-  onHotspotClick: () => void,
-  onNoteClick: () => void
-): ToolbarButton[] => [
-  // --- [ B ], [ I ], [ U ] ---
-  {
-    id: 'bold',
-    label: 'Bold',
-    icon: Bold,
-    onClick: (editor) => editor.chain().focus().toggleBold().run(),
-    isActive: (editor) => editor.isActive('bold'),
-  },
-  {
-    id: 'italic',
-    label: 'Italic',
-    icon: Italic,
-    onClick: (editor) => editor.chain().focus().toggleItalic().run(),
-    isActive: (editor) => editor.isActive('italic'),
-  },
-  {
-    id: 'underline',
-    label: 'Underline',
-    icon: UnderlineIcon,
-    onClick: (editor) => editor.chain().focus().toggleUnderline().run(),
-    isActive: (editor) => editor.isActive('underline'),
-  },
-
-  // --- [ RED PEN ] ---
-  {
-    id: 'red-pen',
-    label: 'Red Pen',
-    icon: Palette,
-    color: '#E00000', // Our "perfect" Red
-    onClick: (editor) =>
-      editor.chain().focus().setColor('#E00000').run(),
-    isActive: (editor) => editor.isActive('textStyle', { color: '#E00000' }),
-  },
-  
-  // --- [ GREEN PEN ] ---
-  {
-    id: 'green-pen',
-    label: 'Green Pen',
-    icon: Palette,
-    color: '#00A000', // Our "perfect" Green
-    onClick: (editor) =>
-      editor.chain().focus().setColor('#00A000').run(),
-    isActive: (editor) => editor.isActive('textStyle', { color: '#00A000' }),
-  },
-  
-  // --- [ BLUE PEN ] ---
-  {
-    id: 'blue-pen',
-    label: 'Blue Pen',
-    icon: Palette,
-    color: '#0000D0', // Our "perfect" Blue
-    onClick: (editor) =>
-      editor.chain().focus().setColor('#0000D0').run(),
-    isActive: (editor) => editor.isActive('textStyle', { color: '#0000D0' }),
-  },
-
-  // --- [ 🔗 HOTSPOT ] ---
-  {
-    id: 'hotspot',
-    label: 'Hotspot',
-    icon: LinkIcon,
-    onClick: onHotspotClick, // This will open our "perfect" Hotspot modal
-    isActive: (editor) => editor.isActive('link'),
-  },
-  
-  // --- [ 🖼️ HANDWRITTEN NOTE ] ---
-  {
-    id: 'note',
-    label: 'Handwritten Note',
-    icon: ImageIcon,
-    onClick: onNoteClick, // This will open our "perfect" Note modal
-    isActive: (editor) => editor.isActive('link', { class: 'handwritten-note' }),
-  },
+  Subscript,
+  Superscript,
+  FontFamily,
+  // --- FIXED: Removed 'FontSize' ---
+  HotspotMark, // <-- ADDED OUR NEW MARK
 ];

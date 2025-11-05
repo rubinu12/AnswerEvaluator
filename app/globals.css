@@ -112,3 +112,44 @@ h1, h2, h3, h4, .font-serif {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
 }
+
+
+/* red green blue pen style */
+
+
+
+.hotspot-mark {
+  cursor: pointer; /* Makes it feel clickable */
+  font-weight: 600; /* semi-bold */
+}
+
+/* Green: Highlight + Solid Underline (As per image) */
+.hotspot-mark[data-type='green'] {
+  color: #15803d; /* Tailwind green-700 */
+  background-color: #f0fdf4; /* Tailwind green-50 */
+  border-bottom: 2px solid #15803d; /* Tailwind green-700 */
+  padding: 2px 1px; /* Add breathing room for the background */
+  border-radius: 3px;
+}
+
+/* Blue: Highlight + Solid Underline (As per image) */
+.hotspot-mark[data-type='blue'] {
+  color: #1d4ed8; /* Tailwind blue-700 */
+  background-color: #eff6ff; /* Tailwind blue-50 */
+  border-bottom: 2px solid #1d4ed8; /* Tailwind blue-700 */
+  padding: 2px 1px; /* Add breathing room for the background */
+  border-radius: 3px;
+}
+
+/* Red: Wavy Underline (As per request) */
+.hotspot-mark[data-type='red'] {
+  color: #b91c1c; /* Tailwind red-700 */
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #b91c1c;
+  /* Reset any styles from other types */
+  background-color: transparent;
+  border-bottom: none;
+  padding: 0;
+  border-radius: 0;
+}
