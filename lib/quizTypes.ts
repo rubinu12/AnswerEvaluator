@@ -24,7 +24,15 @@ export type BackendQuestion = {
   examYear?: string; 
   
   questionType?: QuestionType; 
+  
+  // --- 💎 MODIFIED 💎 ---
+  // This still points to "UltimateExplanation" but that type's
+  // *contents* will be our new soulful model.
   explanation?: string | UltimateExplanation; 
+
+  // --- 💎 ADDED 💎 ---
+  // As requested, for your handwritten notes.
+  handwrittenNoteUrl?: string;
 };
 
 // The transformed Question format our app will use
@@ -34,7 +42,11 @@ export interface Question {
   text: string;
   options: { label: string; text: string }[];
   correctAnswer: string;
+  
+  // --- 💎 MODIFIED 💎 ---
+  // This still points to "UltimateExplanation". No broken imports.
   explanation: string | UltimateExplanation;
+  
   questionType: QuestionType; 
 
   year?: number;
@@ -42,6 +54,10 @@ export interface Question {
   topic?: string;
   exam?: string;
   examYear?: string;
+
+  // --- 💎 ADDED 💎 ---
+  // As requested, for your handwritten notes.
+  handwrittenNoteUrl?: string;
 }
 
 // Represents a user's selected answer
@@ -50,7 +66,7 @@ export interface UserAnswer {
   answer: string;
 }
 
-// --- Quiz Configuration Types ---
+// --- Quiz Configuration Types (Unchanged) ---
 
 export interface QuizFilter {
   exam?: string;
@@ -61,7 +77,7 @@ export interface QuizFilter {
 
 export type GroupByKey = 'topic' | 'examYear';
 
-// --- State & Error Types ---
+// --- State & Error Types (Unchanged) ---
 
 export interface QuizError {
   message: string;
@@ -85,7 +101,9 @@ export interface PerformanceStats {
   maxScore: number;
 }
 
-// --- Zustand Store Types ---
+// --- Zustand Store Types (Unchanged) ---
+// Your store and actions already use "UltimateExplanation" by name,
+// so they will automatically work with the new structure.
 
 export interface QuizState {
   // Core Quiz Data
@@ -146,20 +164,23 @@ export interface QuizActions {
   hideToast: () => void;
   openExplanationEditor: (questionId: string) => void;
   closeExplanationEditor: () => void;
+  
+  // This function now correctly expects the *new* structure
+  // of UltimateExplanation, without breaking its name.
   updateQuestionExplanation: (
     questionId: string,
-    newExplanation: UltimateExplanation
+    newExplanation: UltimateExplanation 
   ) => void;
 }
 
 export type QuizStore = QuizState & QuizActions;
 
 // ==================================================================
-// --- 💎 "PERFECTED" ULTIMATE EXPLANATION TYPES (UPGRADED) 💎 ---
+// --- 💎 "PERFECTED" ULTIMATE EXPLANATION TYPES (SURGICALLY MODIFIED) 💎 ---
 // ==================================================================
 
 /**
- * --- UPDATED: Added your two new types ---
+ * Question Types (Unchanged from your file)
  */
 export type QuestionType =
   | 'SingleChoice'
@@ -181,6 +202,7 @@ export type Hotspot = {
 
 /**
  * Visual aid (map, diagram) (Unchanged)
+ * We'll make this optional in the main type for now to prevent crashes.
  */
 export type VisualAid = {
   type: 'image' | 'video';
@@ -189,112 +211,45 @@ export type VisualAid = {
 };
 
 // --- "Perfect" Schema-Specific Analysis Types ---
-
-/**
- * --- UPDATED: 'SingleChoice' (Concise) ---
- * Based on your new prompt:
- * - REMOVED 'coreConceptAnalysis'
- * - ADDED 'text' to optionAnalysis
- * - ADDED 'finalAnswer'
- */
-export type SingleChoiceAnalysis = {
-  optionAnalysis: {
-    option: string; // e.g., "A"
-    text: string; // e.g., "Silver Iodide..."
-    isCorrect: boolean;
-    analysis: string; // Rich HTML
-  }[];
-  finalAnswer: string; // e.g., "A"
-};
-
-/**
- * 'HowMany' (Unchanged from before, matches your new prompt)
- */
-export type HowManyAnalysis = {
-  itemAnalysis: {
-    item: string; // e.g., "1. Lake Tanganyika"
-    isCorrect: boolean;
-    analysis: string; // Rich HTML
-  }[];
-  conclusion: {
-    countSummary: string; // Rich HTML
-    optionAnalysis: string; // Rich HTML
-  };
-};
-
-/**
- * --- UPDATED: 'MatchTheList' (New Schema) ---
- * Based on your new prompt:
- * - REPLACED 'correctMatches' with 'itemAnalysis'
- * - REPLACED 'conclusion' string with a 'conclusion' object
- */
-export type MatchTheListAnalysis = {
-  itemAnalysis: {
-    item: string; // e.g., "A. [Item A text]"
-    correctMatch: string; // e.g., "[Match 2 text]"
-    analysis: string; // Rich HTML
-  }[];
-  conclusion: {
-    correctCombination: string; // Rich HTML
-    optionAnalysis: string; // Rich HTML
-  };
-};
-
-/**
- * --- NEW: 'SelectTheCode' ---
- * Based on your 'getSelectTheCodeSchema'
- */
-export type MultiSelectAnalysis = {
-  itemAnalysis: {
-    item: string; // e.g., "1. Statement 1"
-    isCorrect: boolean;
-    analysis: string; // Rich HTML
-  }[];
-  conclusion: {
-    correctItemsSummary: string; // Rich HTML
-    optionAnalysis: string; // Rich HTML
-  };
-};
-
-/**
- * --- NEW: 'StatementExplanation' ---
- * Based on your 'getStatementExplanationSchema'
- */
-export type StatementAnalysis = {
-  statements: {
-    id: string; // e.g., "A" or "I"
-    text: string; // e.g., "Statement I text..."
-    isCorrect: boolean; // True/False analysis
-    analysis: string; // Rich HTML
-  }[];
-  relationshipAnalysis: string; // Rich HTML for the "[Because Test]"
-  optionAnalysis: string; // Rich HTML for the final A,B,C,D
-};
+//
+// --- 💎 DELETED 💎 ---
+// All 5 of the old, "soulless" types are GONE:
+// - SingleChoiceAnalysis
+// - HowManyAnalysis
+// - MatchTheListAnalysis
+// - MultiSelectAnalysis
+// - StatementAnalysis
+//
+// ==================================================================
 
 
 /**
 * The "Perfect" Ultimate Explanation JSON structure.
-* --- UPDATED to include all 5 schemas ---
+* --- 💎 SURGICALLY MODIFIED 💎 ---
+*
+* We KEEP THE NAME "UltimateExplanation" to prevent app-wide crashes.
+* We GUT THE CONTENTS and replace them with our new "soulful" schema.
+*
 */
 export type UltimateExplanation = {
-  howToThink: string; // Rich HTML
-  
-  // --- Only ONE of these will be present ---
-  singleChoiceAnalysis?: SingleChoiceAnalysis;
-  howManyAnalysis?: HowManyAnalysis;
-  matchTheListAnalysis?: MatchTheListAnalysis;
-  multiSelectAnalysis?: MultiSelectAnalysis; // <-- NEW
-  statementAnalysis?: StatementAnalysis; // <-- NEW
+  // --- 💎 NEW "SOULFUL" SCHEMA 💎 ---
+  howToThink: string;    // Rich HTML ("🧠 Initial Thoughts")
+  coreAnalysis: string;  // Rich HTML ("🎯 Core Analysis / Mental Model")
+  adminProTip: string;   // Rich HTML ("✍️ Mentor's Pro-Tip")
+  hotspotBank: Hotspot[];
 
-  // --- Common Fields ---
-  adminProTip: string; // Rich HTML
-  takeaway: string; // Rich HTML
+  // --- 💎 KEPT FOR STABILITY 💎 ---
+  // Kept your old fields as *optional* to prevent the app from
+  // crashing in places we haven't refactored yet.
+  // The new prompt won't generate these, but old data won't break.
+  takeaway?: string; 
   visualAid?: VisualAid | null;
-  hotspotBank?: Hotspot[];
 };
 
 /**
- * "Perfect" Helper type guard. (Unchanged)
+ * "Perfect" Helper type guard.
+ * --- 💎 MODIFIED 💎 ---
+ * We KEEP THE NAME but change the LOGIC to check for our new keys.
  */
 export const isUltimateExplanation = (
   explanation: string | UltimateExplanation | undefined
@@ -303,7 +258,7 @@ export const isUltimateExplanation = (
     typeof explanation === 'object' &&
     explanation !== null &&
     'howToThink' in explanation &&
-    'adminProTip' in explanation &&
-    'takeaway' in explanation
+    'coreAnalysis' in explanation && // <-- Checks for the new "soul"
+    'adminProTip' in explanation
   );
 };

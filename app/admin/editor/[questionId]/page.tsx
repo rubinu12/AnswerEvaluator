@@ -1,16 +1,13 @@
-// app/admin/editor/[questionId]/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { notFound, useParams } from 'next/navigation';
-// import { doc, getDoc } from 'firebase/firestore'; // <-- REMOVED (No client-side getDoc)
-// import { db } from '@/lib/firebase'; // <-- REMOVED
 import {
   Question,
   QuestionType,
   UltimateExplanation,
-  isUltimateExplanation,
+  isUltimateExplanation, // This is our correct, refactored type guard
   BackendQuestion,
 } from '@/lib/quizTypes';
 import { useAuthContext } from '@/lib/AuthContext';
@@ -29,20 +26,16 @@ const ExplanationWorkspace = dynamic(
 );
 
 // --- THIS IS THE PERMANENT FIX ---
-// The transformer is now "smart". It checks for your `options` array first.
+// The transformer is now "smart".
 const transformBackendQuestion = (
   q: BackendQuestion,
   index: number
 ): Question => {
   
-  // 1. Check if the `options` array *already* exists on the backend data
-  //    (This is the "looking in the right place" fix you identified)
   let optionsArray: { label: string; text: string }[] = [];
   if (Array.isArray(q.options) && q.options.length > 0) {
-    // If it exists and is not empty, use it directly
     optionsArray = q.options;
   } else {
-    // 2. If it doesn't exist, *then* fall back to the old `optionA` logic
     optionsArray = [
       { label: 'A', text: q.optionA || '' },
       { label: 'B', text: q.optionB || '' },
@@ -55,15 +48,18 @@ const transformBackendQuestion = (
     id: q._id,
     questionNumber: index,
     text: q.questionText,
-    options: optionsArray, // <-- Use our new "smart" array
+    options: optionsArray,
     correctAnswer: q.correctOption,
-    explanation: q.explanation || q.explanationText || '', // Unify explanation
+    explanation: (q.explanation || q.explanationText || '') as string | UltimateExplanation,
     questionType: q.questionType || 'SingleChoice',
     year: q.year,
     subject: q.subject,
     topic: q.topic,
     exam: q.exam,
     examYear: q.examYear,
+    // --- 💎 FIXED 💎 ---
+    // We were forgetting to pass the handwritten note URL
+    handwrittenNoteUrl: q.handwrittenNoteUrl || undefined,
   };
 };
 // --- END OF PERMANENT FIX ---
@@ -84,9 +80,8 @@ export default function AdminEditorPage() {
   const [currentPrompt, setCurrentPrompt] = useState<string>('');
   const [rawAiResponse, setRawAiResponse] = useState<string>('');
 
-  // Fetch question data on load using our new, secure API route
+  // Fetch question data on load
   useEffect(() => {
-    // Wait for auth to be ready and questionId to be present
     if (authLoading || !questionId || !user) {
       return;
     }
@@ -94,10 +89,7 @@ export default function AdminEditorPage() {
     const fetchQuestion = async () => {
       setIsLoading(true);
       try {
-        // 1. Get the auth token from the user
         const token = await user.getIdToken();
-
-        // 2. Call our new admin-only API route
         const response = await fetch(`/api/questions/${questionId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -109,36 +101,41 @@ export default function AdminEditorPage() {
           throw new Error(errorData.message || `Error ${response.status}`);
         }
 
-        // 3. Get the full, raw data from the API
         const backendQuestion = (await response.json()) as BackendQuestion;
         
         console.log('--- RAW API DATA (Admin) ---', backendQuestion);
 
-        // 4. Transform it for the frontend (USING OUR NEW FIXED TRANSFORMER)
         const transformedQuestion = transformBackendQuestion(
           backendQuestion,
           1
         );
         setQuestion(transformedQuestion);
 
-        // Set the initial state for the editor
+        // --- 💎 FIXED 💎 ---
+        // This is the critical fix.
+        // We now check for the *correct* "soulful" explanation.
         if (isUltimateExplanation(transformedQuestion.explanation)) {
           setExplanation(transformedQuestion.explanation);
         } else {
+          // If no explanation exists, we initialize our NEW
+          // "soulful" object with all its required keys.
           setExplanation({
             howToThink: '',
+            coreAnalysis: '', // <-- This was the missing, crashing piece
             adminProTip: '',
-            takeaway: '',
             hotspotBank: [],
+            // 'takeaway' is no longer required for a new explanation
           });
         }
+        // --- End of Fix ---
+
         setQuestionType(transformedQuestion.questionType || 'SingleChoice');
 
       } catch (error: any) {
         console.error('Error fetching question via API:', error);
         toast.error(`Failed to load question: ${error.message}`);
         if (error.message.includes('Forbidden')) {
-          notFound(); // If user is not admin, boot them
+          notFound();
         }
       } finally {
         setIsLoading(false);
@@ -171,11 +168,14 @@ export default function AdminEditorPage() {
       <p className="text-gray-600">
         Editing Question ID: <code className="bg-gray-100 p-1 rounded">{question.id}</code>
       </p>
+      <p className="text-gray-600">
+        Editing Question ID: <code className="bg-gray-100 p-1 rounded">{question.id}</code>
+      </p>
 
       {/* --- Row 1: Command Center --- */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 shadow-sm">
         <CommandCenter
-          question={question} // This is now guaranteed to be a valid, full Question object
+          question={question} 
           questionType={questionType}
           setQuestionType={setQuestionType}
           rawAiResponse={rawAiResponse}
@@ -193,6 +193,9 @@ export default function AdminEditorPage() {
           questionType={questionType}
           explanation={explanation}
           setExplanation={setExplanation}
+          // We pass the note URL so the workspace can *display* it.
+          // We will add the "upload" button to the workspace next.
+          handwrittenNoteUrl={question.handwrittenNoteUrl}
         />
       </div>
     </div>

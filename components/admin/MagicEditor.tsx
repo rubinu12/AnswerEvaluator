@@ -1,6 +1,6 @@
 // components/admin/MagicEditor.tsx
-'use client';
 
+'use client';
 import React from 'react';
 import {
   EditorContent,

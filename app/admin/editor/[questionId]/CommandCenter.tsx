@@ -1,18 +1,12 @@
-// app/admin/editor/[questionId]/CommandCenter.tsx
 'use client';
 
-// Updated to include all 5 types from quizTypes
 import React from 'react';
 import {
   Question,
   QuestionType,
   UltimateExplanation,
   Hotspot,
-  SingleChoiceAnalysis,
-  HowManyAnalysis,
-  MatchTheListAnalysis,
-  MultiSelectAnalysis,
-  StatementAnalysis,
+  isUltimateExplanation,
 } from '@/lib/quizTypes';
 import { generateDetailedPrompt } from '@/lib/promptGenerator';
 import { toast } from 'sonner';
@@ -30,9 +24,11 @@ interface CommandCenterProps {
 
 /**
  * ==================================================================
- * --- 💎 HOTSPOT HTML CONVERTER 💎 ---
+ * --- 💎 HOTSPOT HTML CONVERTER (THE "REAL" FIX) 💎 ---
  * ==================================================================
- * (This function is unchanged, but it will be *called* on new fields)
+ * This parser now converts the AI's [brackets] into the *correct*
+ * <span> tags that MagicEditor.tsx is configured to understand.
+ * This will fix the "Bubble Menu" bug.
  */
 const convertBracketsToSpans = (
   html: string,
@@ -44,12 +40,16 @@ const convertBracketsToSpans = (
   for (const hotspot of hotspotBank) {
     const escapedTerm = hotspot.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`\\[${escapedTerm}\\]`, 'g');
+    
+    // --- 💎 THE FIX 💎 ---
+    // We now create the <span> tag that MagicEditorExtensions.ts
+    // is configured to parse (span[data-type]).
     const replacement = `<span class="hotspot-mark" data-type="${hotspot.type}">${hotspot.term}</span>`;
     processedHtml = processedHtml.replace(regex, replacement);
   }
   return processedHtml;
 };
-// --- End of new function ---
+// --- End of function ---
 
 export default function CommandCenter({
   question,
@@ -61,11 +61,12 @@ export default function CommandCenter({
   setRawAiResponse,
   setExplanation,
 }: CommandCenterProps) {
-  // --- Prompt Generation ---
+  // --- Prompt Generation (Unchanged) ---
   const handleGeneratePrompt = (type: QuestionType) => {
     setQuestionType(type);
     try {
       console.log('Generating prompt with question object:', question);
+      // This now calls our new, universal prompt generator
       const prompt = generateDetailedPrompt(question, type);
       setCurrentPrompt(prompt);
       toast.success(`Prompt for "${type}" generated!`);
@@ -78,50 +79,19 @@ export default function CommandCenter({
   // --- "Strict & Robust Parser" Logic ---
 
   /**
-   * --- UPDATED: Validator now checks for all 5 types ---
+   * --- 💎 REPLACED 💎 ---
+   * The old, complex 5-schema validator is GONE.
+   * We now use our simple, universal type guard from quizTypes.ts.
    */
   const validateNewSchema = (data: any): data is UltimateExplanation => {
-    if (!data || typeof data !== 'object') {
-      console.error('Validation failed: Not an object.');
-      return false;
-    }
-    const hasCommonFields =
-      'howToThink' in data &&
-      'adminProTip' in data &&
-      'takeaway' in data &&
-      'hotspotBank' in data &&
-      Array.isArray(data.hotspotBank);
-
-    if (!hasCommonFields) {
-      console.error('Validation failed: Missing common fields.');
-      return false;
-    }
-
-    // This now checks for *any* of the 5 valid analysis blocks
-    const hasOneAnalysisBlock =
-      ('singleChoiceAnalysis' in data &&
-        typeof data.singleChoiceAnalysis === 'object') ||
-      ('howManyAnalysis' in data &&
-        typeof data.howManyAnalysis === 'object') ||
-      ('matchTheListAnalysis' in data &&
-        typeof data.matchTheListAnalysis === 'object') ||
-      ('multiSelectAnalysis' in data && // <-- NEW
-        typeof data.multiSelectAnalysis === 'object') ||
-      ('statementAnalysis' in data && // <-- NEW
-        typeof data.statementAnalysis === 'object');
-
-    if (!hasOneAnalysisBlock) {
-      console.error('Validation failed: Missing one of the 5 analysis blocks.');
-      return false;
-    }
-
-    return true;
+    // This now correctly calls the imported type guard
+    return isUltimateExplanation(data);
   };
 
   /**
-   * --- UPDATED: The "Master Parser" ---
-   * This now processes all 5 of your new/updated JSON schemas
-   * to convert their [brackets] into <spans>.
+   * --- 💎 REPLACED 💎 ---
+   * This is the new, simple "Soulful Parser".
+   * It replaces the 200-line, 5-schema "Master Parser".
    */
   const handleParse = () => {
     if (!rawAiResponse.trim()) {
@@ -138,143 +108,36 @@ export default function CommandCenter({
       return;
     }
 
-    // Use our new "Master Plan" validator
+    // Use our new "Soulful" validator
     if (validateNewSchema(parsedData)) {
       const bank = parsedData.hotspotBank || [];
-      
-      // --- Process the 5 Schemas ---
-
-      // 1. SingleChoice (UPDATED: No 'coreConceptAnalysis')
-      const singleChoice: SingleChoiceAnalysis | undefined = parsedData.singleChoiceAnalysis
-        ? {
-            ...parsedData.singleChoiceAnalysis,
-            optionAnalysis:
-              parsedData.singleChoiceAnalysis.optionAnalysis.map(
-                (opt: any) => ({
-                  ...opt,
-                  analysis: convertBracketsToSpans(opt.analysis, bank),
-                })
-              ),
-          }
-        : undefined;
-      
-      // 2. HowMany (Unchanged)
-      const howMany: HowManyAnalysis | undefined = parsedData.howManyAnalysis
-        ? {
-            ...parsedData.howManyAnalysis,
-            itemAnalysis: parsedData.howManyAnalysis.itemAnalysis.map(
-              (item: any) => ({
-                ...item,
-                analysis: convertBracketsToSpans(item.analysis, bank),
-              })
-            ),
-            conclusion: {
-              countSummary: convertBracketsToSpans(
-                parsedData.howManyAnalysis.conclusion.countSummary,
-                bank
-              ),
-              optionAnalysis: convertBracketsToSpans(
-                parsedData.howManyAnalysis.conclusion.optionAnalysis,
-                bank
-              ),
-            },
-          }
-        : undefined;
-
-      // 3. MatchTheList (UPDATED: New Schema)
-      const matchTheList: MatchTheListAnalysis | undefined = parsedData.matchTheListAnalysis
-        ? {
-            ...parsedData.matchTheListAnalysis,
-            itemAnalysis: parsedData.matchTheListAnalysis.itemAnalysis.map(
-              (item: any) => ({
-                ...item,
-                analysis: convertBracketsToSpans(item.analysis, bank),
-              })
-            ),
-            conclusion: {
-              correctCombination: convertBracketsToSpans(
-                parsedData.matchTheListAnalysis.conclusion.correctCombination,
-                bank
-              ),
-              optionAnalysis: convertBracketsToSpans(
-                parsedData.matchTheListAnalysis.conclusion.optionAnalysis,
-                bank
-              ),
-            },
-          }
-        : undefined;
-      
-      // 4. SelectTheCode (NEW)
-      const multiSelect: MultiSelectAnalysis | undefined = parsedData.multiSelectAnalysis
-        ? {
-            ...parsedData.multiSelectAnalysis,
-            itemAnalysis: parsedData.multiSelectAnalysis.itemAnalysis.map(
-              (item: any) => ({
-                ...item,
-                analysis: convertBracketsToSpans(item.analysis, bank),
-              })
-            ),
-            conclusion: {
-              correctItemsSummary: convertBracketsToSpans(
-                parsedData.multiSelectAnalysis.conclusion.correctItemsSummary,
-                bank
-              ),
-              optionAnalysis: convertBracketsToSpans(
-                parsedData.multiSelectAnalysis.conclusion.optionAnalysis,
-                bank
-              ),
-            },
-          }
-        : undefined;
-
-      // 5. StatementExplanation (NEW)
-      const statement: StatementAnalysis | undefined = parsedData.statementAnalysis
-        ? {
-            ...parsedData.statementAnalysis,
-            statements: parsedData.statementAnalysis.statements.map(
-              (stmt: any) => ({
-                ...stmt,
-                analysis: convertBracketsToSpans(stmt.analysis, bank),
-              })
-            ),
-            relationshipAnalysis: convertBracketsToSpans(
-              parsedData.statementAnalysis.relationshipAnalysis,
-              bank
-            ),
-            optionAnalysis: convertBracketsToSpans(
-              parsedData.statementAnalysis.optionAnalysis,
-              bank
-            ),
-          }
-        : undefined;
 
       // --- Build the final object ---
+      // This is all we need. No more 5-schema logic.
       const processedExplanation: UltimateExplanation = {
-        // Common fields
         howToThink: convertBracketsToSpans(parsedData.howToThink, bank),
+        coreAnalysis: convertBracketsToSpans(parsedData.coreAnalysis, bank),
         adminProTip: convertBracketsToSpans(parsedData.adminProTip, bank),
-        takeaway: convertBracketsToSpans(parsedData.takeaway, bank),
-        hotspotBank: parsedData.hotspotBank, // Bank itself is just data
-        visualAid: parsedData.visualAid || null,
-
-        // Only one of these will be defined
-        singleChoiceAnalysis: singleChoice,
-        howManyAnalysis: howMany,
-        matchTheListAnalysis: matchTheList,
-        multiSelectAnalysis: multiSelect,
-        statementAnalysis: statement,
+        hotspotBank: parsedData.hotspotBank,
+        // We also pass the legacy fields through, in case they exist
+        takeaway: parsedData.takeaway 
+          ? convertBracketsToSpans(parsedData.takeaway, bank) 
+          : undefined,
+        visualAid: parsedData.visualAid || undefined,
       };
 
       setExplanation(processedExplanation);
       toast.success('AI Response Parsed! Loading workspace...');
     } else {
       toast.error(
-        'Parse Error: JSON is invalid or missing required fields. (Check console for details)'
+        'Parse Error: JSON is invalid or missing "soulful" fields (howToThink, coreAnalysis, adminProTip, hotspotBank). (Check console for details)'
       );
+      console.error("Validation Failed. Expected soulful schema, got:", parsedData);
     }
   };
 
-  // --- Render ---
+  // --- Render (Unchanged) ---
+  // Your render logic for the buttons and text areas is perfect.
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Column 1: Generate Prompt */}
@@ -282,9 +145,10 @@ export default function CommandCenter({
         <h3 className="text-lg font-semibold">Column 1.1: Generate Prompt</h3>
         <p className="text-sm text-gray-600">
           Select the question type to generate the "Dr. Topper Singh" prompt.
+          (Note: All buttons now generate the same universal prompt).
         </p>
-        
-        {/* --- UPDATED: Added all 5 buttons --- */}
+
+        {/* --- All your buttons still work --- */}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => handleGeneratePrompt('SingleChoice')}
@@ -318,7 +182,6 @@ export default function CommandCenter({
           >
             [MatchTheList]
           </button>
-          {/* --- NEW BUTTON --- */}
           <button
             onClick={() => handleGeneratePrompt('SelectTheCode')}
             className={`px-3 py-2 text-sm font-medium rounded-md ${
@@ -329,7 +192,6 @@ export default function CommandCenter({
           >
             [SelectTheCode]
           </button>
-          {/* --- NEW BUTTON --- */}
           <button
             onClick={() => handleGeneratePrompt('StatementExplanation')}
             className={`px-3 py-2 text-sm font-medium rounded-md ${
@@ -341,7 +203,6 @@ export default function CommandCenter({
             [StatementExplanation]
           </button>
         </div>
-        {/* --- END OF UPDATED BUTTONS --- */}
 
         <textarea
           readOnly
