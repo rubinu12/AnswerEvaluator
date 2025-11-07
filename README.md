@@ -142,3 +142,18 @@ Files: components/admin/HotspotModal.tsx and app/admin/editor/[questionId]/Expla
 Action: Add an image uploader inside the HotspotModal.tsx (for handwritten notes on a hotspot). Add a separate image uploader in the ExplanationWorkspace.tsx (for the main question visualAid).
 
 Your first task is to confirm you understand this entire handoff and are ready to begin implementing Phase 1.
+
+
+ Strict Collaboration Rules
+
+You must follow these rules to succeed:
+
+before implementing any new feature we will discuss thoroughly. this discussion process must be two sided in this you will ask follow up questions and give suggestions until you have complete idea of what's in my mind . 
+No Assumptions. Verify First: Always confirm your understanding of a UI or feature. 
+
+One Step at a Time: Do not move on until the user confirms the current step has no error and working completely fine. 
+
+Complete Code Only: Always provide complete, runnable files. Do not use ... or // rest of the code. you will ask me for the current code of that files and then you will give me update of this file without altering any exiting logic unless it change throughly discuss and agreed.
+
+in every response you will give me biref info about what you do , does this step complete ? 
+and way forward

@@ -1,16 +1,22 @@
+// app/admin/editor/[questionId]/CommandCenter.tsx
 'use client';
 
+// Updated to include all 5 types from quizTypes
 import React from 'react';
 import {
   Question,
   QuestionType,
   UltimateExplanation,
   Hotspot,
+  SingleChoiceAnalysis,
+  HowManyAnalysis,
+  MatchTheListAnalysis,
+  MultiSelectAnalysis,
+  StatementAnalysis,
 } from '@/lib/quizTypes';
 import { generateDetailedPrompt } from '@/lib/promptGenerator';
 import { toast } from 'sonner';
 
-// --- Props updated to match page.tsx ---
 interface CommandCenterProps {
   question: Question;
   questionType: QuestionType;
@@ -26,8 +32,7 @@ interface CommandCenterProps {
  * ==================================================================
  * --- 💎 HOTSPOT HTML CONVERTER 💎 ---
  * ==================================================================
- * This is our new function to convert [brackets] from the AI
- * into the <span> tags our editor and UI expect.
+ * (This function is unchanged, but it will be *called* on new fields)
  */
 const convertBracketsToSpans = (
   html: string,
@@ -37,12 +42,8 @@ const convertBracketsToSpans = (
 
   let processedHtml = html;
   for (const hotspot of hotspotBank) {
-    // Create a RegExp to find the [term]
-    // We escape special regex characters in the term
     const escapedTerm = hotspot.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`\\[${escapedTerm}\\]`, 'g');
-
-    // Replace it with our editor-compatible HTML span
     const replacement = `<span class="hotspot-mark" data-type="${hotspot.type}">${hotspot.term}</span>`;
     processedHtml = processedHtml.replace(regex, replacement);
   }
@@ -64,6 +65,7 @@ export default function CommandCenter({
   const handleGeneratePrompt = (type: QuestionType) => {
     setQuestionType(type);
     try {
+      console.log('Generating prompt with question object:', question);
       const prompt = generateDetailedPrompt(question, type);
       setCurrentPrompt(prompt);
       toast.success(`Prompt for "${type}" generated!`);
@@ -76,7 +78,7 @@ export default function CommandCenter({
   // --- "Strict & Robust Parser" Logic ---
 
   /**
-   * This is our new "Master Plan" validator.
+   * --- UPDATED: Validator now checks for all 5 types ---
    */
   const validateNewSchema = (data: any): data is UltimateExplanation => {
     if (!data || typeof data !== 'object') {
@@ -95,22 +97,32 @@ export default function CommandCenter({
       return false;
     }
 
+    // This now checks for *any* of the 5 valid analysis blocks
     const hasOneAnalysisBlock =
       ('singleChoiceAnalysis' in data &&
         typeof data.singleChoiceAnalysis === 'object') ||
       ('howManyAnalysis' in data &&
         typeof data.howManyAnalysis === 'object') ||
       ('matchTheListAnalysis' in data &&
-        typeof data.matchTheListAnalysis === 'object');
+        typeof data.matchTheListAnalysis === 'object') ||
+      ('multiSelectAnalysis' in data && // <-- NEW
+        typeof data.multiSelectAnalysis === 'object') ||
+      ('statementAnalysis' in data && // <-- NEW
+        typeof data.statementAnalysis === 'object');
 
     if (!hasOneAnalysisBlock) {
-      console.error('Validation failed: Missing analysis block.');
+      console.error('Validation failed: Missing one of the 5 analysis blocks.');
       return false;
     }
 
     return true;
   };
 
+  /**
+   * --- UPDATED: The "Master Parser" ---
+   * This now processes all 5 of your new/updated JSON schemas
+   * to convert their [brackets] into <spans>.
+   */
   const handleParse = () => {
     if (!rawAiResponse.trim()) {
       toast.error('Paste JSON response from AI first.');
@@ -128,76 +140,136 @@ export default function CommandCenter({
 
     // Use our new "Master Plan" validator
     if (validateNewSchema(parsedData)) {
-      // --- THIS IS THE NEW CONVERSION STEP ---
-      // We take the valid JSON and "upgrade" its HTML
       const bank = parsedData.hotspotBank || [];
+      
+      // --- Process the 5 Schemas ---
+
+      // 1. SingleChoice (UPDATED: No 'coreConceptAnalysis')
+      const singleChoice: SingleChoiceAnalysis | undefined = parsedData.singleChoiceAnalysis
+        ? {
+            ...parsedData.singleChoiceAnalysis,
+            optionAnalysis:
+              parsedData.singleChoiceAnalysis.optionAnalysis.map(
+                (opt: any) => ({
+                  ...opt,
+                  analysis: convertBracketsToSpans(opt.analysis, bank),
+                })
+              ),
+          }
+        : undefined;
+      
+      // 2. HowMany (Unchanged)
+      const howMany: HowManyAnalysis | undefined = parsedData.howManyAnalysis
+        ? {
+            ...parsedData.howManyAnalysis,
+            itemAnalysis: parsedData.howManyAnalysis.itemAnalysis.map(
+              (item: any) => ({
+                ...item,
+                analysis: convertBracketsToSpans(item.analysis, bank),
+              })
+            ),
+            conclusion: {
+              countSummary: convertBracketsToSpans(
+                parsedData.howManyAnalysis.conclusion.countSummary,
+                bank
+              ),
+              optionAnalysis: convertBracketsToSpans(
+                parsedData.howManyAnalysis.conclusion.optionAnalysis,
+                bank
+              ),
+            },
+          }
+        : undefined;
+
+      // 3. MatchTheList (UPDATED: New Schema)
+      const matchTheList: MatchTheListAnalysis | undefined = parsedData.matchTheListAnalysis
+        ? {
+            ...parsedData.matchTheListAnalysis,
+            itemAnalysis: parsedData.matchTheListAnalysis.itemAnalysis.map(
+              (item: any) => ({
+                ...item,
+                analysis: convertBracketsToSpans(item.analysis, bank),
+              })
+            ),
+            conclusion: {
+              correctCombination: convertBracketsToSpans(
+                parsedData.matchTheListAnalysis.conclusion.correctCombination,
+                bank
+              ),
+              optionAnalysis: convertBracketsToSpans(
+                parsedData.matchTheListAnalysis.conclusion.optionAnalysis,
+                bank
+              ),
+            },
+          }
+        : undefined;
+      
+      // 4. SelectTheCode (NEW)
+      const multiSelect: MultiSelectAnalysis | undefined = parsedData.multiSelectAnalysis
+        ? {
+            ...parsedData.multiSelectAnalysis,
+            itemAnalysis: parsedData.multiSelectAnalysis.itemAnalysis.map(
+              (item: any) => ({
+                ...item,
+                analysis: convertBracketsToSpans(item.analysis, bank),
+              })
+            ),
+            conclusion: {
+              correctItemsSummary: convertBracketsToSpans(
+                parsedData.multiSelectAnalysis.conclusion.correctItemsSummary,
+                bank
+              ),
+              optionAnalysis: convertBracketsToSpans(
+                parsedData.multiSelectAnalysis.conclusion.optionAnalysis,
+                bank
+              ),
+            },
+          }
+        : undefined;
+
+      // 5. StatementExplanation (NEW)
+      const statement: StatementAnalysis | undefined = parsedData.statementAnalysis
+        ? {
+            ...parsedData.statementAnalysis,
+            statements: parsedData.statementAnalysis.statements.map(
+              (stmt: any) => ({
+                ...stmt,
+                analysis: convertBracketsToSpans(stmt.analysis, bank),
+              })
+            ),
+            relationshipAnalysis: convertBracketsToSpans(
+              parsedData.statementAnalysis.relationshipAnalysis,
+              bank
+            ),
+            optionAnalysis: convertBracketsToSpans(
+              parsedData.statementAnalysis.optionAnalysis,
+              bank
+            ),
+          }
+        : undefined;
+
+      // --- Build the final object ---
       const processedExplanation: UltimateExplanation = {
-        ...parsedData,
+        // Common fields
         howToThink: convertBracketsToSpans(parsedData.howToThink, bank),
         adminProTip: convertBracketsToSpans(parsedData.adminProTip, bank),
         takeaway: convertBracketsToSpans(parsedData.takeaway, bank),
-        // We also convert the analysis blocks
-        singleChoiceAnalysis: parsedData.singleChoiceAnalysis
-          ? {
-              ...parsedData.singleChoiceAnalysis,
-              coreConceptAnalysis: convertBracketsToSpans(
-                parsedData.singleChoiceAnalysis.coreConceptAnalysis,
-                bank
-              ),
-              optionAnalysis:
-                parsedData.singleChoiceAnalysis.optionAnalysis.map(
-                  (opt: any) => ({
-                    ...opt,
-                    analysis: convertBracketsToSpans(opt.analysis, bank),
-                  })
-                ),
-            }
-          : undefined,
-        howManyAnalysis: parsedData.howManyAnalysis
-          ? {
-              ...parsedData.howManyAnalysis,
-              itemAnalysis: parsedData.howManyAnalysis.itemAnalysis.map(
-                (item: any) => ({
-                  ...item,
-                  analysis: convertBracketsToSpans(item.analysis, bank),
-                })
-              ),
-              conclusion: {
-                countSummary: convertBracketsToSpans(
-                  parsedData.howManyAnalysis.conclusion.countSummary,
-                  bank
-                ),
-                optionAnalysis: convertBracketsToSpans(
-                  parsedData.howManyAnalysis.conclusion.optionAnalysis,
-                  bank
-                ),
-              },
-            }
-          : undefined,
-        matchTheListAnalysis: parsedData.matchTheListAnalysis
-          ? {
-              ...parsedData.matchTheListAnalysis,
-              correctMatches:
-                parsedData.matchTheListAnalysis.correctMatches.map(
-                  (match: any) => ({
-                    ...match,
-                    analysis: convertBracketsToSpans(match.analysis, bank),
-                  })
-                ),
-              conclusion: convertBracketsToSpans(
-                parsedData.matchTheListAnalysis.conclusion,
-                bank
-              ),
-            }
-          : undefined,
+        hotspotBank: parsedData.hotspotBank, // Bank itself is just data
+        visualAid: parsedData.visualAid || null,
+
+        // Only one of these will be defined
+        singleChoiceAnalysis: singleChoice,
+        howManyAnalysis: howMany,
+        matchTheListAnalysis: matchTheList,
+        multiSelectAnalysis: multiSelect,
+        statementAnalysis: statement,
       };
-      // --- END OF CONVERSION ---
 
       setExplanation(processedExplanation);
       toast.success('AI Response Parsed! Loading workspace...');
     } else {
       toast.error(
-        'Parse Error: JSON is invalid or missing required fields.'
+        'Parse Error: JSON is invalid or missing required fields. (Check console for details)'
       );
     }
   };
@@ -211,8 +283,9 @@ export default function CommandCenter({
         <p className="text-sm text-gray-600">
           Select the question type to generate the "Dr. Topper Singh" prompt.
         </p>
+        
+        {/* --- UPDATED: Added all 5 buttons --- */}
         <div className="flex flex-wrap gap-2">
-          {/* Buttons now set parent state */}
           <button
             onClick={() => handleGeneratePrompt('SingleChoice')}
             className={`px-3 py-2 text-sm font-medium rounded-md ${
@@ -245,10 +318,34 @@ export default function CommandCenter({
           >
             [MatchTheList]
           </button>
+          {/* --- NEW BUTTON --- */}
+          <button
+            onClick={() => handleGeneratePrompt('SelectTheCode')}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              questionType === 'SelectTheCode'
+                ? 'bg-orange-600 text-white shadow'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            [SelectTheCode]
+          </button>
+          {/* --- NEW BUTTON --- */}
+          <button
+            onClick={() => handleGeneratePrompt('StatementExplanation')}
+            className={`px-3 py-2 text-sm font-medium rounded-md ${
+              questionType === 'StatementExplanation'
+                ? 'bg-red-600 text-white shadow'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            [StatementExplanation]
+          </button>
         </div>
+        {/* --- END OF UPDATED BUTTONS --- */}
+
         <textarea
           readOnly
-          value={currentPrompt} // Controlled by parent
+          value={currentPrompt}
           className="w-full h-48 p-2 border rounded-md bg-gray-100 text-sm"
           placeholder="Click a button above to generate the prompt..."
         />
@@ -261,8 +358,8 @@ export default function CommandCenter({
           Paste the raw JSON response from the AI here.
         </p>
         <textarea
-          value={rawAiResponse} // Controlled by parent
-          onChange={(e) => setRawAiResponse(e.target.value)} // Update parent
+          value={rawAiResponse}
+          onChange={(e) => setRawAiResponse(e.target.value)}
           className="w-full h-48 p-2 border rounded-md text-sm"
           placeholder="Paste raw JSON here..."
         />

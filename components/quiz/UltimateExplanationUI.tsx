@@ -1,3 +1,4 @@
+// components/quiz/UltimateExplanationUI.tsx
 'use client';
 
 import React from 'react';
@@ -8,17 +9,24 @@ import {
 import HotspotTooltip from './HotspotTooltip'; // We import your Radix tooltip
 import { Eye, Pencil, Lightbulb, Presentation, Map, Video, Link, CheckCircle2, XCircle } from 'lucide-react';
 
+// --- THIS IS THE FIX (Step 2) ---
+// 1. Define props for the helper
+interface RenderWithRadixHotspotsProps {
+  html: string;
+  hotspotBank: Hotspot[];
+  onHotspotClick?: (hotspot: Hotspot) => void; // <-- ADDED: The click handler
+}
+
 /**
  * A new helper component that parses the editor's HTML and
  * wraps the hotspot spans with our Radix Tooltip component.
  */
-const RenderWithRadixHotspots = ({
+export const RenderWithRadixHotspots = ({
   html,
   hotspotBank,
-}: {
-  html: string;
-  hotspotBank: Hotspot[];
-}) => {
+  onHotspotClick, // <-- ADDED
+}: RenderWithRadixHotspotsProps) => {
+  // --- END OF FIX ---
   if (!html) return null;
   if (!hotspotBank || hotspotBank.length === 0) {
     // No hotspots, just render the HTML
@@ -48,13 +56,18 @@ const RenderWithRadixHotspots = ({
           const hotspot = hotspotBank.find((h) => h.term === term);
 
           if (hotspot) {
-            // Wrap the raw HTML span in our Radix Tooltip component
-            // The Radix component will use the span as its `children` (the trigger)
+            // --- THIS IS THE FIX (Step 2) ---
+            // 2. Pass the handler down to the tooltip
             return (
-              <HotspotTooltip key={index} hotspot={hotspot}>
+              <HotspotTooltip
+                key={index}
+                hotspot={hotspot}
+                onClick={onHotspotClick} // <-- PASSED DOWN
+              >
                 <span dangerouslySetInnerHTML={{ __html: part }} />
               </HotspotTooltip>
             );
+            // --- END OF FIX ---
           }
         }
         
@@ -65,16 +78,23 @@ const RenderWithRadixHotspots = ({
   );
 };
 
+// --- THIS IS THE FIX (Step 2) ---
+// 3. Define props for the main component
+interface UltimateExplanationUIProps {
+  explanation: UltimateExplanation;
+  onHotspotClick?: (hotspot: Hotspot) => void; // <-- ADDED
+}
+
 /**
  * This is the main component to display the "Ultimate Explanation"
  * to the student. It is now upgraded to our "Master Plan" schema
  * and uses the Radix-based HotspotTooltip.
  */
-const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
+const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
   explanation,
+  onHotspotClick, // <-- ADDED
 }) => {
-  // All useState and hover logic has been REMOVED.
-  // The HotspotTooltip component (via RenderWithRadixHotspots) now handles all hover logic.
+  // --- END OF FIX ---
 
   const hotspotBank = explanation.hotspotBank || [];
 
@@ -86,9 +106,11 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
         Topper's Mental Model
       </h2>
       <div className="text-lg">
+        {/* 4. Pass handler to all instances */}
         <RenderWithRadixHotspots
           html={explanation.howToThink}
           hotspotBank={hotspotBank}
+          onHotspotClick={onHotspotClick}
         />
       </div>
     </div>
@@ -122,6 +144,7 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
                 <RenderWithRadixHotspots
                   html={explanation.singleChoiceAnalysis.coreConceptAnalysis}
                   hotspotBank={hotspotBank}
+                  onHotspotClick={onHotspotClick}
                 />
               </div>
               <div className="space-y-3">
@@ -151,6 +174,7 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
                         <RenderWithRadixHotspots
                           html={opt.analysis}
                           hotspotBank={hotspotBank}
+                          onHotspotClick={onHotspotClick}
                         />
                       </div>
                     </div>
@@ -190,6 +214,7 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
                       <RenderWithRadixHotspots
                         html={item.analysis}
                         hotspotBank={hotspotBank}
+                        onHotspotClick={onHotspotClick}
                       />
                     </div>
                   </div>
@@ -200,10 +225,12 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
                 <RenderWithRadixHotspots
                   html={explanation.howManyAnalysis.conclusion.countSummary}
                   hotspotBank={hotspotBank}
+                  onHotspotClick={onHotspotClick}
                 />
                 <RenderWithRadixHotspots
                   html={explanation.howManyAnalysis.conclusion.optionAnalysis}
                   hotspotBank={hotspotBank}
+                  onHotspotClick={onHotspotClick}
                 />
               </div>
             </div>
@@ -238,6 +265,7 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
                           <RenderWithRadixHotspots
                             html={match.analysis}
                             hotspotBank={hotspotBank}
+                            onHotspotClick={onHotspotClick}
                           />
                         </div>
                       </div>
@@ -250,6 +278,7 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
                 <RenderWithRadixHotspots
                   html={explanation.matchTheListAnalysis.conclusion}
                   hotspotBank={hotspotBank}
+                  onHotspotClick={onHotspotClick}
                 />
               </div>
             </div>
@@ -297,6 +326,7 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
             <RenderWithRadixHotspots
               html={explanation.adminProTip}
               hotspotBank={hotspotBank}
+              onHotspotClick={onHotspotClick}
             />
           </div>
         </div>
@@ -314,6 +344,7 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
         <RenderWithRadixHotspots
           html={explanation.takeaway}
           hotspotBank={hotspotBank}
+          onHotspotClick={onHotspotClick}
         />
       </div>
       <button className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-all">
@@ -353,4 +384,3 @@ const UltimateExplanationUI: React.FC<{ explanation: UltimateExplanation }> = ({
 };
 
 export default UltimateExplanationUI;
-

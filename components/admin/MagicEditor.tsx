@@ -1,3 +1,4 @@
+// components/admin/MagicEditor.tsx
 'use client';
 
 import React from 'react';
@@ -5,18 +6,21 @@ import {
   EditorContent,
   useEditor,
   Editor as TiptapEditor,
-   // We are using BubbleMenu
+   // <-- FIXED: Correct import path
 } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus'
-import { EditorState } from '@tiptap/pm/state'; // For typing
+// import { EditorState } from '@tiptap/pm/state'; // <-- Removed: Unused import
 import { extensions } from './MagicEditorExtensions';
-import { EditorProps } from '@tiptap/pm/view';
+// import { EditorProps } from '@tiptap/pm/view'; // <-- Removed: Unused import
 
+// --- THIS IS THE FIX ---
+// We are adding onBlur and autoFocus to the props
 interface MagicEditorProps {
   content: string;
   onChange: (html: string) => void;
-  // Called when user selects text and clicks [Connect]
   onConnectClick: (editor: TiptapEditor) => void;
+  onBlur?: () => void; // <-- ADDED
+  autoFocus?: boolean; // <-- ADDED
 }
 
 /**
@@ -26,15 +30,24 @@ const TiptapEditorComponent = ({
   content,
   onChange,
   onConnectClick,
+  onBlur, // <-- ADDED
+  autoFocus, // <-- ADDED
 }: MagicEditorProps) => {
   const editor = useEditor({
     extensions,
     content,
-    // --- THIS IS THE FIX ---
     // This tells Tiptap to wait for the client to be ready
-    // before rendering, preventing the SSR hydration mismatch.
     immediatelyRender: false,
+
+    // --- THIS IS THE FIX ---
+    autofocus: autoFocus, // Pass autoFocus to Tiptap
+    onBlur: () => {
+      if (onBlur) {
+        onBlur(); // Call the onBlur function from props
+      }
+    },
     // --- END OF FIX ---
+
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
@@ -53,9 +66,8 @@ const TiptapEditorComponent = ({
         <BubbleMenu
           editor={editor}
           // We removed the invalid 'tippyOptions' prop
-          shouldShow={({ state }: { state: EditorState }) =>
-            !state.selection.empty
-          }
+          // FIXED: The 'state' prop is provided by shouldShow
+          shouldShow={({ state }) => !state.selection.empty}
           className="bg-white shadow-lg border rounded-lg p-1 flex space-x-1"
         >
           {/* --- STEP 3b: Our new [Connect] button --- */}
@@ -109,4 +121,3 @@ export default function MagicEditor(props: MagicEditorProps) {
     </div>
   );
 }
-

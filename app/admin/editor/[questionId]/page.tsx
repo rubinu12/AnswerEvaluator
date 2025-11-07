@@ -1,10 +1,11 @@
+// app/admin/editor/[questionId]/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { notFound, useParams } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+// import { doc, getDoc } from 'firebase/firestore'; // <-- REMOVED (No client-side getDoc)
+// import { db } from '@/lib/firebase'; // <-- REMOVED
 import {
   Question,
   QuestionType,
@@ -27,22 +28,34 @@ const ExplanationWorkspace = dynamic(
   { ssr: false, loading: () => <p>Loading Editor Playground...</p> }
 );
 
-// --- FIXED: This function is now local and safely handles undefined options ---
+// --- THIS IS THE PERMANENT FIX ---
+// The transformer is now "smart". It checks for your `options` array first.
 const transformBackendQuestion = (
   q: BackendQuestion,
   index: number
 ): Question => {
-  return {
-    id: q._id,
-    questionNumber: index,
-    text: q.questionText,
-    // Safely fallback to empty string if option is missing
-    options: [
+  
+  // 1. Check if the `options` array *already* exists on the backend data
+  //    (This is the "looking in the right place" fix you identified)
+  let optionsArray: { label: string; text: string }[] = [];
+  if (Array.isArray(q.options) && q.options.length > 0) {
+    // If it exists and is not empty, use it directly
+    optionsArray = q.options;
+  } else {
+    // 2. If it doesn't exist, *then* fall back to the old `optionA` logic
+    optionsArray = [
       { label: 'A', text: q.optionA || '' },
       { label: 'B', text: q.optionB || '' },
       { label: 'C', text: q.optionC || '' },
       { label: 'D', text: q.optionD || '' },
-    ],
+    ];
+  }
+
+  return {
+    id: q._id,
+    questionNumber: index,
+    text: q.questionText,
+    options: optionsArray, // <-- Use our new "smart" array
     correctAnswer: q.correctOption,
     explanation: q.explanation || q.explanationText || '', // Unify explanation
     questionType: q.questionType || 'SingleChoice',
@@ -53,10 +66,11 @@ const transformBackendQuestion = (
     examYear: q.examYear,
   };
 };
+// --- END OF PERMANENT FIX ---
 
 export default function AdminEditorPage() {
   const { questionId } = useParams() as { questionId: string };
-  const { userProfile, loading: authLoading } = useAuthContext();
+  const { user, userProfile, loading: authLoading } = useAuthContext();
 
   // --- Core State ---
   const [question, setQuestion] = useState<Question | null>(null);
@@ -70,28 +84,37 @@ export default function AdminEditorPage() {
   const [currentPrompt, setCurrentPrompt] = useState<string>('');
   const [rawAiResponse, setRawAiResponse] = useState<string>('');
 
-  // Fetch question data on load
+  // Fetch question data on load using our new, secure API route
   useEffect(() => {
-    if (!questionId) return;
+    // Wait for auth to be ready and questionId to be present
+    if (authLoading || !questionId || !user) {
+      return;
+    }
 
     const fetchQuestion = async () => {
       setIsLoading(true);
       try {
-        const docRef = doc(db, 'questions', questionId);
-        const docSnap = await getDoc(docRef);
+        // 1. Get the auth token from the user
+        const token = await user.getIdToken();
 
-        if (!docSnap.exists()) {
-          toast.error('Question not found.');
-          notFound();
-          return;
+        // 2. Call our new admin-only API route
+        const response = await fetch(`/api/questions/${questionId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Error ${response.status}`);
         }
 
-        const backendQuestion = {
-          _id: docSnap.id,
-          ...docSnap.data(),
-        } as BackendQuestion;
+        // 3. Get the full, raw data from the API
+        const backendQuestion = (await response.json()) as BackendQuestion;
+        
+        console.log('--- RAW API DATA (Admin) ---', backendQuestion);
 
-        // Use the fixed local transformer
+        // 4. Transform it for the frontend (USING OUR NEW FIXED TRANSFORMER)
         const transformedQuestion = transformBackendQuestion(
           backendQuestion,
           1
@@ -102,7 +125,6 @@ export default function AdminEditorPage() {
         if (isUltimateExplanation(transformedQuestion.explanation)) {
           setExplanation(transformedQuestion.explanation);
         } else {
-          // If explanation is old string or null, create a blank new object
           setExplanation({
             howToThink: '',
             adminProTip: '',
@@ -111,18 +133,22 @@ export default function AdminEditorPage() {
           });
         }
         setQuestionType(transformedQuestion.questionType || 'SingleChoice');
+
       } catch (error: any) {
-        console.error('Error fetching question:', error);
-        toast.error('Failed to load question.');
+        console.error('Error fetching question via API:', error);
+        toast.error(`Failed to load question: ${error.message}`);
+        if (error.message.includes('Forbidden')) {
+          notFound(); // If user is not admin, boot them
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchQuestion();
-  }, [questionId]);
+  }, [questionId, user, authLoading]); // Runs when auth is ready
 
-  // Handle Admin Auth
+  // Handle Admin Auth and initial loading
   if (authLoading || isLoading) {
     return <PageLoader />;
   }
@@ -132,9 +158,11 @@ export default function AdminEditorPage() {
     return notFound();
   }
 
+  // --- THIS IS THE CRITICAL GUARD ---
   if (!question) {
     return <PageLoader />;
   }
+  // --- END OF GUARD ---
 
   // This is the main "Two-Row Layout"
   return (
@@ -147,14 +175,14 @@ export default function AdminEditorPage() {
       {/* --- Row 1: Command Center --- */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 shadow-sm">
         <CommandCenter
-          question={question}
+          question={question} // This is now guaranteed to be a valid, full Question object
           questionType={questionType}
           setQuestionType={setQuestionType}
           rawAiResponse={rawAiResponse}
           setRawAiResponse={setRawAiResponse}
           currentPrompt={currentPrompt}
           setCurrentPrompt={setCurrentPrompt}
-          setExplanation={setExplanation} // This sets the explanation for Row 2
+          setExplanation={setExplanation}
         />
       </div>
 
@@ -163,8 +191,8 @@ export default function AdminEditorPage() {
         <ExplanationWorkspace
           questionId={question.id}
           questionType={questionType}
-          explanation={explanation} // Pass the live explanation down
-          setExplanation={setExplanation} // Pass the setter down
+          explanation={explanation}
+          setExplanation={setExplanation}
         />
       </div>
     </div>

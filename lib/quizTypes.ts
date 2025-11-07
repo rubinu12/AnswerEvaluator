@@ -7,21 +7,24 @@ import { auth } from '@/lib/firebase'; // We'll need this for auth
 export type BackendQuestion = {
   _id: string;
   questionText: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
+  
+  // This supports both your old data (optionA) and new (options)
+  optionA?: string;
+  optionB?: string;
+  optionC?: string;
+  optionD?: string;
+  options?: { label: string; text: string }[];
+
   correctOption: string;
-  explanationText: string;
+  explanationText?: string; // Made optional
   year?: number;
   subject?: string;
   topic?: string;
   exam?: string;
-  examYear?: string; // This is a composite key we create
+  examYear?: string; 
   
-  // --- 💎 UPGRADE: NEW FIELDS 💎 ---
-  questionType?: QuestionType; // Optional for backward compatibility
-  explanation?: string | UltimateExplanation; // This will replace explanationText
+  questionType?: QuestionType; 
+  explanation?: string | UltimateExplanation; 
 };
 
 // The transformed Question format our app will use
@@ -31,12 +34,8 @@ export interface Question {
   text: string;
   options: { label: string; text: string }[];
   correctAnswer: string;
-  
-  // --- 💎 UPGRADE: EXPLANATION FIELD 💎 ---
   explanation: string | UltimateExplanation;
-  
-  // --- 💎 UPGRADE: QUESTION TYPE 💎 ---
-  questionType: QuestionType; // We will default to 'SingleChoice' if missing
+  questionType: QuestionType; 
 
   year?: number;
   subject?: string;
@@ -53,7 +52,6 @@ export interface UserAnswer {
 
 // --- Quiz Configuration Types ---
 
-// Filters used to fetch questions
 export interface QuizFilter {
   exam?: string;
   year?: string;
@@ -61,25 +59,21 @@ export interface QuizFilter {
   topic?: string;
 }
 
-// The key to group questions by (e.g., "Topic" or "Exam Year")
 export type GroupByKey = 'topic' | 'examYear';
 
 // --- State & Error Types ---
 
-// A generic quiz error
 export interface QuizError {
   message: string;
-  type: 'auth' | 'generic'; // Auth error (e.g., session expired) or other
+  type: 'auth' | 'generic';
 }
 
-// For our pop-up toast notifications
 export interface ToastState {
   show: boolean;
   message: string;
   type: 'info' | 'warning';
 }
 
-// The final calculated performance stats
 export interface PerformanceStats {
   finalScore: number;
   accuracy: number;
@@ -93,7 +87,6 @@ export interface PerformanceStats {
 
 // --- Zustand Store Types ---
 
-// This defines all the STATE properties
 export interface QuizState {
   // Core Quiz Data
   questions: Question[];
@@ -108,11 +101,11 @@ export interface QuizState {
   
   // Timer
   timeLeft: number;
-  totalTime: number; // Total quiz time in seconds
+  totalTime: number;
 
   // UI & Interaction State
-  currentQuestionNumberInView: number; // The question# the user is looking at
-  currentViewAnswer: string | null;    // For showing a single answer's explanation
+  currentQuestionNumberInView: number;
+  currentViewAnswer: string | null; 
   isPageScrolled: boolean;
   isTopBarVisible: boolean;
   
@@ -128,31 +121,19 @@ export interface QuizState {
 
   // Notifications & Stats
   toast: ToastState;
-  
-  // --- 💎 "SCRAPPED" MODAL STATE 💎 ---
-  // This is for the old "cramped" modal we "scrapped"
   editingQuestionId: string | null;
-
   performanceStats: PerformanceStats | null;
 }
 
-// This defines all the ACTIONS (functions)
 export interface QuizActions {
-  // --- Initialization & Setup ---
   loadAndStartQuiz: (filter: QuizFilter) => Promise<void>;
-  
-  // --- Quiz Lifecycle ---
   startTest: () => void;
   submitTest: () => void;
-  resetTest: () => void; // Resets store and navigates to dashboard
-  
-  // --- Answer & Review ---
+  resetTest: () => void;
   handleAnswerSelect: (questionId: string, answer: string) => void;
   toggleBookmark: (questionId: string) => void;
   toggleMarkForReview: (questionId: string) => void;
-  
-  // --- Navigation & UI ---
-  handleDetailedSolution: () => void; // Show solution mode after report
+  handleDetailedSolution: () => void;
   viewAnswer: (questionId: string) => void;
   closeAnswerView: () => void;
   setCurrentQuestionNumberInView: (questionNumber: number) => void;
@@ -160,82 +141,74 @@ export interface QuizActions {
   setIsTopBarVisible: (isVisible: boolean) => void;
   setCurrentGroupInView: (groupName: string | null) => void;
   setIsGroupingEnabled: (isEnabled: boolean) => void;
-
-  // --- Timer ---
   setTimeLeft: (timeLeft: number) => void;
-
-  // --- Notifications ---
   showToast: (message: string, type: 'info' | 'warning') => void;
   hideToast: () => void;
-  
-  // --- 💎 "SCRAPPED" MODAL ACTIONS 💎 ---
   openExplanationEditor: (questionId: string) => void;
   closeExplanationEditor: () => void;
   updateQuestionExplanation: (
     questionId: string,
     newExplanation: UltimateExplanation
   ) => void;
-  
-  // --- Session Management (Coming Later) ---
-  // saveSession: () => void;
-  // loadSession: () => void;
 }
 
-// The final combined store type
 export type QuizStore = QuizState & QuizActions;
 
 // ==================================================================
-// --- 💎 6. "PERFECTED" ULTIMATE EXPLANATION TYPES 💎 ---
-// These are our new "Master Plan" types, "perfectly" upgraded.
+// --- 💎 "PERFECTED" ULTIMATE EXPLANATION TYPES (UPGRADED) 💎 ---
 // ==================================================================
 
 /**
- * Defines the 4 types of questions our app supports.
- * "PERFECT" FIX 2: Added 'HowMany' to the union.
+ * --- UPDATED: Added your two new types ---
  */
 export type QuestionType =
-  | 'SingleChoice' // 4 options, 1 correct (A, B, C, D)
-  | 'StatementBased' // Kept for mapping, maps to 'HowMany'
-  | 'HowManyPairs' // Kept for mapping, maps to 'HowMany'
-  | 'HowMany' // Our new "perfect" general type for "how many..." questions
-  | 'MatchTheList'; // List I vs List II (A-1, B-2, C-3)
+  | 'SingleChoice'
+  | 'StatementBased'
+  | 'HowManyPairs'
+  | 'HowMany'
+  | 'MatchTheList'
+  | 'SelectTheCode' // <-- NEW
+  | 'StatementExplanation'; // <-- NEW
 
 /**
- * "Perfected" Pen-Based Hotspot.
- * This "perfectly" matches our new "Master Plan".
+ * Pen-Based Hotspot. (Unchanged)
  */
 export type Hotspot = {
-  term: string; // The bracketed [term]
-  type: 'green' | 'blue' | 'red'; // Our "Pen-Based" types
-  definition: string; // The HTML explanation for the hover-card
+  term: string;
+  type: 'green' | 'blue' | 'red';
+  definition: string;
 };
 
 /**
- * The visual aid (map, diagram)
+ * Visual aid (map, diagram) (Unchanged)
  */
 export type VisualAid = {
   type: 'image' | 'video';
-  url: string; // URL to the image/video
+  url: string;
   caption?: string;
 };
 
 // --- "Perfect" Schema-Specific Analysis Types ---
-// We have "scrapped" the old "cramped" CoreAnalysisItem types.
 
 /**
- * "Perfect" Schema for: [SingleChoice]
+ * --- UPDATED: 'SingleChoice' (Concise) ---
+ * Based on your new prompt:
+ * - REMOVED 'coreConceptAnalysis'
+ * - ADDED 'text' to optionAnalysis
+ * - ADDED 'finalAnswer'
  */
 export type SingleChoiceAnalysis = {
-  coreConceptAnalysis: string; // Rich HTML
   optionAnalysis: {
-    option: string; // e.g., "(a) Silver Iodide..."
+    option: string; // e.g., "A"
+    text: string; // e.g., "Silver Iodide..."
     isCorrect: boolean;
     analysis: string; // Rich HTML
   }[];
+  finalAnswer: string; // e.g., "A"
 };
 
 /**
- * "Perfect" Schema for: [HowMany]
+ * 'HowMany' (Unchanged from before, matches your new prompt)
  */
 export type HowManyAnalysis = {
   itemAnalysis: {
@@ -250,31 +223,70 @@ export type HowManyAnalysis = {
 };
 
 /**
- * "Perfect" Schema for: [MatchTheList]
+ * --- UPDATED: 'MatchTheList' (New Schema) ---
+ * Based on your new prompt:
+ * - REPLACED 'correctMatches' with 'itemAnalysis'
+ * - REPLACED 'conclusion' string with a 'conclusion' object
  */
 export type MatchTheListAnalysis = {
-  correctMatches: {
-    itemA: string; // e.g., "List I: Item A"
-    correctMatchB: string; // e.g., "List II: Item 3"
+  itemAnalysis: {
+    item: string; // e.g., "A. [Item A text]"
+    correctMatch: string; // e.g., "[Match 2 text]"
     analysis: string; // Rich HTML
   }[];
-  conclusion: string; // Rich HTML
+  conclusion: {
+    correctCombination: string; // Rich HTML
+    optionAnalysis: string; // Rich HTML
+  };
 };
 
 /**
+ * --- NEW: 'SelectTheCode' ---
+ * Based on your 'getSelectTheCodeSchema'
+ */
+export type MultiSelectAnalysis = {
+  itemAnalysis: {
+    item: string; // e.g., "1. Statement 1"
+    isCorrect: boolean;
+    analysis: string; // Rich HTML
+  }[];
+  conclusion: {
+    correctItemsSummary: string; // Rich HTML
+    optionAnalysis: string; // Rich HTML
+  };
+};
+
+/**
+ * --- NEW: 'StatementExplanation' ---
+ * Based on your 'getStatementExplanationSchema'
+ */
+export type StatementAnalysis = {
+  statements: {
+    id: string; // e.g., "A" or "I"
+    text: string; // e.g., "Statement I text..."
+    isCorrect: boolean; // True/False analysis
+    analysis: string; // Rich HTML
+  }[];
+  relationshipAnalysis: string; // Rich HTML for the "[Because Test]"
+  optionAnalysis: string; // Rich HTML for the final A,B,C,D
+};
+
+
+/**
 * The "Perfect" Ultimate Explanation JSON structure.
-* This is the "masterpiece" object our "Strict & Robust Parser" will
-* validate and our "WYSIWYG Workspace" will edit.
+* --- UPDATED to include all 5 schemas ---
 */
 export type UltimateExplanation = {
   howToThink: string; // Rich HTML
   
-  // --- "Perfect" Schemas (Only ONE will be present) ---
+  // --- Only ONE of these will be present ---
   singleChoiceAnalysis?: SingleChoiceAnalysis;
   howManyAnalysis?: HowManyAnalysis;
   matchTheListAnalysis?: MatchTheListAnalysis;
+  multiSelectAnalysis?: MultiSelectAnalysis; // <-- NEW
+  statementAnalysis?: StatementAnalysis; // <-- NEW
 
-  // --- "Perfect" Common Fields ---
+  // --- Common Fields ---
   adminProTip: string; // Rich HTML
   takeaway: string; // Rich HTML
   visualAid?: VisualAid | null;
@@ -282,8 +294,7 @@ export type UltimateExplanation = {
 };
 
 /**
- * "Perfect" Helper type guard to check if an explanation
- * is our new Ultimate type.
+ * "Perfect" Helper type guard. (Unchanged)
  */
 export const isUltimateExplanation = (
   explanation: string | UltimateExplanation | undefined

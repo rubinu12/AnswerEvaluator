@@ -1,3 +1,4 @@
+// components/quiz/HotspotTooltip.tsx
 'use client';
 
 import React from 'react';
@@ -7,13 +8,19 @@ import { Hotspot } from '@/lib/quizTypes'; // This is our new "Master Plan" type
 interface HotspotTooltipProps {
   children: React.ReactNode;
   hotspot: Hotspot;
+  onClick?: (hotspot: Hotspot) => void; // <-- ADDED: Make tooltip clickable
 }
 
 /**
  * Renders our "Magic UI" hotspot tooltip using Radix UI.
- * This is upgraded to use our "Pen-Based" styling.
+ * This is upgraded to use our "Pen-Based" styling
+ * and is now optionally clickable for the admin editor.
  */
-const HotspotTooltip: React.FC<HotspotTooltipProps> = ({ children, hotspot }) => {
+const HotspotTooltip: React.FC<HotspotTooltipProps> = ({
+  children,
+  hotspot,
+  onClick, // <-- ADDED
+}) => {
   // Helper to get the correct colors for the "Pen Type"
   const getColors = () => {
     switch (hotspot.type) {
@@ -52,7 +59,12 @@ const HotspotTooltip: React.FC<HotspotTooltipProps> = ({ children, hotspot }) =>
         <Tooltip.Portal>
           <Tooltip.Content
             sideOffset={5}
-            className={`z-50 max-w-sm rounded-lg shadow-lg border-2 ${getColors()}`}
+            // --- THIS IS THE FIX ---
+            onClick={() => onClick && onClick(hotspot)} // <-- ADDED
+            className={`z-50 max-w-sm rounded-lg shadow-lg border-2 ${getColors()} ${
+              onClick ? 'cursor-pointer' : '' // <-- ADDED for visual cue
+            }`}
+            // --- END OF FIX ---
           >
             <div className="p-4">
               <h4 className="text-lg font-bold mb-2">{hotspot.term}</h4>
@@ -83,4 +95,3 @@ const HotspotTooltip: React.FC<HotspotTooltipProps> = ({ children, hotspot }) =>
 };
 
 export default HotspotTooltip;
-
