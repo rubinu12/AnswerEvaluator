@@ -17,7 +17,8 @@ const AnswerColumn = () => {
     showReport,
     showDetailedSolution,
     handleAnswerSelect, // This is the action for selection
-    viewAnswer, // This is the action for viewing solution
+    // viewAnswer, // <-- OLD ACTION (REMOVED)
+    openExplanationModal, // <-- 💎 NEW ACTION (ADDED)
     currentQuestionNumberInView,
     setCurrentQuestionNumberInView,
   } = useQuizStore();
@@ -207,9 +208,9 @@ const AnswerColumn = () => {
                     </div>
                   </div>
 
-                  {/* View Button (from your original code) */}
+                  {/* --- 💎 MODIFIED VIEW BUTTON (AS REQUESTED) 💎 --- */}
                   <button
-                    onClick={() => viewAnswer(id)}
+                    onClick={() => openExplanationModal(id)} // <-- This is the new "Modal Sheet" trigger
                     className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
                   >
                     <Eye className="w-4 h-4" />
@@ -229,7 +230,7 @@ const AnswerColumn = () => {
                         }
                         scrollToQuestion(qNum);
                       }}
-                      disabled={showReport || showDetailedSolution || (isAnswered && !isTestMode)}
+      disabled={showReport || showDetailedSolution || (isAnswered && !isTestMode)}
                       className={`h-10 flex items-center justify-center rounded-lg border font-semibold text-sm
                         ${getButtonClass(question, qNum, option.label)}
                         ${(showReport || showDetailedSolution) ? 'cursor-default' : 'transform active:scale-95'}

@@ -80,10 +80,12 @@ export default function ExplanationController({
           onClose={onClose}
         />
       ) : (
-        // --- STUDENT VIEW ---
+        // --- 💎 STUDENT VIEW (FIXED) 💎 ---
+        // Both question and onClose are now passed, matching the
+        // ExplanationControllerProps type.
         <StudentExplanationView
-          explanation={question.explanation}
-          handwrittenNoteUrl={question.handwrittenNoteUrl}
+          question={question}
+          onClose={onClose}
         />
       )}
     </div>

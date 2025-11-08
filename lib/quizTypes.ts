@@ -141,7 +141,10 @@ export interface QuizState {
   toast: ToastState;
   editingQuestionId: string | null;
   performanceStats: PerformanceStats | null;
-}
+
+  // --- 💎 MODAL SHEET LOGIC (AS DISCUSSED) 💎 ---
+  explanationModalQuestionId: string | null; // <-- NEW
+};
 
 export interface QuizActions {
   loadAndStartQuiz: (filter: QuizFilter) => Promise<void>;
@@ -171,6 +174,10 @@ export interface QuizActions {
     questionId: string,
     newExplanation: UltimateExplanation 
   ) => void;
+
+  // --- 💎 MODAL SHEET LOGIC (AS DISCUSSED) 💎 ---
+  openExplanationModal: (questionId: string) => void; // <-- NEW
+  closeExplanationModal: () => void; // <-- NEW
 }
 
 export type QuizStore = QuizState & QuizActions;

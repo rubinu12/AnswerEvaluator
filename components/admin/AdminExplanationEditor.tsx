@@ -20,10 +20,8 @@ import MagicEditor from '@/components/admin/MagicEditor';
 import HotspotModal, {
   HotspotModalData,
 } from '@/components/admin/HotspotModal';
-// --- 💎 "HYBRID" MODEL FIX 💎 ---
 // We NEED the renderer for "Preview Mode" to show tooltips
 import { RenderWithRadixHotspots } from '@/components/quiz/UltimateExplanationUI';
-// --- END OF FIX ---
 
 
 const EMPTY_EXPLANATION: UltimateExplanation = {
@@ -69,12 +67,10 @@ export default function AdminExplanationEditor({
   const [rawAiResponse, setRawAiResponse] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- 💎 "HYBRID" MODEL STATE 💎 ---
-  // This is the "click-to-edit" state. This is ESSENTIAL.
+  // This is the "click-to-edit" state.
   const [editingBlock, setEditingBlock] = useState<
     'howToThink' | 'coreAnalysis' | 'adminProTip' | null
   >(null);
-  // --- END OF FIX ---
 
   const [isControlRoomOpen, setIsControlRoomOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -107,7 +103,10 @@ export default function AdminExplanationEditor({
     }
   };
 
+  // --- 💎 "BROKEN PARSE" FIX (PROBLEM 4) 💎 ---
+  // Added console.log statements for debugging
   const handleParse = () => {
+    console.log('handleParse called. Raw response:', rawAiResponse); // DEBUG
     if (!rawAiResponse.trim()) {
       toast.error('Paste JSON response from AI first.');
       return;
@@ -115,28 +114,42 @@ export default function AdminExplanationEditor({
     let parsedData: any;
     try {
       parsedData = JSON.parse(rawAiResponse);
+      console.log('Parsed JSON data:', parsedData); // DEBUG
     } catch (error: any) {
       toast.error(`Invalid JSON: ${error.message}`);
       return;
     }
+    
     if (isUltimateExplanation(parsedData)) {
+      console.log('isUltimateExplanation check PASSED'); // DEBUG
       const bank = parsedData.hotspotBank || [];
       const processed: UltimateExplanation = {
-        howToThink: convertBracketsToSpans(parsedData.howToThink, bank),
-        coreAnalysis: convertBracketsToSpans(parsedData.coreAnalysis, bank),
-        adminProTip: convertBracketsToSpans(parsedData.adminProTip, bank),
+        howToThink: convertBracketsToSpans(parsedData.howToThink || '', bank),
+        coreAnalysis: convertBracketsToSpans(parsedData.coreAnalysis || '', bank),
+        adminProTip: convertBracketsToSpans(parsedData.adminProTip || '', bank),
         hotspotBank: bank,
       };
+      
+      console.log('Processed explanation object:', processed); // DEBUG
+      
+      // Check if blocks are empty
+      if (!processed.howToThink && !processed.coreAnalysis && !processed.adminProTip) {
+        console.warn('Warning: All processed blocks are empty. Check parsedData fields.'); // DEBUG
+        toast.warning('Parsed, but all content blocks were empty.');
+      }
+
       setExplanation(processed);
       toast.success('AI Response Parsed! Loading workspace...');
       setRawAiResponse('');
       setIsControlRoomOpen(false);
     } else {
+      console.error('isUltimateExplanation check FAILED'); // DEBUG
       toast.error(
         'Parse Error: JSON missing "soulful" fields (howToThink, coreAnalysis, etc.)'
       );
     }
   };
+  // --- 💎 END OF "BROKEN PARSE" FIX 💎 ---
 
   // --- Editor Content Change Handler (Correct) ---
   const handleContentChange = (
@@ -151,12 +164,10 @@ export default function AdminExplanationEditor({
     }
   };
   
-  // --- 💎 "HYBRID" MODEL HANDLER 💎 ---
   // This is the new handler that switches back to "Preview Mode"
   const handleBlur = () => {
     setEditingBlock(null);
   };
-  // --- END OF FIX ---
 
   // --- Hotspot Modal Handlers ---
   
@@ -179,7 +190,6 @@ export default function AdminExplanationEditor({
   };
 
   // 2. For clicking tooltips in "Preview Mode"
-  // This is the fix for the "tooltip not showing" bug
   const handleHotspotClick = (hotspot: Hotspot) => {
     toast.info(`Editing hotspot: ${hotspot.term}`);
     setModalData({ ...hotspot });
@@ -187,6 +197,7 @@ export default function AdminExplanationEditor({
     setActiveEditor(null); // No active editor, we are in preview mode
   };
 
+  // --- 💎 "BROKEN SAVE" FIX (PROBLEM 3) 💎 ---
   // This one function now handles saving from BOTH flows
   const handleSaveHotspot = (data: HotspotModalData) => {
     if (!explanation) return;
@@ -197,8 +208,6 @@ export default function AdminExplanationEditor({
     }
     
     // Flow 2: We were in "Preview Mode"
-    // We must manually update any spans in the *HTML content*
-    // This is a new, critical piece of logic.
     if (!activeEditor) {
       const updateHtml = (html: string) => {
         const regex = new RegExp(`(<span class="hotspot-mark" data-type=")(.*?)(">${data.term}<\/span>)`, 'g');
@@ -217,16 +226,26 @@ export default function AdminExplanationEditor({
     // Update the bank
     const newBank = [...explanation.hotspotBank];
     const existingIndex = newBank.findIndex((h) => h.term === data.term);
+
+    const hotspotToSave: Hotspot = {
+      term: data.term,
+      type: data.type,
+      definition: data.definition,
+    };
+    
     if (existingIndex > -1) {
-      newBank[existingIndex] = data;
+      // Update existing hotspot
+      newBank[existingIndex] = hotspotToSave;
     } else {
-      newBank.push(data);
+      // Add new hotspot
+      newBank.push(hotspotToSave);
     }
     setExplanation((prev) => ({ ...prev!, hotspotBank: newBank }));
     
     toast.success(`Hotspot "${data.term}" saved!`);
     closeModal();
   };
+  // --- 💎 END OF "BROKEN SAVE" FIX 💎 ---
 
   const handleDeleteHotspot = () => {
     if (!explanation || !modalData) return;
@@ -238,12 +257,11 @@ export default function AdminExplanationEditor({
     }
     
     // Flow 2: We were in "Preview Mode"
-    // We must manually remove the span from the HTML
     if (!activeEditor) {
-       const removeHtml = (html: string) => {
-        const regex = new RegExp(`(<span class="hotspot-mark" data-type=".*?">${termToDelete}<\/span>)`, 'g');
-        return html.replace(regex, termToDelete); // Replace span with just its text
-      };
+        const removeHtml = (html: string) => {
+         const regex = new RegExp(`(<span class="hotspot-mark" data-type=".*?">${termToDelete}<\/span>)`, 'g');
+         return html.replace(regex, termToDelete); // Replace span with just its text
+       };
       setExplanation((prev) => ({
         ...prev!,
         howToThink: removeHtml(prev!.howToThink),
@@ -330,7 +348,6 @@ export default function AdminExplanationEditor({
         </button>
         {isControlRoomOpen && (
           <div className="p-6 border-t border-gray-200 space-y-4">
-            {/* ... (All control room code is correct) ... */}
             <div>
               <h4 className="font-semibold">Step 1: Generate Prompt</h4>
               <button
@@ -376,14 +393,21 @@ export default function AdminExplanationEditor({
                 content={explanation.howToThink}
                 onChange={(html) => handleContentChange('howToThink', html)}
                 onConnectClick={handleConnectClick}
-                onBlur={handleBlur} // This prop is now correctly passed
+                onBlur={handleBlur} 
                 autoFocus={true}
               />
             ) : (
               // --- B. PREVIEW MODE ---
+              // --- 💎 "JUMP/CRAMPED/SELECTION" FIX (PROBLEMS 1, 2, 3) 💎 ---
               <div
-                className="w-full min-h-[100px] text-lg leading-relaxed cursor-text p-4"
-                onClick={() => setEditingBlock('howToThink')}
+                // 1. Use ".ProseMirror" class to get all editor styles
+                //    (fixes line-height, padding, min-height)
+                className="ProseMirror w-full cursor-text p-4"
+                // 2. Use "onMouseDown" to preserve text selection
+                onMouseDown={(e) => {
+                  e.preventDefault(); 
+                  setEditingBlock('howToThink');
+                }}
               >
                 <RenderWithRadixHotspots
                   html={explanation.howToThink}
@@ -406,14 +430,18 @@ export default function AdminExplanationEditor({
                 content={explanation.coreAnalysis}
                 onChange={(html) => handleContentChange('coreAnalysis', html)}
                 onConnectClick={handleConnectClick}
-                onBlur={handleBlur} // This prop is now correctly passed
+                onBlur={handleBlur}
                 autoFocus={true}
               />
             ) : (
               // --- B. PREVIEW MODE ---
+              // --- 💎 "JUMP/CRAMPED/SELECTION" FIX (PROBLEMS 1, 2, 3) 💎 ---
               <div
-                className="w-full min-h-[100px] text-lg leading-relaxed cursor-text p-4"
-                onClick={() => setEditingBlock('coreAnalysis')}
+                className="ProseMirror w-full cursor-text p-4"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setEditingBlock('coreAnalysis');
+                }}
               >
                 <RenderWithRadixHotspots
                   html={explanation.coreAnalysis}
@@ -436,14 +464,18 @@ export default function AdminExplanationEditor({
                 content={explanation.adminProTip}
                 onChange={(html) => handleContentChange('adminProTip', html)}
                 onConnectClick={handleConnectClick}
-                onBlur={handleBlur} // This prop is now correctly passed
+                onBlur={handleBlur}
                 autoFocus={true}
               />
             ) : (
               // --- B. PREVIEW MODE ---
+              // --- 💎 "JUMP/CRAMPED/SELECTION" FIX (PROBLEMS 1, 2, 3) 💎 ---
               <div
-                className="w-full min-h-[100px] text-lg leading-relaxed cursor-text p-4"
-                onClick={() => setEditingBlock('adminProTip')}
+                className="ProseMirror w-full cursor-text p-4"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setEditingBlock('adminProTip');
+                }}
               >
                 <RenderWithRadixHotspots
                   html={explanation.adminProTip}

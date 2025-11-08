@@ -14,54 +14,63 @@ interface MagicEditorProps {
   content: string;
   onChange: (html: string) => void;
   onConnectClick: (editor: TiptapEditor) => void;
-  // --- THIS IS THE FIX ---
-  // The onBlur prop is REQUIRED for our "Hybrid" model
-  // to switch from "Edit Mode" back to "Preview Mode".
   onBlur: () => void;
   autoFocus?: boolean;
-  // --- END OF FIX ---
+  // --- 💎 NEW ARCHITECTURE UPGRADE 💎 ---
+  // We can now control if the editor is in read-only mode
+  isEditable?: boolean;
 }
 
 const TiptapEditorComponent = ({
   content,
   onChange,
   onConnectClick,
-  onBlur, // We now use this prop
+  onBlur,
   autoFocus,
+  isEditable = true, // Default to true to avoid breaking existing code
 }: MagicEditorProps) => {
   const editor = useEditor({
     extensions,
     content,
     immediatelyRender: false,
     
-    // --- "BROKEN BUBBLEMENU" FIX ---
-    // This is the race condition fix. It delays the blur event
-    // so the BubbleMenu button's 'onClick' can fire *before*
-    // the editor unmounts (by switching to "Preview Mode").
+    // --- 💎 NEW ARCHITECTURE UPGRADE 💎 ---
+    // The editor's editable state is now controlled by our prop
+    editable: isEditable,
+
     onBlur: () => {
       if (onBlur) {
-        setTimeout(onBlur, 100); // 100ms delay
+        // We still need the delay to prevent the bubble menu from breaking
+        setTimeout(onBlur, 100); 
       }
     },
-    // --- END OF FIX ---
 
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
     
-    // --- "NO JUMP" FIX ---
-    // These classes will be identical to our "Preview" div.
+    // --- 💎 "CRAMPED UI" & "JUMP BUG" PERMANENT FIX 💎 ---
+    // We remove all the custom classes and use "ProseMirror"
+    // This will pull all styles (min-height, line-height, padding)
+    // directly from your globals.css, ensuring it ALWAYS
+    // matches the "Preview Mode" (which will also use this class).
     editorProps: {
       attributes: {
-        class:
-          'w-full min-h-[100px] text-lg leading-relaxed focus:outline-none p-4',
+        class: 'ProseMirror', // This is the professional-grade fix
       },
     },
     
-    // --- "CLUNKY WORKFLOW" FIX ---
-    // This will be 'true' when we click to edit.
     autofocus: autoFocus,
   });
+
+  // --- 💎 NEW ARCHITECTURE UPGRADE 💎 ---
+  // This effect ensures that if the isEditable prop changes
+  // (e.g., the user clicks), we update the editor.
+  useEffect(() => {
+    if (editor && editor.isEditable !== isEditable) {
+      editor.setEditable(isEditable);
+    }
+  }, [editor, isEditable]);
   
   // This hook ensures content is updated from the parser
   useEffect(() => {
@@ -70,7 +79,6 @@ const TiptapEditorComponent = ({
     }
   }, [content, editor]);
 
-  // This guard fixes the 'Editor | null' errors
   if (!editor) {
     return null;
   }
@@ -79,13 +87,17 @@ const TiptapEditorComponent = ({
     <>
       <BubbleMenu
         editor={editor}
-        shouldShow={({ state }) => !state.selection.empty}
+        // --- 💎 NEW ARCHITECTURE UPGRADE 💎 ---
+        // The bubble menu should only show when the editor
+        // is actually editable.
+        shouldShow={({ state, editor }) =>
+          !state.selection.empty && editor.isEditable
+        }
         className="bg-white shadow-lg border rounded-lg p-1 flex space-x-1 z-10"
       >
         {/* These buttons will now work */}
         <button
           type="button"
-          // We use onMouseDown to prevent the blur event from firing
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onConnectClick(editor)}
           className="p-2 text-blue-600 hover:bg-gray-100 rounded"
@@ -131,8 +143,11 @@ const TiptapEditorComponent = ({
 };
 
 export default function MagicEditor(props: MagicEditorProps) {
+  // We wrap the editor in a div that gives it a container
+  // The editor itself will have the .ProseMirror styles
+  // for padding, min-height, and line-height.
   return (
-    <div className="magic-editor">
+    <div className="magic-editor-wrapper">
       <TiptapEditorComponent {...props} />
     </div>
   );

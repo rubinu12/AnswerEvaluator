@@ -60,6 +60,9 @@ const initialState: QuizState = {
   // --- 💎 "PERFECT" ADMIN STATE 💎 ---
   editingQuestionId: null,
 
+  // --- 💎 MODAL SHEET LOGIC (AS DISCUSSED) 💎 ---
+  explanationModalQuestionId: null, // <-- NEW
+
   performanceStats: null,
 };
 
@@ -263,6 +266,21 @@ export const useQuizStore = create<QuizStore>()(
       hideToast: () => {
         set({ toast: { show: false, message: '', type: 'info' } });
       },
+
+      // --- 💎 MODAL SHEET LOGIC (AS DISCUSSED) 💎 ---
+      openExplanationModal: (questionId: string) => {
+        console.log(`openExplanationModal: ${questionId}`);
+        set({ 
+          explanationModalQuestionId: questionId,
+          currentViewAnswer: null // Defensively set old state to null
+        });
+      },
+      
+      closeExplanationModal: () => {
+        console.log('closeExplanationModal');
+        set({ explanationModalQuestionId: null });
+      },
+      // --- 💎 END OF NEW ACTIONS 💎 ---
 
       // --- 💎 "PERFECT" ADMIN ACTIONS 💎 ---
       // These actions now match lib/quizTypes.ts "perfectly"
