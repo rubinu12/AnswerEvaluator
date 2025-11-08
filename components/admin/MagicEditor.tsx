@@ -1,49 +1,46 @@
 // components/admin/MagicEditor.tsx
-
 'use client';
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   EditorContent,
   useEditor,
   Editor as TiptapEditor,
-   // <-- FIXED: Correct import path
 } from '@tiptap/react';
-import { BubbleMenu } from '@tiptap/react/menus'
-// import { EditorState } from '@tiptap/pm/state'; // <-- Removed: Unused import
+// Your correct import path
+import { BubbleMenu } from '@tiptap/react/menus';
 import { extensions } from './MagicEditorExtensions';
-// import { EditorProps } from '@tiptap/pm/view'; // <-- Removed: Unused import
 
-// --- THIS IS THE FIX ---
-// We are adding onBlur and autoFocus to the props
 interface MagicEditorProps {
   content: string;
   onChange: (html: string) => void;
   onConnectClick: (editor: TiptapEditor) => void;
-  onBlur?: () => void; // <-- ADDED
-  autoFocus?: boolean; // <-- ADDED
+  // --- THIS IS THE FIX ---
+  // The onBlur prop is REQUIRED for our "Hybrid" model
+  // to switch from "Edit Mode" back to "Preview Mode".
+  onBlur: () => void;
+  autoFocus?: boolean;
+  // --- END OF FIX ---
 }
 
-/**
- * This is the "editable text box" for our Playground.
- */
 const TiptapEditorComponent = ({
   content,
   onChange,
   onConnectClick,
-  onBlur, // <-- ADDED
-  autoFocus, // <-- ADDED
+  onBlur, // We now use this prop
+  autoFocus,
 }: MagicEditorProps) => {
   const editor = useEditor({
     extensions,
     content,
-    // This tells Tiptap to wait for the client to be ready
     immediatelyRender: false,
-
-    // --- THIS IS THE FIX ---
-    autofocus: autoFocus, // Pass autoFocus to Tiptap
+    
+    // --- "BROKEN BUBBLEMENU" FIX ---
+    // This is the race condition fix. It delays the blur event
+    // so the BubbleMenu button's 'onClick' can fire *before*
+    // the editor unmounts (by switching to "Preview Mode").
     onBlur: () => {
       if (onBlur) {
-        onBlur(); // Call the onBlur function from props
+        setTimeout(onBlur, 100); // 100ms delay
       }
     },
     // --- END OF FIX ---
@@ -51,72 +48,91 @@ const TiptapEditorComponent = ({
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
+    
+    // --- "NO JUMP" FIX ---
+    // These classes will be identical to our "Preview" div.
     editorProps: {
-      // This makes the editor look like plain text until clicked
       attributes: {
         class:
-          'prose prose-sm sm:prose-base lg:prose-lg xl:prose-2xl m-5 focus:outline-none',
+          'w-full min-h-[100px] text-lg leading-relaxed focus:outline-none p-4',
       },
     },
+    
+    // --- "CLUNKY WORKFLOW" FIX ---
+    // This will be 'true' when we click to edit.
+    autofocus: autoFocus,
   });
+  
+  // This hook ensures content is updated from the parser
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content, { emitUpdate: false });
+    }
+  }, [content, editor]);
+
+  // This guard fixes the 'Editor | null' errors
+  if (!editor) {
+    return null;
+  }
 
   return (
     <>
-      {editor && (
-        <BubbleMenu
-          editor={editor}
-          // We removed the invalid 'tippyOptions' prop
-          // FIXED: The 'state' prop is provided by shouldShow
-          shouldShow={({ state }) => !state.selection.empty}
-          className="bg-white shadow-lg border rounded-lg p-1 flex space-x-1"
+      <BubbleMenu
+        editor={editor}
+        shouldShow={({ state }) => !state.selection.empty}
+        className="bg-white shadow-lg border rounded-lg p-1 flex space-x-1 z-10"
+      >
+        {/* These buttons will now work */}
+        <button
+          type="button"
+          // We use onMouseDown to prevent the blur event from firing
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onConnectClick(editor)}
+          className="p-2 text-blue-600 hover:bg-gray-100 rounded"
+          title="Create/Edit Hotspot"
         >
-          {/* --- STEP 3b: Our new [Connect] button --- */}
-          <button
-            onClick={() => onConnectClick(editor)}
-            className="p-2 text-blue-600 hover:bg-gray-100 rounded"
-            title="Create/Edit Hotspot"
-          >
-            Connect
-          </button>
-
-          {/* Standard Tiptap buttons */}
-          <button
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`p-2 hover:bg-gray-100 rounded ${
-              editor.isActive('bold') ? 'bg-gray-200' : ''
-            }`}
-          >
-            Bold
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`p-2 hover:bg-gray-100 rounded ${
-              editor.isActive('italic') ? 'bg-gray-200' : ''
-            }`}
-          >
-            Italic
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            className={`p-2 hover:bg-gray-100 rounded ${
-              editor.isActive('underline') ? 'bg-gray-200' : ''
-            }`}
-          >
-            Underline
-          </button>
-        </BubbleMenu>
-      )}
+          Connect
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          className={`p-2 hover:bg-gray-100 rounded ${
+            editor.isActive('bold') ? 'bg-gray-200' : ''
+          }`}
+        >
+          Bold
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          className={`p-2 hover:bg-gray-100 rounded ${
+            editor.isActive('italic') ? 'bg-gray-200' : ''
+          }`}
+        >
+          Italic
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={`p-2 hover:bg-gray-100 rounded ${
+            editor.isActive('underline') ? 'bg-gray-200' : ''
+          }`}
+        >
+          Underline
+        </button>
+      </BubbleMenu>
 
       <EditorContent editor={editor} />
     </>
   );
 };
 
-// This is the wrapper component that provides the editor context
 export default function MagicEditor(props: MagicEditorProps) {
   return (
     <div className="magic-editor">
-      {/* We fixed the name conflict here */}
       <TiptapEditorComponent {...props} />
     </div>
   );

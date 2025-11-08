@@ -1,26 +1,24 @@
+// components/quiz/UltimateExplanationUI.tsx
 'use client';
 
 import React from 'react';
-// --- 💎 FIX 1: Correct Imports ---
-// We now import `Element` from `html-react-parser` itself.
 import parse, { domToReact, DOMNode, Element } from 'html-react-parser';
-// We still need `Text` from domhandler for safe text extraction.
 import { Text } from 'domhandler';
-// --- End of Fix ---
 import {
   UltimateExplanation,
   Hotspot,
   isUltimateExplanation,
 } from '@/lib/quizTypes';
 import { Lightbulb, Eye, Pencil, Paperclip } from 'lucide-react';
-import HotspotTooltip from './HotspotTooltip'; // <-- We import your *real* component
+import HotspotTooltip from './HotspotTooltip';
 import Image from 'next/image';
 
 /**
- * --- 💎 "SOULFUL" HOTSPOT RENDERER (v3.3 - THE FINAL, *ACTUAL* FIX) 💎 ---
+ * --- 💎 "SOULFUL" HOTSPOT RENDERER (v3.5 - THE COLOR FIX) 💎 ---
  *
- * This version fixes the bug by checking `domNode.name === 'hotspot'`
- * instead of the incorrect `domNode.tagName`.
+ * This version fixes the "missing colors" bug.
+ * It now renders the <span> with the exact `className` and `data-type`
+ * that your existing `globals.css` file targets.
  */
 export const RenderWithRadixHotspots: React.FC<{
   html: string;
@@ -29,13 +27,12 @@ export const RenderWithRadixHotspots: React.FC<{
 }> = ({ html, hotspotBank, onHotspotClick }) => {
   const options = {
     replace: (domNode: DOMNode) => {
-      // --- 💎 THE BUG FIX 💎 ---
-      // We must check `domNode.name === 'hotspot'`.
-      // `domNode.tagName` does not exist on this type.
-      if (domNode instanceof Element && domNode.name === 'hotspot') {
-        // --- 💎 END OF BUG FIX 💎 ---
-
-        // --- Safe Term Extraction ---
+      // This logic is correct: find the <span> tag
+      if (
+        domNode instanceof Element &&
+        domNode.name === 'span' &&
+        domNode.attribs?.class?.includes('hotspot-mark')
+      ) {
         let term = '';
         if (
           domNode.children &&
@@ -44,39 +41,39 @@ export const RenderWithRadixHotspots: React.FC<{
         ) {
           term = (domNode.children[0] as Text).data;
         } else {
-          // Fallback for empty or complex hotspots
-          // This type-cast is now correct and safe.
           return <>{domToReact(domNode.children as DOMNode[])}</>;
         }
-        
-        // Find the matching hotspot object from our bank
+
         const hotspot = hotspotBank.find((h) => h.term === term);
 
         if (hotspot) {
-          // We pass the props your component *actually* expects
           return (
             <HotspotTooltip hotspot={hotspot} onClick={onHotspotClick}>
-              {/* This span is the 'children' prop for HotspotTooltip */}
+              {/* --- 💎 THE COLOR FIX 💎 --- */}
+              {/*
+                This now renders the <span> with `className="hotspot-mark"`
+                and `data-type={hotspot.type}`. This will make your
+                existing CSS classes (`.hotspot-mark[data-type='blue']`)
+                work correctly.
+              */}
               <span
-                className={`hotspot hotspot-${hotspot.type} ${
+                className={`hotspot-mark ${
                   onHotspotClick ? 'cursor-pointer' : ''
                 }`}
+                data-type={hotspot.type}
               >
                 {term}
               </span>
+              {/* --- END OF FIX --- */}
             </HotspotTooltip>
           );
         }
         // Hotspot exists in HTML but not in bank
-        return <span className="hotspot hotspot-invalid">{term}</span>;
+        return <span className="hotspot-mark">{term}</span>;
       }
-      
-      // Return all other nodes (like <p>, <strong>, <span>) unchanged
-      return domNode;
     },
   };
 
-  // We parse the HTML with our replacement options
   return <>{parse(html, options)}</>;
 };
 
@@ -86,22 +83,20 @@ interface UltimateExplanationUIProps {
   handwrittenNoteUrl?: string | null;
 }
 
-// --- DELETED ---
-// All the old, "soulless" 5-schema helper components are GONE.
-
 /**
- * --- 💎 "SOULFUL" EXPLANATION UI (v3.0 - THE FINAL) 💎 ---
+ * --- 💎 "SOULFUL" EXPLANATION UI (v3.2 - UI Polish) 💎 ---
+ * We are removing the 'prose' classes to stop them from
+ * interfering with your 'hotspot-mark' classes.
  */
 const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
   explanation,
   handwrittenNoteUrl,
 }) => {
-  // Our NEW type guard (from lib/quizTypes.ts)
   if (!isUltimateExplanation(explanation)) {
     return (
       <div className="p-4 text-gray-700 bg-gray-50 rounded-lg">
         {explanation && typeof explanation === 'string' ? (
-          <p>{explanation}</p> // Legacy string parser
+          <p>{explanation}</p>
         ) : (
           <p>No explanation available for this question yet.</p>
         )}
@@ -109,7 +104,6 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
     );
   }
 
-  // We can now safely access our "soulful" object
   const { howToThink, coreAnalysis, adminProTip, hotspotBank, takeaway } =
     explanation;
 
@@ -121,7 +115,8 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
           <Eye className="w-5 h-5 mr-2 text-blue-600" />
           🧠 Topper's Mental Model
         </h3>
-        <div className="prose prose-sm max-w-none">
+        {/* 'prose' class removed to allow custom CSS to apply */}
+        <div className="text-base leading-relaxed">
           <RenderWithRadixHotspots
             html={howToThink}
             hotspotBank={hotspotBank || []}
@@ -135,7 +130,8 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
           <Pencil className="w-5 h-5 mr-2 text-blue-600" />
           🎯 Core Analysis
         </h3>
-        <div className="prose prose-sm max-w-none prose-strong:text-blue-900">
+        {/* 'prose' class removed */}
+        <div className="text-base leading-relaxed">
           <RenderWithRadixHotspots
             html={coreAnalysis}
             hotspotBank={hotspotBank || []}
@@ -149,7 +145,8 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
           <Lightbulb className="w-5 h-5 mr-2" />
           ✍️ Mentor's Pro-Tip
         </h3>
-        <div className="prose prose-sm max-w-none">
+        {/* 'prose' class removed */}
+        <div className="text-base leading-relaxed">
           <RenderWithRadixHotspots
             html={adminProTip}
             hotspotBank={hotspotBank || []}
@@ -157,7 +154,7 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
         </div>
       </div>
 
-      {/* --- 4. Handwritten Note (Your Requested Feature) --- */}
+      {/* --- 4. Handwritten Note (Unchanged) --- */}
       {handwrittenNoteUrl && (
         <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-300 shadow-sm">
           <h3 className="font-bold text-lg text-yellow-900 mb-2 flex items-center">
@@ -169,8 +166,8 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
               src={handwrittenNoteUrl}
               alt="User's handwritten note"
               layout="responsive"
-              width={800} // Default dimensions
-              height={1000} //
+              width={800}
+              height={1000}
               objectFit="contain"
               className="bg-white"
             />
@@ -182,7 +179,8 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
       {takeaway && (
         <div className="p-4 bg-green-50 rounded-lg border border-green-200 text-green-900">
           <h3 className="font-bold text-lg mb-2">✅ The Takeaway</h3>
-          <div className="prose prose-sm max-w-none">
+          {/* 'prose' class removed */}
+          <div className="text-base leading-relaxed">
             <RenderWithRadixHotspots
               html={takeaway}
               hotspotBank={hotspotBank || []}

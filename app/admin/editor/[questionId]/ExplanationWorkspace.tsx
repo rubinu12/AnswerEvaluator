@@ -1,8 +1,9 @@
+// app/admin/editor/[questionId]/ExplanationWorkspace.tsx
 'use client';
 
 import React, { useState } from 'react';
 import {
-  UltimateExplanation, // We keep the name, but its *structure* is new
+  UltimateExplanation,
   QuestionType,
   Hotspot,
 } from '@/lib/quizTypes';
@@ -13,56 +14,41 @@ import { Editor as TiptapEditor } from '@tiptap/react';
 import HotspotModal, {
   HotspotModalData,
 } from '@/components/admin/HotspotModal';
-// We import the renderer from the UI component
-import { RenderWithRadixHotspots } from '@/components/quiz/UltimateExplanationUI';
-// Import all the icons we'll need for the new UI blocks
-import { Eye, Pencil, Lightbulb, Paperclip } from 'lucide-react'; // Added Paperclip
-import Image from 'next/image'; // Added Image
+// --- 💎 "TRUE WYSIWYG" FIX 💎 ---
+// RenderWithRadixHotspots is NO LONGER NEEDED here because
+// we are always in the editor.
+import { Eye, Pencil, Lightbulb, Paperclip } from 'lucide-react';
+import Image from 'next/image';
 
-// --- 💎 FIXED 💎 ---
-// These are the props passed down from page.tsx
 interface ExplanationWorkspaceProps {
   explanation: UltimateExplanation | null;
   setExplanation: (exp: UltimateExplanation) => void;
   questionId: string;
-  questionType: QuestionType; // We still get this, but our UI won't use it
-  handwrittenNoteUrl?: string | null; // <-- This is the fix for the error
+  questionType: QuestionType;
+  handwrittenNoteUrl?: string | null;
 }
 
-/**
- * --- 💎 "SOULFUL" HYBRID EDITOR (v3.0 - FINAL) 💎 ---
- * This file has been refactored to use the ONE, UNIVERSAL
- * "soulful" explanation model.
- *
- * - DELETED all 5 old schema blocks.
- * - DELETED all 10+ old state handlers.
- * - ADDED one new "coreAnalysis" block.
- * - MODIFIED handleTopLevelContentChange to be the only handler.
- * - ADDED handwrittenNoteUrl prop and display.
- */
 export default function ExplanationWorkspace({
   explanation,
   setExplanation,
   questionId,
   questionType,
-  handwrittenNoteUrl, // <-- We now receive the prop
+  handwrittenNoteUrl,
 }: ExplanationWorkspaceProps) {
   const { user } = useAuthContext();
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- "Soulful" Hybrid Editor State ---
-  // This state tracks which of our 3 blocks is in "Edit Mode".
-  const [editingBlock, setEditingBlock] = useState<
-    'howToThink' | 'coreAnalysis' | 'adminProTip' | null
-  >(null);
+  // --- 💎 "TRUE WYSIWYG" FIX 💎 ---
+  // The editingBlock state is GONE. This is the root of all bugs.
+  // const [editingBlock, setEditingBlock] = useState<...>(null);
 
-  // --- Hotspot Modal State (Unchanged) ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalData, setModalData] = useState<HotspotModalData | null>(null);
   const [activeEditor, setActiveEditor] = useState<TiptapEditor | null>(null);
 
-  // --- Save to Firestore Logic ---
+  // --- Save to Firestore Logic (Unchanged) ---
   const handleSave = async () => {
+    // ... (This function is correct and unchanged)
     if (!user) {
       toast.error('You must be logged in to save.');
       return;
@@ -71,11 +57,9 @@ export default function ExplanationWorkspace({
       toast.error('No explanation data to save. Please parse first.');
       return;
     }
-
     setIsSaving(true);
     try {
       const token = await user.getIdToken();
-      // We are saving to our "split collection" API route
       const response = await fetch(`/api/questions/${questionId}`, {
         method: 'PATCH',
         headers: {
@@ -84,17 +68,13 @@ export default function ExplanationWorkspace({
         },
         body: JSON.stringify({
           explanation: explanation,
-          questionType: questionType, // We still save this
-          // We don't need to save the handwrittenNoteUrl here,
-          // as that's a separate "upload" operation.
+          questionType: questionType,
         }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to save data.');
       }
-
       toast.success('Explanation saved successfully!');
     } catch (error: any) {
       console.error('Save error:', error);
@@ -104,18 +84,12 @@ export default function ExplanationWorkspace({
     }
   };
 
-  // --- Content Change Handlers (Immutability is critical) ---
+  // --- 💎 "TRUE WYSIWYG" FIX 💎 ---
+  // The onBlur handler is NO LONGER NEEDED because we are never
+  // switching back to a "preview" state.
+  // const handleBlur = () => { setEditingBlock(null); };
 
-  // This is our universal "onBlur" handler
-  const handleBlur = () => {
-    setEditingBlock(null);
-  };
-
-  /**
-   * --- 💎 NEW "SOULFUL" HANDLER 💎 ---
-   * This is now our ONE AND ONLY content change handler for all
-   * 3 parts of our new "soulful" explanation.
-   */
+  // --- Content Change Handler (Unchanged) ---
   const handleTopLevelContentChange = (
     field: 'howToThink' | 'coreAnalysis' | 'adminProTip',
     content: string
@@ -128,28 +102,11 @@ export default function ExplanationWorkspace({
     }
   };
 
-  // --- DELETED---
-  // All 10+ complex state handlers for the 5 old schemas
-  // (e.g., handleSingleChoiceOptionChange, handleHowManyItemChange)
-  // are GONE. This file is now 100x simpler.
+  // --- 💎 "TRUE WYSIWYG" FIX 💎 ---
+  // handleHotspotClick is GONE. It was only for the preview.
+  // const handleHotspotClick = (hotspot: Hotspot) => { ... };
 
-  // --- Hotspot Logic (Unchanged) ---
-  // This logic works perfectly with our new model
-  // because it only depends on `explanation.hotspotBank`.
-
-  // (Method 1: Click Tooltip)
-  const handleHotspotClick = (hotspot: Hotspot) => {
-    toast.info(`Editing hotspot: ${hotspot.term}`);
-    setModalData({
-      term: hotspot.term,
-      type: hotspot.type,
-      definition: hotspot.definition,
-    });
-    setIsModalOpen(true);
-    setActiveEditor(null);
-  };
-
-  // (Method 2: Select Text)
+  // --- Connect Click Handler (Unchanged) ---
   const handleConnectClick = (editor: TiptapEditor) => {
     const { from, to, empty } = editor.state.selection;
     if (empty) {
@@ -169,16 +126,18 @@ export default function ExplanationWorkspace({
     setIsModalOpen(true);
   };
 
-  // (Save - works for both methods)
+  // --- 💎 RUNTIME ERROR FIX 💎 ---
   const handleSaveHotspot = (data: HotspotModalData) => {
     if (!explanation) return;
     if (activeEditor) {
-      // This logic is wrong, it should be <hotspot>
-      // activeEditor.chain().focus().setMark('hotspot', { type: data.type }).run();
-      // Your convertBracketsToSpans in CommandCenter.tsx handles this.
-      // The MagicEditor should be updated to create <hotspot> tags.
-      // For now, this just saves to the bank.
+      // We remove the .focus() call that caused the crash.
+      activeEditor
+        .chain()
+        // .focus() // <-- BUGGY CODE REMOVED
+        .setMark('hotspot', { type: data.type })
+        .run();
     }
+    // ... (rest of the function is correct)
     const existingIndex =
       explanation.hotspotBank?.findIndex((h) => h.term === data.term) ?? -1;
     let newHotspotBank: Hotspot[];
@@ -195,14 +154,14 @@ export default function ExplanationWorkspace({
     toast.success(`Hotspot "${data.term}" saved!`);
   };
 
-  // (Delete - works for both methods)
   const handleDeleteHotspot = () => {
     if (!explanation || !modalData) return;
     const termToDelete = modalData.term;
     if (activeEditor) {
-      // This logic is also related to Tiptap setup
-      // activeEditor.chain().focus().unsetMark('hotspot').run();
+      // We remove the .focus() call here too.
+      activeEditor.chain().unsetMark('hotspot').run();
     }
+    // ... (rest of the function is correct)
     const newHotspotBank = (explanation.hotspotBank || []).filter(
       (h) => h.term !== termToDelete
     );
@@ -223,9 +182,6 @@ export default function ExplanationWorkspace({
     );
   }
 
-  // We can safely read this now.
-  const hotspotBank = explanation.hotspotBank || [];
-
   return (
     <>
       <HotspotModal
@@ -237,108 +193,68 @@ export default function ExplanationWorkspace({
       />
 
       <div className="w-full space-y-8">
-        {/* --- 1. Topper's Mental Model (Unchanged) --- */}
+        {/* --- 1. Topper's Mental Model --- */}
         <div className="playground-block">
           <h2 className="text-2xl font-bold text-gray-900 mb-3 flex items-center">
             <Eye className="w-6 h-6 mr-2 text-blue-600" />
             🧠 Topper's Mental Model (howToThink)
           </h2>
-          <div className="p-4 border rounded-lg shadow-inner bg-white min-h-[100px]">
-            {editingBlock === 'howToThink' ? (
-              <MagicEditor
-                content={explanation.howToThink}
-                onChange={(html) =>
-                  handleTopLevelContentChange('howToThink', html)
-                }
-                onConnectClick={handleConnectClick}
-                onBlur={handleBlur}
-                autoFocus={true}
-              />
-            ) : (
-              <div
-                className="cursor-text text-lg"
-                onClick={() => setEditingBlock('howToThink')}
-              >
-                <RenderWithRadixHotspots
-                  html={explanation.howToThink}
-                  hotspotBank={hotspotBank}
-                  onHotspotClick={handleHotspotClick}
-                />
-              </div>
-            )}
+          {/* --- 💎 "TRUE WYSIWYG" FIX 💎 --- */}
+          {/* The preview div is GONE. We ONLY render the editor. */}
+          <div className="border rounded-lg shadow-inner bg-white">
+            <MagicEditor
+              content={explanation.howToThink}
+              onChange={(html) =>
+                handleTopLevelContentChange('howToThink', html)
+              }
+              onConnectClick={handleConnectClick}
+              // onBlur prop is GONE.
+            />
           </div>
         </div>
 
-        {/* --- 💎 2. CORE ANALYSIS (NEW "SOULFUL" BLOCK) 💎 --- */}
-        {/* This replaces all 5 old, complex blocks */}
+        {/* --- 2. CORE ANALYSIS --- */}
         <div className="playground-block">
           <h2 className="text-2xl font-bold text-gray-900 mb-3 flex items-center">
             <Pencil className="w-6 h-6 mr-2 text-blue-600" />
             🎯 Core Analysis (Mental Model)
           </h2>
-          <div className="p-4 border-l-4 border-blue-500 bg-blue-50 rounded-lg shadow-inner min-h-[150px]">
-            {editingBlock === 'coreAnalysis' ? (
-              <MagicEditor
-                content={explanation.coreAnalysis}
-                onChange={(html) =>
-                  handleTopLevelContentChange('coreAnalysis', html)
-                }
-                onConnectClick={handleConnectClick}
-                onBlur={handleBlur}
-                autoFocus={true}
-              />
-            ) : (
-              <div
-                className="cursor-text text-lg"
-                onClick={() => setEditingBlock('coreAnalysis')}
-              >
-                <RenderWithRadixHotspots
-                  html={explanation.coreAnalysis}
-                  hotspotBank={hotspotBank}
-                  onHotspotClick={handleHotspotClick}
-                />
-              </div>
-            )}
+          {/* --- 💎 "TRUE WYSIWYG" FIX 💎 --- */}
+          {/* The preview div is GONE. We ONLY render the editor. */}
+          <div className="border-l-4 border-blue-500 bg-blue-50 rounded-lg shadow-inner">
+            <MagicEditor
+              content={explanation.coreAnalysis}
+              onChange={(html) =>
+                handleTopLevelContentChange('coreAnalysis', html)
+              }
+              onConnectClick={handleConnectClick}
+              // onBlur prop is GONE.
+            />
           </div>
         </div>
-        {/* --- END OF NEW CORE ANALYSIS --- */}
 
-        {/* --- 3. Mentor's Pro-Tip (Unchanged) --- */}
+        {/* --- 3. Mentor's Pro-Tip --- */}
         <div className="playground-block">
-          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-5 rounded-lg shadow-sm min-h-[100px]">
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-5 rounded-lg shadow-sm">
             <h2 className="text-xl font-bold text-blue-900 mb-2 flex items-center">
               <Lightbulb className="w-6 h-6 mr-2" />
               ✍️ Mentor's Pro-Tip
             </h2>
-            <div className="text-lg">
-              {editingBlock === 'adminProTip' ? (
-                <MagicEditor
-                  content={explanation.adminProTip}
-                  onChange={(html) =>
-                    handleTopLevelContentChange('adminProTip', html)
-                  }
-                  onConnectClick={handleConnectClick}
-                  onBlur={handleBlur}
-                  autoFocus={true}
-                />
-              ) : (
-                <div
-                  className="cursor-text"
-                  onClick={() => setEditingBlock('adminProTip')}
-                >
-                  <RenderWithRadixHotspots
-                    html={explanation.adminProTip}
-                    hotspotBank={hotspotBank}
-                    onHotspotClick={handleHotspotClick}
-                  />
-                </div>
-              )}
-            </div>
+            {/* --- 💎 "TRUE WYSIWYG" FIX 💎 --- */}
+            {/* The preview div is GONE. We ONLY render the editor. */}
+            <MagicEditor
+              content={explanation.adminProTip}
+              onChange={(html) =>
+                handleTopLevelContentChange('adminProTip', html)
+              }
+              onConnectClick={handleConnectClick}
+              // onBlur prop is GONE.
+            />
           </div>
         </div>
-        
-        {/* --- 💎 4. HANDWRITTEN NOTE (NEW) 💎 --- */}
-        {/* This block is new, as requested. */}
+
+        {/* --- 4. HANDWRITTEN NOTE (Unchanged) --- */}
+        {/* ... your handwritten note code ... */}
         <div className="playground-block">
           <h2 className="text-2xl font-bold text-gray-900 mb-3 flex items-center">
             <Paperclip className="w-6 h-6 mr-2 text-blue-600" />
@@ -361,7 +277,6 @@ export default function ExplanationWorkspace({
               <p>No handwritten note attached yet.</p>
             </div>
           )}
-          {/* We will add the 'Upload' button functionality in a future step */}
           <button
             onClick={() => toast.info('Upload feature coming soon!')}
             className="mt-4 w-full py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-md shadow-sm hover:bg-gray-300"
@@ -370,10 +285,7 @@ export default function ExplanationWorkspace({
           </button>
         </div>
 
-        {/* --- 5. Takeaway (DELETED) --- */}
-        {/* The "Takeaway" block is gone, as it's no longer in our type. */}
-
-        {/* Save Button (Unchanged) */}
+        {/* --- Save Button (Unchanged) --- */}
         <div className="pt-6 border-t mt-12">
           <button
             onClick={handleSave}
