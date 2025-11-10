@@ -1,31 +1,54 @@
 // components/admin/MagicEditorExtensions.ts
-
-// --- Imports from your original file ---
 import StarterKit from '@tiptap/starter-kit';
 import { Link } from '@tiptap/extension-link';
 import { Color } from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Underline } from '@tiptap/extension-underline';
-import { Highlight } from '@tiptap/extension-highlight'; // This will now work after the npm install
+import { Highlight } from '@tiptap/extension-highlight';
 import { Subscript } from '@tiptap/extension-subscript';
 import { Superscript } from '@tiptap/extension-superscript';
 import { FontFamily } from '@tiptap/extension-font-family';
-// --- FIXED: Removed the './fontSize' import ---
 
-// --- NEW HOTSPOT MARK (PHASE 3) ---
-import { Mark, mergeAttributes, MarkType } from '@tiptap/core';
-// We also need these types for our (upcoming) button logic
-import { Editor } from '@tiptap/react';
+// --- NEW IMPORTS FOR TYPES ---
+import { Mark, mergeAttributes, RawCommands, CommandProps, Editor } from '@tiptap/core';
+import { MarkType } from '@tiptap/pm/model'; // Correct import for MarkType
+// --- END NEW IMPORTS ---
+
+// --- NEW TYPE DECLARATION ---
+// This extends Tiptap's types to make our custom commands type-safe
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    hotspot: {
+      setHotspot: (attributes: { type: string }) => ReturnType;
+      toggleHotspot: (attributes: { type: string }) => ReturnType;
+      unsetHotspot: () => ReturnType;
+    };
+  }
+}
+// --- END NEW TYPE DECLARATION ---
 
 /**
  * Our custom Tiptap Mark for "Hotspots".
- * This allows us to "mark" text with a data-type, which we
- * can then style with CSS and make interactive.
  */
 export const HotspotMark = Mark.create({
   name: 'hotspot',
 
-  // This allows us to store the 'type' (red/green/blue)
+  parseHTML() {
+    return [
+      {
+        tag: 'span.hotspot-mark[data-type]',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, { class: 'hotspot-mark' }),
+      0,
+    ];
+  },
+
   addAttributes() {
     return {
       type: {
@@ -38,32 +61,30 @@ export const HotspotMark = Mark.create({
     };
   },
 
-  // This defines how the mark is parsed from HTML
-  parseHTML() {
-    return [
-      {
-        tag: 'span[data-type]',
-      },
-    ];
+  // --- THIS BLOCK IS NOW FULLY TYPE-SAFE ---
+  addCommands() {
+    return {
+      setHotspot:
+        (attributes: { type: string }) =>
+        ({ commands }: CommandProps) => {
+          return commands.setMark(this.name, attributes);
+        },
+      toggleHotspot:
+        (attributes: { type: string }) =>
+        ({ commands }: CommandProps) => {
+          return commands.toggleMark(this.name, attributes);
+        },
+      unsetHotspot:
+        () =>
+        ({ commands }: CommandProps) => {
+          return commands.unsetMark(this.name);
+        },
+    };
   },
-
-  // This defines how the mark is rendered back to HTML
-  renderHTML({ HTMLAttributes }) {
-    // We add a 'hotspot-mark' class for styling and click detection
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes, { class: 'hotspot-mark' }),
-      0,
-    ];
-  },
-
-  // --- FIXED: Removed the broken `addCommands` block entirely ---
-  // We will use the built-in `editor.commands.toggleMark()`
-  // in the MagicEditor component itself.
+  // --- END OF FIX ---
 });
-// --- END OF NEW HOTSPOT MARK ---
 
-// Tiptap Extensions
+// --- THIS IS YOUR ORIGINAL, CORRECT CONFIGURATION ---
 const starterKit = StarterKit.configure({
   bulletList: {
     HTMLAttributes: {
@@ -103,10 +124,11 @@ const starterKit = StarterKit.configure({
   },
   gapcursor: false,
 });
+// --- END OF YOUR ORIGINAL CONFIG ---
 
 // This is the final, correct extensions array
 export const extensions = [
-  starterKit,
+  starterKit, // <-- This now includes your bulletList config
   Link.configure({
     HTMLAttributes: {
       class:
@@ -122,6 +144,5 @@ export const extensions = [
   Subscript,
   Superscript,
   FontFamily,
-  // --- FIXED: Removed 'FontSize' ---
   HotspotMark, // <-- ADDED OUR NEW MARK
 ];

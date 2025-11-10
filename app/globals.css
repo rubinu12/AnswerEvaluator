@@ -153,3 +153,60 @@ h1, h2, h3, h4, .font-serif {
   padding: 0;
   border-radius: 0;
 }
+
+
+/*
+ --- 💎 "SOULFUL" EDITOR STYLES (THE FIX) 💎 ---
+ This is the class used by both MagicEditor (Admin)
+ and UltimateExplanationUI (Student) to ensure
+ professional padding and styling.
+*/
+.ProseMirror {
+  /* Spacing */
+  padding: 0.75rem 1rem; /* 12px 16px */
+  min-height: 100px;
+  line-height: 1.7;
+
+  /* Typography */
+  @apply text-base text-gray-800;
+}
+
+/* Fix focus outline for accessibility */
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Tiptap default "empty" placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
+
+/* --- Tiptap List Styling (from your config) --- */
+.ProseMirror ul {
+  @apply list-disc list-outside;
+  padding-left: 1.5rem; /* Add padding for list */
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror ol {
+  @apply list-decimal list-outside;
+  padding-left: 1.5rem; /* Add padding for list */
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror li {
+  @apply leading-normal;
+  margin-bottom: 0.25rem;
+}
+
+.ProseMirror blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+}

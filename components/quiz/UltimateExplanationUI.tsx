@@ -9,25 +9,32 @@ import {
   Hotspot,
   isUltimateExplanation,
 } from '@/lib/quizTypes';
-import { Lightbulb, Eye, Pencil, Paperclip } from 'lucide-react';
+import { Brain, Target, Pen, Paperclip } from 'lucide-react';
 import HotspotTooltip from './HotspotTooltip';
 import Image from 'next/image';
 
 /**
- * --- 💎 "SOULFUL" HOTSPOT RENDERER (v3.5 - THE COLOR FIX) 💎 ---
+ * --- 💎 "SOULFUL" HOTSPOT RENDERER (v4) 💎 ---
  *
- * This version fixes the "missing colors" bug.
- * It now renders the <span> with the exact `className` and `data-type`
- * that your existing `globals.css` file targets.
+ * This helper component is responsible for parsing the HTML string
+ * and replacing any <span class="hotspot-mark">...</span> tags
+ * with our interactive <HotspotTooltip> component.
+ *
+ * It is also used by the HotspotTooltip to render HTML *inside*
+ * the tooltip definition itself.
  */
 export const RenderWithRadixHotspots: React.FC<{
   html: string;
   hotspotBank: Hotspot[];
   onHotspotClick?: (hotspot: Hotspot) => void;
 }> = ({ html, hotspotBank, onHotspotClick }) => {
+  if (!html) {
+    return null;
+  }
+
   const options = {
     replace: (domNode: DOMNode) => {
-      // This logic is correct: find the <span> tag
+      // Find the <span> tag
       if (
         domNode instanceof Element &&
         domNode.name === 'span' &&
@@ -41,21 +48,17 @@ export const RenderWithRadixHotspots: React.FC<{
         ) {
           term = (domNode.children[0] as Text).data;
         } else {
+          // Fallback if the span is empty for some reason
           return <>{domToReact(domNode.children as DOMNode[])}</>;
         }
 
+        // Find the matching hotspot data from the bank
         const hotspot = hotspotBank.find((h) => h.term === term);
 
         if (hotspot) {
+          // Replace the span with our interactive Tooltip component
           return (
             <HotspotTooltip hotspot={hotspot} onClick={onHotspotClick}>
-              {/* --- 💎 THE COLOR FIX 💎 --- */}
-              {/*
-                This now renders the <span> with `className="hotspot-mark"`
-                and `data-type={hotspot.type}`. This will make your
-                existing CSS classes (`.hotspot-mark[data-type='blue']`)
-                work correctly.
-              */}
               <span
                 className={`hotspot-mark ${
                   onHotspotClick ? 'cursor-pointer' : ''
@@ -64,11 +67,10 @@ export const RenderWithRadixHotspots: React.FC<{
               >
                 {term}
               </span>
-              {/* --- END OF FIX --- */}
             </HotspotTooltip>
           );
         }
-        // Hotspot exists in HTML but not in bank
+        // If hotspot is in HTML but not in bank (error case), render it plainly
         return <span className="hotspot-mark">{term}</span>;
       }
     },
@@ -84,9 +86,10 @@ interface UltimateExplanationUIProps {
 }
 
 /**
- * --- 💎 "SOULFUL" EXPLANATION UI (v3.2 - UI Polish) 💎 ---
- * We are removing the 'prose' classes to stop them from
- * interfering with your 'hotspot-mark' classes.
+ * --- 💎 "SOULFUL" EXPLANATION UI (v4 - Streamlined) 💎 ---
+ *
+ * This is the new, professional layout. It removes the "boxy" UI
+ * and uses our "soulful" schema keys as the main headers.
  */
 const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
   explanation,
@@ -96,7 +99,7 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
     return (
       <div className="p-4 text-gray-700 bg-gray-50 rounded-lg">
         {explanation && typeof explanation === 'string' ? (
-          <p>{explanation}</p>
+          <p className="whitespace-pre-line">{explanation}</p>
         ) : (
           <p>No explanation available for this question yet.</p>
         )}
@@ -104,55 +107,50 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
     );
   }
 
-  const { howToThink, coreAnalysis, adminProTip, hotspotBank, takeaway } =
-    explanation;
+  const { howToThink, coreAnalysis, adminProTip, hotspotBank } = explanation;
+  const bank = hotspotBank || [];
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6">
       {/* --- 1. Topper's Mental Model (howToThink) --- */}
-      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="font-bold text-lg text-gray-800 mb-2 flex items-center">
-          <Eye className="w-5 h-5 mr-2 text-blue-600" />
-          🧠 Topper's Mental Model
-        </h3>
-        {/* 'prose' class removed to allow custom CSS to apply */}
-        <div className="text-base leading-relaxed">
-          <RenderWithRadixHotspots
-            html={howToThink}
-            hotspotBank={hotspotBank || []}
-          />
+      {howToThink && (
+        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
+          <h3 className="font-bold text-lg text-gray-800 mb-3 flex items-center">
+            <Brain className="w-5 h-5 mr-2 text-blue-600" />
+            🧠 Topper's Mental Model
+          </h3>
+          {/* We use .ProseMirror to get styling from globals.css */}
+          <div className="ProseMirror">
+            <RenderWithRadixHotspots html={howToThink} hotspotBank={bank} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* --- 2. Core Analysis (coreAnalysis) --- */}
-      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
-        <h3 className="font-bold text-lg text-blue-900 mb-2 flex items-center">
-          <Pencil className="w-5 h-5 mr-2 text-blue-600" />
-          🎯 Core Analysis
-        </h3>
-        {/* 'prose' class removed */}
-        <div className="text-base leading-relaxed">
-          <RenderWithRadixHotspots
-            html={coreAnalysis}
-            hotspotBank={hotspotBank || []}
-          />
+      {coreAnalysis && (
+        <div className="p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500 shadow-sm">
+          <h3 className="font-bold text-lg text-blue-900 mb-3 flex items-center">
+            <Target className="w-5 h-5 mr-2 text-blue-600" />
+            🎯 Core Analysis
+          </h3>
+          <div className="ProseMirror">
+            <RenderWithRadixHotspots html={coreAnalysis} hotspotBank={bank} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* --- 3. Mentor's Pro-Tip (adminProTip) --- */}
-      <div className="p-4 bg-blue-100 rounded-lg border border-blue-300 text-blue-900 shadow-sm">
-        <h3 className="font-bold text-lg mb-2 flex items-center">
-          <Lightbulb className="w-5 h-5 mr-2" />
-          ✍️ Mentor's Pro-Tip
-        </h3>
-        {/* 'prose' class removed */}
-        <div className="text-base leading-relaxed">
-          <RenderWithRadixHotspots
-            html={adminProTip}
-            hotspotBank={hotspotBank || []}
-          />
+      {adminProTip && (
+        <div className="p-4 bg-blue-100 rounded-lg border border-blue-300 text-blue-900 shadow-sm">
+          <h3 className="font-bold text-lg mb-3 flex items-center">
+            <Pen className="w-5 h-5 mr-2" />
+            ✍️ Mentor's Pro-Tip
+          </h3>
+          <div className="ProseMirror">
+            <RenderWithRadixHotspots html={adminProTip} hotspotBank={bank} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* --- 4. Handwritten Note (Unchanged) --- */}
       {handwrittenNoteUrl && (
@@ -170,20 +168,6 @@ const UltimateExplanationUI: React.FC<UltimateExplanationUIProps> = ({
               height={1000}
               objectFit="contain"
               className="bg-white"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* --- 5. Takeaway (KEPT for Legacy Data) --- */}
-      {takeaway && (
-        <div className="p-4 bg-green-50 rounded-lg border border-green-200 text-green-900">
-          <h3 className="font-bold text-lg mb-2">✅ The Takeaway</h3>
-          {/* 'prose' class removed */}
-          <div className="text-base leading-relaxed">
-            <RenderWithRadixHotspots
-              html={takeaway}
-              hotspotBank={hotspotBank || []}
             />
           </div>
         </div>

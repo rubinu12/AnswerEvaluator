@@ -1,14 +1,14 @@
 // app/api/questions/[questionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db, admin } from '@/lib/firebase-admin'; // "Perfectly" using your exact imports
+import { db, admin } from '@/lib/firebase-admin';
 import {
   UltimateExplanation,
   QuestionType,
+  isUltimateExplanation, // <-- Import our type guard
 } from '@/lib/quizTypes';
 import { FieldValue } from 'firebase-admin/firestore';
 
-// This line forces the route to be 100% dynamic,
-// which resolves the "params should be awaited" warning.
+// This line forces the route to be 100% dynamic
 export const dynamic = 'force-dynamic';
 
 // We define the context type for clarity
@@ -20,106 +20,10 @@ type RouteContext = {
 
 /**
  * ==================================================================
- * --- 💎 GET Function (FIXED to read from BOTH collections) 💎 ---
+ * --- GET Function (This was already correct, no changes) ---
  * ==================================================================
  */
 export async function GET(
-  request: NextRequest,
-  context: RouteContext 
-) {
-  try {
-    const { questionId } = context.params; 
-    if (!questionId) {
-      return NextResponse.json(
-        { message: 'Question ID is required.' },
-        { status: 400 }
-      );
-    }
-
-    // 1. Verify Admin Authentication
-    const authorization = request.headers.get('Authorization');
-    if (!authorization || !authorization.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { message: 'Unauthorized.' },
-        { status: 401 }
-      );
-    }
-    const token = authorization.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    const userDocRef = db.collection('users').doc(decodedToken.uid);
-    const userDoc = await userDocRef.get();
-
-    if (!userDoc.exists || userDoc.data()?.subscriptionStatus !== 'ADMIN') {
-      return NextResponse.json(
-        { message: 'Forbidden. Admin role required.' },
-        { status: 403 }
-      );
-    }
-
-    // 2. --- NEW LOGIC: Fetch from BOTH collections ---
-    const questionRef = db.collection('questions').doc(questionId);
-    const explanationRef = db.collection('explanations').doc(questionId);
-
-    // Fetch in parallel
-    const [questionSnap, explanationSnap] = await Promise.all([
-      questionRef.get(),
-      explanationRef.get(),
-    ]);
-
-    if (!questionSnap.exists) {
-      return NextResponse.json(
-        { message: 'Question not found.' },
-        { status: 404 }
-      );
-    }
-
-    const questionData = questionSnap.data();
-    let explanationData = null;
-
-    // Check if the explanation *document* exists
-    if (explanationSnap.exists) {
-      // The entire document IS the explanation object
-      explanationData = explanationSnap.data(); 
-    }
-    // --- END OF NEW LOGIC ---
-
-    // 3. Return the MERGED data
-    // The page.tsx file expects a single object
-    return NextResponse.json(
-      {
-        _id: questionSnap.id,
-        ...questionData,
-        // We add the explanation object to the response.
-        // If it was null, page.tsx will handle it.
-        explanation: explanationData, 
-      },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error('API_QUESTIONS_GET_ERROR:', error);
-    if (error.code === 'auth/id-token-expired') {
-      return NextResponse.json(
-        { message: 'Token expired. Please log in again.' },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json(
-      { message: 'Internal Server Error', error: error.message },
-      { status: 500 }
-    );
-  }
-}
-// ==================================================================
-// --- 💎 END OF GET Function 💎 ---
-// ==================================================================
-
-
-/**
- * ==================================================================
- * --- 💎 PATCH Function (FIXED to write to BOTH collections) 💎 ---
- * ==================================================================
- */
-export async function PATCH(
   request: NextRequest,
   context: RouteContext
 ) {
@@ -144,7 +48,7 @@ export async function PATCH(
     const decodedToken = await admin.auth().verifyIdToken(token);
     const userDocRef = db.collection('users').doc(decodedToken.uid);
     const userDoc = await userDocRef.get();
-    
+
     if (!userDoc.exists || userDoc.data()?.subscriptionStatus !== 'ADMIN') {
       return NextResponse.json(
         { message: 'Forbidden. Admin role required.' },
@@ -152,58 +56,136 @@ export async function PATCH(
       );
     }
 
-    // 2. Get and validate the new "Master Plan" body
+    // 2. Fetch from BOTH collections
+    const questionRef = db.collection('questions').doc(questionId);
+    const explanationRef = db.collection('explanations').doc(questionId);
+
+    const [questionSnap, explanationSnap] = await Promise.all([
+      questionRef.get(),
+      explanationRef.get(),
+    ]);
+
+    if (!questionSnap.exists) {
+      return NextResponse.json(
+        { message: 'Question not found.' },
+        { status: 404 }
+      );
+    }
+
+    const questionData = questionSnap.data();
+    let explanationData = null;
+
+    if (explanationSnap.exists) {
+      explanationData = explanationSnap.data();
+    }
+
+    // 3. Return the MERGED data
+    return NextResponse.json(
+      {
+        _id: questionSnap.id,
+        ...questionData,
+        // Add the explanation object. If it's null, the client handles it.
+        explanation: explanationData,
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    console.error('API_QUESTIONS_GET_ERROR:', error);
+    if (error.code === 'auth/id-token-expired') {
+      return NextResponse.json(
+        { message: 'Token expired. Please log in again.' },
+        { status: 401 }
+      );
+    }
+    return NextResponse.json(
+      { message: 'Internal Server Error', error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * ==================================================================
+ * --- 💎 PATCH Function (FIXED to validate our "v4" schema) 💎 ---
+ * ==================================================================
+ */
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext
+) {
+  try {
+    const { questionId } = context.params;
+    if (!questionId) {
+      return NextResponse.json(
+        { message: 'Question ID is required.' },
+        { status: 400 }
+      );
+    }
+
+    // 1. Verify Admin Authentication (Unchanged)
+    const authorization = request.headers.get('Authorization');
+    if (!authorization || !authorization.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { message: 'Unauthorized.' },
+        { status: 401 }
+      );
+    }
+    const token = authorization.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const userDocRef = db.collection('users').doc(decodedToken.uid);
+    const userDoc = await userDocRef.get();
+
+    if (!userDoc.exists || userDoc.data()?.subscriptionStatus !== 'ADMIN') {
+      return NextResponse.json(
+        { message: 'Forbidden. Admin role required.' },
+        { status: 403 }
+      );
+    }
+
+    // 2. Get and validate the new "v4" body
     const body = (await request.json()) as {
       explanation: UltimateExplanation;
-      questionType: QuestionType;
+      questionType?: QuestionType; // Make questionType optional
     };
 
     const { explanation, questionType } = body;
 
-    // (Validation logic is unchanged and correct)
-    if (
-      !explanation.howToThink ||
-      !explanation.adminProTip ||
-      !explanation.takeaway
-    ) {
+    // --- 💎 NEW "V4" VALIDATION LOGIC 💎 ---
+    // We use our type guard to check for the "soulful" keys
+    if (!isUltimateExplanation(explanation)) {
       return NextResponse.json(
         {
           message:
-            'Invalid explanation JSON structure. Missing common fields.',
+            'Invalid explanation JSON structure. Missing "soulful" fields (howToThink, coreAnalysis, adminProTip).',
         },
         { status: 400 }
       );
     }
-    if (
-      !explanation.singleChoiceAnalysis &&
-      !explanation.howManyAnalysis &&
-      !explanation.matchTheListAnalysis
-    ) {
-      return NextResponse.json(
-        { message: 'Invalid explanation JSON. Missing analysis block.' },
-        { status: 400 }
-      );
-    }
+    // --- 💎 END OF NEW VALIDATION LOGIC 💎 ---
 
-    // 3. --- NEW LOGIC: Write to BOTH collections ---
+    // 3. Write to BOTH collections
     const questionRef = db.collection('questions').doc(questionId);
     const explanationRef = db.collection('explanations').doc(questionId);
 
-    // We run these operations in parallel for speed
+    const questionUpdateData: { [key: string]: any } = {
+      // We also delete the old legacy field
+      explanationText: FieldValue.delete(),
+    };
+
+    // Only update questionType if it was provided
+    if (questionType) {
+      questionUpdateData.questionType = questionType;
+    }
+
     await Promise.all([
-      // 1. Update the 'questionType' in the 'questions' collection
-      questionRef.update({
-        questionType: questionType,
-        // We also delete the old legacy field, just in case
-        explanationText: FieldValue.delete(),
-      }),
-      
+      // 1. Update the 'questions' collection
+      questionRef.update(questionUpdateData),
+
       // 2. Set the *entire* 'explanation' object as the document
       //    in the 'explanations' collection.
-      //    .set() will create the doc if it doesn't exist.
-      explanationRef.set(explanation) 
+      explanationRef.set(explanation),
     ]);
-    // --- END OF NEW LOGIC ---
+    // --- END OF WRITE LOGIC ---
 
     return NextResponse.json(
       { message: 'Explanation saved successfully.' },

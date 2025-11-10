@@ -3,25 +3,21 @@
 
 import React from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Hotspot } from '@/lib/quizTypes'; // This is our new "Master Plan" type
+import { Hotspot } from '@/lib/quizTypes';
+import { RenderWithRadixHotspots } from './UltimateExplanationUI';
 
 interface HotspotTooltipProps {
   children: React.ReactNode;
   hotspot: Hotspot;
-  onClick?: (hotspot: Hotspot) => void; // <-- ADDED: Make tooltip clickable
+  onClick?: (hotspot: Hotspot) => void;
 }
 
-/**
- * Renders our "Magic UI" hotspot tooltip using Radix UI.
- * This is upgraded to use our "Pen-Based" styling
- * and is now optionally clickable for the admin editor.
- */
 const HotspotTooltip: React.FC<HotspotTooltipProps> = ({
   children,
   hotspot,
-  onClick, // <-- ADDED
+  onClick,
 }) => {
-  // Helper to get the correct colors for the "Pen Type"
+  // ... (getColors and getArrowColor functions are unchanged) ...
   const getColors = () => {
     switch (hotspot.type) {
       case 'green':
@@ -34,10 +30,9 @@ const HotspotTooltip: React.FC<HotspotTooltipProps> = ({
         return 'bg-gray-900 border-gray-700 text-white';
     }
   };
-  
-  // Helper for the Radix Arrow
+
   const getArrowColor = () => {
-     switch (hotspot.type) {
+    switch (hotspot.type) {
       case 'green':
         return 'fill-green-50';
       case 'blue':
@@ -47,50 +42,38 @@ const HotspotTooltip: React.FC<HotspotTooltipProps> = ({
       default:
         return 'fill-gray-900';
     }
-  }
+  };
 
   return (
-    <Tooltip.Provider delayDuration={300}>
-      <Tooltip.Root>
-        <Tooltip.Trigger asChild>
-          {/* The trigger is just the styled text from the editor */}
-          {children}
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Content
-            sideOffset={5}
-            // --- THIS IS THE FIX ---
-            onClick={() => onClick && onClick(hotspot)} // <-- ADDED
-            className={`z-50 max-w-sm rounded-lg shadow-lg border-2 ${getColors()} ${
-              onClick ? 'cursor-pointer' : '' // <-- ADDED for visual cue
-            }`}
-            // --- END OF FIX ---
-          >
-            <div className="p-4">
-              <h4 className="text-lg font-bold mb-2">{hotspot.term}</h4>
-              
-              {/* We use dangerouslySetInnerHTML for the definition */}
-              <div
-                className="text-sm leading-relaxed prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: hotspot.definition }}
-              />
-
-              {/* We will add this back in Phase 4 */}
-              {/* {hotspot.handwrittenNoteUrl && (
-                <div className="mt-3 border-t border-gray-700 pt-3">
-                  <img
-                    src={hotspot.handwrittenNoteUrl}
-                    alt="Handwritten Note"
-                    className="w-full h-auto rounded-md"
-                  />
-                </div>
-              )} */}
-            </div>
-            <Tooltip.Arrow className={getArrowColor()} />
-          </Tooltip.Content>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+    // --- 1. THE <Tooltip.Provider> IS REMOVED FROM HERE ---
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild onClick={() => onClick && onClick(hotspot)}>
+        {/*
+          The 'asChild' prop passes the trigger's functionality
+          down to the {children}, which is the <span>
+          RenderWithRadixHotspots creates.
+        */}
+        {children}
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          sideOffset={5}
+          className={`z-[99] max-w-sm rounded-lg shadow-xl border-2 ProseMirror ${getColors()} ${
+            onClick ? 'cursor-pointer' : ''
+          }`}
+        >
+          <div className="p-4">
+            <h4 className="text-lg font-bold !mt-0 !mb-2">{hotspot.term}</h4>
+            <RenderWithRadixHotspots
+              html={hotspot.definition}
+              hotspotBank={[]}
+            />
+          </div>
+          <Tooltip.Arrow className={getArrowColor()} />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+    // --- 2. END OF REMOVAL ---
   );
 };
 
