@@ -5,9 +5,11 @@ import {
   EditorContent,
   useEditor,
   Editor as TiptapEditor,
-
+  NodeViewWrapper,
+  NodeViewProps,
+  ReactNodeViewRenderer,
 } from '@tiptap/react';
-import { BubbleMenu } from '@tiptap/react/menus'
+import { BubbleMenu } from '@tiptap/react/menus';
 import { extensions } from './MagicEditorExtensions';
 import {
   Bold,
@@ -17,29 +19,106 @@ import {
   Highlighter,
   List,
   ListOrdered,
+  Paintbrush,
 } from 'lucide-react';
+import { Hotspot } from '@/lib/quizTypes';
+import HotspotTooltip from '../quiz/HotspotTooltip';
+import { HotspotModalData } from './HotspotModal';
+
+// (The broken `declare module` block has been REMOVED from here)
+
+// --- Hotspot Node View Component ---
+export const HotspotNodeView: React.FC<NodeViewProps> = ({
+  node,
+  editor,
+  getPos,
+}) => {
+  const { term, type } = node.attrs;
+
+  // Retrieve props from the editor
+  // These errors will now be gone.
+  const { hotspotBank, onHotspotClick } = editor.options.editorProps;
+
+  // Find the full hotspot data from the bank
+  const hotspotData = (hotspotBank as Hotspot[])?.find(
+    (h: Hotspot) => h.term === term
+  );
+
+  // If the editor is in read-only mode...
+  if (!editor.isEditable) {
+    if (!hotspotData) {
+      // Data not found, just render the term
+      return <span className={`hotspot-mark-broken`}>{term}</span>;
+    }
+    // ...render the text wrapped in the real Tooltip.
+    // THIS FIXES THE BUG.
+    return (
+      <HotspotTooltip hotspot={hotspotData}>
+        <span className={`hotspot-mark`} data-type={type}>
+          {term}
+        </span>
+      </HotspotTooltip>
+    );
+  }
+
+  // If the editor is editable...
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // ...call the handler to open the modal.
+    // THIS IS THE NEW "click-to-edit" WORKFLOW.
+    if (onHotspotClick) {
+      const modalData: HotspotModalData = hotspotData || { term, type, definition: '' };
+      // We pass the editor, position, and data
+      onHotspotClick(modalData, getPos, editor);
+    }
+  };
+
+  // ...render a simple span that is clickable.
+  return (
+    <span
+      className={`hotspot-mark editable`}
+      data-type={type}
+      onClick={handleClick}
+      contentEditable={false}
+    >
+      {term}
+    </span>
+  );
+};
+// --- END: Hotspot Node View Component ---
+
 
 interface MagicEditorProps {
   content: string;
   onChange: (html: string) => void;
+  // This prop is now ONLY for CREATING new hotspots
   onConnectClick: (editor: TiptapEditor) => void;
-  isEditable: boolean; // <-- The "Hybrid" mode prop
+  isEditable: boolean;
   autoFocus?: boolean;
+
+  // --- NEW PROPS ---
+  hotspotBank: Hotspot[];
+  onHotspotClick: (
+    data: HotspotModalData,
+    getPos: () => number | undefined,
+    editor: TiptapEditor
+  ) => void;
+  // --- END NEW PROPS ---
 }
 
 // This is the actual Tiptap component.
-// We've moved all logic inside here.
 const TiptapEditorComponent = ({
   content,
   onChange,
   onConnectClick,
   isEditable,
   autoFocus,
+  hotspotBank,
+  onHotspotClick,
 }: MagicEditorProps) => {
-  // 1. Use `useState` to hold the editor instance.
   const [editor, setEditor] = useState<TiptapEditor | null>(null);
 
-  // 2. Initialize the editor inside `useEffect` to run ONLY on the client.
+  // 2. Initialize the editor
   useEffect(() => {
     const tiptapEditor = new TiptapEditor({
       extensions,
@@ -48,11 +127,14 @@ const TiptapEditorComponent = ({
 
       editorProps: {
         attributes: {
-          class: 'ProseMirror', // Your global styling class
+          class: 'ProseMirror',
         },
+        // --- Pass props to NodeViews ---
+        // This error will now be gone.
+        hotspotBank: hotspotBank,
+        onHotspotClick: onHotspotClick,
       },
 
-      // 3. Update the parent component's state on every change.
       onUpdate: ({ editor }) => {
         onChange(editor.getHTML());
       },
@@ -60,15 +142,13 @@ const TiptapEditorComponent = ({
 
     setEditor(tiptapEditor);
 
-    // 4. Clean up the editor instance when the component unmounts.
     return () => {
       tiptapEditor.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount.
 
-  // 5. This "Hybrid" hook ensures that if the `isEditable` prop changes,
-  //    the editor's state is updated to match.
+  // 5. This hook updates editable state
   useEffect(() => {
     if (editor && editor.isEditable !== isEditable) {
       editor.setEditable(isEditable);
@@ -78,36 +158,45 @@ const TiptapEditorComponent = ({
     }
   }, [editor, isEditable, autoFocus]);
 
-  // 6. This hook updates the editor's content if the `content` prop
-  //    changes (e.g., after your "Parse" button is clicked).
+  // 6. This hook updates content (e.g., on "Parse")
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
-      // `setContent` updates the editor's content from the outside.
-      // `emitUpdate: false` prevents an infinite loop.
       editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [content, editor]);
 
-  // Don't render anything until the editor is initialized on the client.
+  // --- NEW: This hook updates editorProps ---
+  useEffect(() => {
+    if (editor) {
+      editor.setOptions({
+        editorProps: {
+          attributes: {
+            class: 'ProseMirror',
+          },
+          // This error will now be gone.
+          hotspotBank: hotspotBank,
+          onHotspotClick: onHotspotClick,
+        },
+      });
+    }
+  }, [editor, hotspotBank, onHotspotClick]);
+
+
   if (!editor) {
     return null;
   }
 
   return (
     <>
-      {/*
-        7. This Bubble Menu will now work. It shows:
-           - When the editor is editable.
-           - When you have selected text (selection is not empty).
-      */}
       <BubbleMenu
         editor={editor}
         shouldShow={({ state, editor }) =>
+          // Show menu if selection is not empty AND editor is editable
           !state.selection.empty && editor.isEditable
         }
         className="bg-white shadow-lg border border-gray-200 rounded-lg p-1 flex items-center divide-x divide-gray-200"
       >
-        {/* This is your "Connect" button for hotspots */}
+        {/* "Connect" button (for CREATING new hotspots) */}
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
@@ -117,6 +206,27 @@ const TiptapEditorComponent = ({
         >
           <Link className="w-4 h-4" />
         </button>
+
+        {/* --- NEW: Color Picker --- */}
+        <div className="flex items-center px-1 relative">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().unsetColor().run()}
+            className="p-2 hover:bg-gray-100 rounded-md text-gray-500"
+            title="Remove color"
+          >
+            <Paintbrush className="w-4 h-4" />
+          </button>
+          {/* This is a simple HTML color picker */}
+          <input
+            type="color"
+            onInput={(e) => editor.chain().focus().setColor(e.currentTarget.value).run()}
+            value={editor.getAttributes('textStyle').color || '#000000'}
+            className="w-6 h-6 p-0 border-none bg-transparent cursor-pointer"
+            title="Set text color"
+          />
+        </div>
         
         {/* Standard formatting buttons */}
         <div className="flex items-center px-1">
@@ -202,7 +312,6 @@ const TiptapEditorComponent = ({
 export default function MagicEditor(props: MagicEditorProps) {
   return (
     <div className="magic-editor-wrapper relative">
-      {/* We pass all props to the client-side editor component */}
       <TiptapEditorComponent {...props} />
     </div>
   );

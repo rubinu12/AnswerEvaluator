@@ -6,7 +6,6 @@ import {
   Question,
   UltimateExplanation,
   Hotspot,
-  isUltimateExplanation,
 } from '@/lib/quizTypes';
 import { generateDetailedPrompt } from '@/lib/promptGenerator';
 import { useAuthContext } from '@/lib/AuthContext';
@@ -22,6 +21,7 @@ import {
   Pen,
   Copy,
   Download,
+  AlertTriangle,
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 
@@ -37,19 +37,74 @@ const EMPTY_EXPLANATION: UltimateExplanation = {
   hotspotBank: [],
 };
 
+// Robust JSON Validation Function
+const validateExplanationJSON = (
+  data: any
+): { isValid: boolean; error: string | null; data?: UltimateExplanation } => {
+  if (typeof data !== 'object' || data === null) {
+    return { isValid: false, error: 'Input is not a valid JSON object.' };
+  }
+  const requiredKeys: Array<keyof UltimateExplanation> = [
+    'howToThink',
+    'coreAnalysis',
+    'adminProTip',
+    'hotspotBank',
+  ];
+  for (const key of requiredKeys) {
+    if (!(key in data)) {
+      return { isValid: false, error: `JSON is missing required key: "${key}"` };
+    }
+  }
+  // ... (rest of your validation logic is fine) ...
+  if (typeof data.howToThink !== 'string') {
+    return { isValid: false, error: 'Key "howToThink" must be a string.' };
+  }
+  if (typeof data.coreAnalysis !== 'string') {
+    return { isValid: false, error: 'Key "coreAnalysis" must be a string.' };
+  }
+  if (typeof data.adminProTip !== 'string') {
+    return { isValid: false, error: 'Key "adminProTip" must be a string.' };
+  }
+  if (!Array.isArray(data.hotspotBank)) {
+    return { isValid: false, error: 'Key "hotspotBank" must be an array.' };
+  }
+  for (const item of data.hotspotBank) {
+    if (
+      typeof item !== 'object' ||
+      item === null ||
+      typeof item.term !== 'string' ||
+      typeof item.type !== 'string' ||
+      typeof item.definition !== 'string'
+    ) {
+      return {
+        isValid: false,
+        error:
+          'An item in "hotspotBank" has an invalid shape. Must include term, type, and definition.',
+      };
+    }
+  }
+  return {
+    isValid: true,
+    error: null,
+    data: data as UltimateExplanation,
+  };
+};
+
 const convertBracketsToSpans = (
   html: string,
   hotspotBank: Hotspot[]
 ): string => {
   if (!html || !hotspotBank) return html;
-  
   let processedHtml = html;
-  
-  const sortedBank = [...hotspotBank].sort((a, b) => b.term.length - a.term.length);
-
+  // Sort to prevent partial matches (e.g., "India" before "Indian Ocean")
+  const sortedBank = [...hotspotBank].sort(
+    (a, b) => b.term.length - a.term.length
+  );
   for (const hotspot of sortedBank) {
     const escapedTerm = hotspot.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Regex to find [Term] but not inside an HTML tag
     const regex = new RegExp(`(?<!>)\\[${escapedTerm}\\]`, 'g');
+    // This creates the HTML that our new HotspotNode's `parseHTML` will read
     const replacement = `<span class="hotspot-mark" data-type="${hotspot.type}">${hotspot.term}</span>`;
     processedHtml = processedHtml.replace(regex, replacement);
   }
@@ -68,57 +123,54 @@ export default function AdminExplanationEditor({
   onClose,
 }: AdminExplanationEditorProps) {
   const { user } = useAuthContext();
-
   const [explanation, setExplanation] = useState<UltimateExplanation | null>(
     null
   );
   const [rawAiResponse, setRawAiResponse] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-
   const [editingBlock, setEditingBlock] = useState<
     'howToThink' | 'coreAnalysis' | 'adminProTip' | null
   >(null);
-
   const [isControlRoomOpen, setIsControlRoomOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalData, setModalData] = useState<HotspotModalData | null>(null);
+  
+  // --- 💎 NEW STATE ---
+  // We now store the active editor *and* the node's position
   const [activeEditor, setActiveEditor] = useState<TiptapEditor | null>(null);
+  const [activeNodePos, setActiveNodePos] = useState<number | null>(null);
+  // --- 💎 END NEW STATE ---
 
-  // --- 💎 THIS IS THE FIX for the "data disappears" bug 💎 ---
   useEffect(() => {
     let loadedExplanation: UltimateExplanation | null = null;
-
-    if (isUltimateExplanation(question.explanation)) {
-      // CASE 1: The prop is *already* the correct object (e.g., after a save)
-      loadedExplanation = question.explanation;
-    } else if (typeof question.explanation === 'string') {
-      // CASE 2: The prop is a STRING (from localStorage/stale store)
-      // We try to parse it.
+    let explanationProp = question.explanation;
+    if (typeof explanationProp === 'string') {
       try {
-        const parsed = JSON.parse(question.explanation);
-        if (isUltimateExplanation(parsed)) {
-          // It was a string, but it's the correct object!
-          loadedExplanation = parsed;
+        const parsed = JSON.parse(explanationProp);
+        if (typeof parsed === 'object' && parsed !== null) {
+          explanationProp = parsed;
         }
       } catch (e) {
-        // It was a string, but not valid JSON (e.g., "No explanation yet")
-        // We'll let it fall through to the empty state.
+        // It's just a string (e.g., "No explanation yet"), not JSON.
       }
     }
-
-    // Now we set the state based on what we found
+    if (
+      typeof explanationProp === 'object' &&
+      explanationProp !== null &&
+      'howToThink' in explanationProp &&
+      'coreAnalysis' in explanationProp
+    ) {
+      loadedExplanation = explanationProp as UltimateExplanation;
+    }
     if (loadedExplanation) {
       setExplanation(loadedExplanation);
-      setIsControlRoomOpen(false); // Hide controls if already done
+      setIsControlRoomOpen(false);
     } else {
-      // Fallback: It's empty, a bad string, or not an explanation object
       setExplanation(EMPTY_EXPLANATION);
-      setIsControlRoomOpen(true); // Show controls to start
+      setIsControlRoomOpen(true);
     }
-  }, [question]); // This dependency is correct
-  // --- 💎 END OF FIX 💎 ---
+  }, [question]);
 
-  // --- Control Room Functions ---
   const handleGeneratePrompt = () => {
     try {
       const prompt = generateDetailedPrompt(
@@ -133,9 +185,6 @@ export default function AdminExplanationEditor({
     }
   };
 
-  // --- "Parse & Load" Function ---
-  // This logic was already correct and will now work
-  // because the editor will be in the correct initial state.
   const handleParse = () => {
     if (!rawAiResponse.trim()) {
       toast.error('Paste JSON response from AI first.');
@@ -143,45 +192,61 @@ export default function AdminExplanationEditor({
     }
     let parsedData: any;
     try {
-      const cleanedResponse = rawAiResponse
+      let cleanedResponse = rawAiResponse
         .replace(/^```json\s*/, '')
         .replace(/```$/, '');
+      const nonBreakingSpace = new RegExp(String.fromCharCode(160), 'g');
+      cleanedResponse = cleanedResponse.replace(nonBreakingSpace, ' ');
       parsedData = JSON.parse(cleanedResponse);
     } catch (error: any) {
-      toast.error(`Invalid JSON: ${error.message}`);
+      toast.error(`Invalid JSON: ${error.message}`, {
+        icon: <AlertTriangle className="w-4 h-4 text-red-500" />,
+      });
       return;
     }
 
-    if (isUltimateExplanation(parsedData)) {
-      const bank = parsedData.hotspotBank || [];
+    const validation = validateExplanationJSON(parsedData);
 
-      const processed: UltimateExplanation = {
-        howToThink: convertBracketsToSpans(parsedData.howToThink || '', bank),
-        coreAnalysis: convertBracketsToSpans(
-          parsedData.coreAnalysis || '',
-          bank
-        ),
-        adminProTip: convertBracketsToSpans(
-          parsedData.adminProTip || '',
-          bank
-        ),
-        hotspotBank: bank,
-      };
+    if (validation.isValid && validation.data) {
+      try {
+        const bank = validation.data.hotspotBank || [];
 
-      setExplanation(processed); 
-      
-      toast.success('AI Response Parsed! Loading workspace...');
-      setRawAiResponse('');
-      setIsControlRoomOpen(false);
-      setEditingBlock(null);
+        const processed: UltimateExplanation = {
+          howToThink: convertBracketsToSpans(
+            validation.data.howToThink || '',
+            bank
+          ),
+          coreAnalysis: convertBracketsToSpans(
+            validation.data.coreAnalysis || '',
+            bank
+          ),
+          adminProTip: convertBracketsToSpans(
+            validation.data.adminProTip || '',
+            bank
+          ),
+          hotspotBank: bank,
+        };
+
+        setExplanation(processed);
+        toast.success('AI Response Parsed! Loading workspace...');
+        setRawAiResponse('');
+        setIsControlRoomOpen(false);
+        setEditingBlock(null);
+      } catch (error: any) {
+        console.error('Processing error:', error);
+        toast.error(`Processing Error: ${error.message}`, {
+          icon: <AlertTriangle className="w-4 h-4 text-red-500" />,
+          duration: 5000,
+        });
+      }
     } else {
-      toast.error(
-        'Parse Error: JSON missing "soulful" fields (howToThink, coreAnalysis, etc.)'
-      );
+      toast.error(validation.error || 'Failed to parse JSON.', {
+        icon: <AlertTriangle className="w-4 h-4 text-red-500" />,
+        duration: 5000,
+      });
     }
   };
 
-  // --- Editor Content Change Handler ---
   const handleContentChange = (
     field: 'howToThink' | 'coreAnalysis' | 'adminProTip',
     content: string
@@ -194,75 +259,133 @@ export default function AdminExplanationEditor({
     }
   };
 
-  // --- "Hybrid Editor" Click-to-Edit Handler ---
   const handleEditClick = (
     field: 'howToThink' | 'coreAnalysis' | 'adminProTip'
   ) => {
     setEditingBlock(field);
   };
+  
+  // --- 💎 REFACTORED MODAL HANDLERS 💎 ---
 
-  // --- Hotspot Modal Handlers ---
-  const handleConnectClick = (editor: TiptapEditor) => {
+  /**
+   * This ONE function handles opening the modal for
+   * BOTH creating a new hotspot AND editing an existing one.
+   */
+  const handleHotspotModalOpen = (
+    data: HotspotModalData,
+    getPos: () => number | undefined,
+    editor: TiptapEditor
+  ) => {
+    const pos = getPos();
+    if (typeof pos === 'number') {
+      // This is an EXISTING node ("click-to-edit")
+      setActiveNodePos(pos);
+    } else {
+      // This is a NEW selection (from Bubble Menu)
+      // activeNodePos is already null, which is correct
+    }
+    
+    setActiveEditor(editor);
+    setModalData(data);
+    setIsModalOpen(true);
+  };
+
+  /**
+   * This is the function passed to the Bubble Menu's "Connect" button
+   * It prepares the data for a NEW hotspot.
+   */
+  const handleCreateHotspotClick = (editor: TiptapEditor) => {
     const { from, to, empty } = editor.state.selection;
     if (empty) {
       toast.error('Please select text to create a hotspot.');
       return;
     }
     const selectedText = editor.state.doc.textBetween(from, to, ' ');
-    setActiveEditor(editor);
+    
     const existingHotspot = explanation?.hotspotBank?.find(
       (h) => h.term === selectedText
     );
-    setModalData(
-      existingHotspot || { term: selectedText, type: 'green', definition: '' }
-    );
-    setIsModalOpen(true);
+    
+    const data: HotspotModalData =
+      existingHotspot || { term: selectedText, type: 'green', definition: '' };
+
+    // Call the master handler, passing `undefined` for getPos
+    handleHotspotModalOpen(data, () => undefined, editor);
   };
 
-  // This handles saving from the HotspotModal
+
   const handleSaveHotspot = (data: HotspotModalData) => {
-    if (!explanation) return;
+    if (!explanation || !activeEditor) return;
 
-    if (activeEditor) {
-      activeEditor
-        .chain()
-        .focus()
-        .setMark('hotspot', { type: data.type })
-        .run();
-    }
-
+    // 1. Update the Hotspot Bank (always)
     const newBank = [...explanation.hotspotBank];
     const existingIndex = newBank.findIndex((h) => h.term === data.term);
-
     const hotspotToSave: Hotspot = {
       term: data.term,
       type: data.type,
       definition: data.definition,
     };
-
     if (existingIndex > -1) {
       newBank[existingIndex] = hotspotToSave;
     } else {
       newBank.push(hotspotToSave);
     }
+    // Set state to trigger re-render in all editors
     setExplanation((prev) => ({ ...prev!, hotspotBank: newBank }));
+
+    // 2. Update the Tiptap Editor
+    const { from, to } = activeEditor.state.selection;
+    
+    if (activeNodePos !== null) {
+      // We are EDITING an existing node
+      activeEditor
+        .chain()
+        .focus()
+        // Update the node's attributes at its saved position
+        .command(({ tr }) => {
+          tr.setNodeMarkup(activeNodePos, undefined, { term: data.term, type: data.type });
+          return true;
+        })
+        .run();
+    } else {
+      // We are CREATING a new node
+      activeEditor
+        .chain()
+        .focus()
+        .deleteRange({ from, to }) // Delete the selected text
+        .insertContent({
+          type: 'hotspot', // Insert our new node
+          attrs: {
+            term: data.term,
+            type: data.type,
+          },
+        })
+        .run();
+    }
 
     toast.success(`Hotspot "${data.term}" saved!`);
     closeModal();
   };
 
   const handleDeleteHotspot = () => {
-    if (!explanation || !modalData) return;
+    if (!explanation || !modalData || !activeEditor) return;
+    
     const termToDelete = modalData.term;
 
-    if (activeEditor) {
-      activeEditor.chain().focus().unsetMark('hotspot').run();
-    }
-
+    // 1. Delete from the bank
     const newBank = explanation.hotspotBank.filter(
       (h) => h.term !== termToDelete
     );
     setExplanation((prev) => ({ ...prev!, hotspotBank: newBank }));
+
+    // 2. Delete the node from the editor
+    if (activeNodePos !== null) {
+      // If we clicked a node, delete it by its position
+      activeEditor.chain().focus().deleteNodeAt(activeNodePos).run();
+    } else {
+      // If we just selected text, delete the selection
+      activeEditor.chain().focus().deleteSelection().run();
+    }
 
     toast.success(`Hotspot "${termToDelete}" deleted.`);
     closeModal();
@@ -272,9 +395,12 @@ export default function AdminExplanationEditor({
     setIsModalOpen(false);
     setModalData(null);
     setActiveEditor(null);
+    setActiveNodePos(null); // <-- Reset node position
   };
+  
+  // --- 💎 END REFACTORED HANDLERS 💎 ---
 
-  // --- Main Save Function ---
+
   const handleSaveToFirestore = async () => {
     if (!explanation) {
       toast.error('No explanation to save.');
@@ -282,9 +408,7 @@ export default function AdminExplanationEditor({
     }
     setEditingBlock(null);
     setIsSaving(true);
-
     try {
-      // This timeout is a good idea to let the UI update
       setTimeout(async () => {
         await onSave(explanation);
         toast.success('Explanation saved successfully!');
@@ -416,6 +540,7 @@ export default function AdminExplanationEditor({
                 ? 'bg-white border-blue-400 ring-2 ring-blue-200'
                 : 'bg-gray-50 border-gray-200 hover:border-gray-300'
             }`}
+            // We still use onClick on the *wrapper* to enable editing
             onClick={() => handleEditClick('howToThink')}
           >
             <h3 className="font-bold text-lg text-gray-800 mb-2 flex items-center p-4">
@@ -430,9 +555,12 @@ export default function AdminExplanationEditor({
               <MagicEditor
                 content={explanation.howToThink}
                 onChange={(html) => handleContentChange('howToThink', html)}
-                onConnectClick={handleConnectClick}
+                onConnectClick={handleCreateHotspotClick}
                 isEditable={editingBlock === 'howToThink'}
                 autoFocus={editingBlock === 'howToThink'}
+                // --- 💎 PASS NEW PROPS ---
+                hotspotBank={explanation.hotspotBank}
+                onHotspotClick={handleHotspotModalOpen}
               />
             </div>
           </div>
@@ -458,9 +586,12 @@ export default function AdminExplanationEditor({
               <MagicEditor
                 content={explanation.coreAnalysis}
                 onChange={(html) => handleContentChange('coreAnalysis', html)}
-                onConnectClick={handleConnectClick}
+                onConnectClick={handleCreateHotspotClick}
                 isEditable={editingBlock === 'coreAnalysis'}
                 autoFocus={editingBlock === 'coreAnalysis'}
+                // --- 💎 PASS NEW PROPS ---
+                hotspotBank={explanation.hotspotBank}
+                onHotspotClick={handleHotspotModalOpen}
               />
             </div>
           </div>
@@ -486,9 +617,12 @@ export default function AdminExplanationEditor({
               <MagicEditor
                 content={explanation.adminProTip}
                 onChange={(html) => handleContentChange('adminProTip', html)}
-                onConnectClick={handleConnectClick}
+                onConnectClick={handleCreateHotspotClick}
                 isEditable={editingBlock === 'adminProTip'}
                 autoFocus={editingBlock === 'adminProTip'}
+                // --- 💎 PASS NEW PROPS ---
+                hotspotBank={explanation.hotspotBank}
+                onHotspotClick={handleHotspotModalOpen}
               />
             </div>
           </div>
@@ -499,7 +633,7 @@ export default function AdminExplanationEditor({
           isOpen={isModalOpen}
           onClose={closeModal}
           onSave={handleSaveHotspot}
-          onDelete={modalData?.definition ? handleDeleteHotspot : undefined}
+          onDelete={modalData?.term ? handleDeleteHotspot : undefined} // Allow delete if term exists
           initialData={modalData}
         />
       </div>

@@ -44,7 +44,7 @@ Here is exactly what you must put in each key. You MUST follow these rules:
 * This is the "soul." It's the user's **Initial Thought**.
 * Write the 10-second "expert mental scan" an aspirant should have.
 * How do you *immediately* categorize this question? What's the obvious trap? What's the key concept to recall?
-* This MUST be written as a <strong>concise HTML string</strong> (use <strong>, <em>, <ul>, <li>, etc.)
+* This MUST be written as a <strong>concise HTML string</strong>.
 
 **2. \`coreAnalysis\` (The "Soulful Mental Model"):**
 * This is the "brain." This is the most important component.
@@ -59,16 +59,16 @@ Here is exactly what you must put in each key. You MUST follow these rules:
     * A **Scientific Principle** (for S&T).
     * ...or **any other framework** that makes the topic clear and the answer obvious.
 * **DO NOT** just list "A is wrong... B is right..." First, build your expert "Mental Model," and *then* use that model to analyze the options.
-* This MUST be written as a **rich HTML string**. Use \`<ul>\`, \`<li>\`, and \`<strong>\` extensively to structure your analysis.
+* This MUST be written as a **rich HTML string**.
 * **Hotspot Selection:** While writing this HTML, you must identify a **small number (5-7 maximum)** of high-value strategic terms and wrap them in square brackets \`[like this]\`. **Do not wrap basic terms.** A term should *only* be wrapped if it directly corresponds to a high-value insight you will provide in the \`hotspotBank\`.
 
 **3. \`adminProTip\` (The "Mentor's Pro-Tip"):**
 * This is the final "Aha!" moment.
 * It must be a **practical, high-yield *strategy* or *deeper connection*** to help the user beat this *type* of question in the future.
-* This MUST be written as a <strong>concise HTML string</strong> (use <strong>, <em>, <ul>, <li>, etc.)
+* This MUST be written as a <strong>concise HTML string</strong>.
 
 **4. \`hotspotBank\` (The "3-Pen System"):**
-* You **MUST** provide one object for *every single* \`[hotspot]\` you created (max 3-5).
+* You **MUST** provide one object for *every single* \`[hotspot]\` you created (max 5-7).
 
 * **--- 💎 CRITICAL HOTSPOT RULES 💎 ---**
 * **MANDATE 1: QUALITY, NOT QUANTITY.** You must only create 5-7 *highly effective* hotspots. Do not wrap every common noun or place name.
@@ -81,7 +81,16 @@ Here is exactly what you must put in each key. You MUST follow these rules:
         * **GOOD:** \`{"term": "Article 21", "type": "blue", "definition": "This is the 'anchor' article. It connects to: <ul><li><strong>Environment:</strong> Right to a clean environment.</li><li><strong>Social Justice:</strong> Right to dignity, justifying welfare schemes.</li></ul>"}\`
     * **\`red\` (Trap):** Explain a *non-obvious trap* or a common *conceptual misunderstanding*.
         * **GOOD:** \`{"term": "Resignation of PM", "type": "red", "definition": "<strong>Trap:</strong> The PM's resignation does *not* automatically dissolve the Lok Sabha. It only dissolves the *Council of Ministers*. The President may invite another person to form the government."}\`
-* **MANDATE 4: USE RICH HTML.** All \`definition\` fields **MUST** be HTML strings. Use \`<strong>\`, \`<ul>\`, and \`<li>\` to make them scannable and professional.
+* **MANDATE 4: USE RICH HTML.** All \`definition\` fields **MUST** be HTML strings.
+
+---
+### 💎 --- (NEW) CRITICAL HTML RULES --- 💎
+---
+
+* All HTML in \`howToThink\`, \`coreAnalysis\`, \`adminProTip\`, and \`definition\` fields **MUST** only use the following allowed tags:
+* **Allowed Tags:** \`<p>\`, \`<strong>\`, \`<em>\`, \`<ul>\`, \`<ol>\`, \`<li>\`, \`<hr>\`, \`<u>\`, \`<mark>\`, \`<sub>\`, \`<sup>\`
+* **For Colors:** You **MAY** use \`<span style="color: #HEXCODE;">text</span>\`. You **MUST** use 6-digit hex codes (e.g., \`#FF0000\` for red), not color names.
+* **DO NOT** use any other tags like \`<div>\`, \`<h1>\`, or complex style attributes. The JSON will be rejected.
 
 ---
 ### The Question
