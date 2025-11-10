@@ -109,37 +109,28 @@ export const useQuizStore = create<QuizStore>()(
             throw new Error('No questions were found for your selection.');
           }
 
-          // --- 💎 "PERFECT" TYPE-SAFETY FIX 💎 ---
-          // This is where we fix the bug. We process the raw backend data
-          // into our strict `Question` interface.
+          // --- 💎 THIS IS THE FIX 💎 ---
+          // The data from /api/quizzes (rawQuestions) is *already* in the correct format.
+          // Your `app/api/quizzes/route.ts` file's `transformFirestoreDocToQuestion`
+          // function already prepared it. We just need to trust it and pass it through.
+          
+          // We still map it just to be 100% safe and ensure defaults.
           const processedQuestions: Question[] = rawQuestions.map((q: any, index: number) => {
             
-            // 1. Determine the explanation
-            //    The new `explanation` field (which can be an object) takes precedence.
-            //    If it's missing, fall back to the old `explanationText` string.
             const explanationContent: string | UltimateExplanation = 
-              q.explanation || q.explanationText || '';
+              q.explanation || ""; // Use the explanation from the API, or fallback
 
             return {
-              ...q,
-              id: q._id, // Ensure `id` is set from `_id`
-              questionNumber: index + 1, // Assign a question number
-              text: q.questionText,
+              ...q, // Pass through all fields from the API (like subject, topic, etc.)
               
-              // 2. Set default questionType if missing from old data
-              questionType: q.questionType || 'SingleChoice', 
+              id: q.id, // <-- FIX: Use the `id` field from the API
+              questionNumber: q.questionNumber || index + 1, // Use number from API or fallback
+              text: q.text, // Use text from API
+              options: q.options, // <-- FIX: Use the `options` array from the API
+              correctAnswer: q.correctAnswer, // Use correctAnswer from API
               
-              // 3. Unify explanation field
               explanation: explanationContent,
-              
-              // 4. Build options array (this was in your old code)
-              options: [
-                { label: 'A', text: q.optionA },
-                { label: 'B', text: q.optionB },
-                { label: 'C', text: q.optionC },
-                { label: 'D', text: q.optionD },
-              ],
-              correctAnswer: q.correctOption,
+              questionType: q.questionType || 'SingleChoice', // Default fallback
             };
           });
           // --- 💎 END OF FIX 💎 ---

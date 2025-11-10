@@ -23,6 +23,7 @@ import {
   Copy,
   Download,
 } from 'lucide-react';
+import * as Tooltip from '@radix-ui/react-tooltip';
 
 // Our new, stable "Hybrid" editor
 import MagicEditor from '@/components/admin/MagicEditor';
@@ -50,13 +51,24 @@ const convertBracketsToSpans = (
   hotspotBank: Hotspot[]
 ): string => {
   if (!html || !hotspotBank) return html;
+  
   let processedHtml = html;
-  for (const hotspot of hotspotBank) {
+  
+  // Create a sorted list of hotspots, longest term first.
+  // This prevents bugs where a short term (e.g., "UPSC") replaces
+  // part of a longer term (e.g., "UPSC Mains").
+  const sortedBank = [...hotspotBank].sort((a, b) => b.term.length - a.term.length);
+
+  for (const hotspot of sortedBank) {
     // Escape special regex characters in the term
     const escapedTerm = hotspot.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
     // Create a regex to find the term wrapped in square brackets
-    // [Some Key Term] -> <span ...>Some Key Term</span>
-    const regex = new RegExp(`\\[${escapedTerm}\\]`, 'g');
+    // We use a "negative lookbehind" (?<!) to ensure we don't double-replace
+    // a term that's already inside an HTML tag.
+    // It looks for [Term] that is NOT preceded by `>`
+    const regex = new RegExp(`(?<!>)\\[${escapedTerm}\\]`, 'g');
+    
     const replacement = `<span class="hotspot-mark" data-type="${hotspot.type}">${hotspot.term}</span>`;
     processedHtml = processedHtml.replace(regex, replacement);
   }
@@ -85,7 +97,6 @@ export default function AdminExplanationEditor({
   const [isSaving, setIsSaving] = useState(false);
 
   // --- "Hybrid Editor" State ---
-  // This tracks which block is currently editable, or 'null' if all are read-only
   const [editingBlock, setEditingBlock] = useState<
     'howToThink' | 'coreAnalysis' | 'adminProTip' | null
   >(null);
@@ -126,6 +137,7 @@ export default function AdminExplanationEditor({
   };
 
   // --- 💎 "BROKEN PARSE" FUNCTION (NOW FIXED) 💎 ---
+  // This function is the same as yours, which is correct.
   const handleParse = () => {
     if (!rawAiResponse.trim()) {
       toast.error('Paste JSON response from AI first.');
@@ -161,7 +173,9 @@ export default function AdminExplanationEditor({
         hotspotBank: bank,
       };
 
-      setExplanation(processed);
+      // THIS IS THE KEY: This state update feeds the MagicEditor components
+      setExplanation(processed); 
+      
       toast.success('AI Response Parsed! Loading workspace...');
       setRawAiResponse('');
       setIsControlRoomOpen(false);
@@ -188,7 +202,6 @@ export default function AdminExplanationEditor({
   };
 
   // --- "Hybrid Editor" Click-to-Edit Handler ---
-  // This just sets the state. The MagicEditor component handles the rest.
   const handleEditClick = (
     field: 'howToThink' | 'coreAnalysis' | 'adminProTip'
   ) => {
@@ -196,9 +209,6 @@ export default function AdminExplanationEditor({
   };
 
   // --- Hotspot Modal Handlers ---
-
-  // This is called by MagicEditor's "Connect" button.
-  // This logic is now fixed and will work.
   const handleConnectClick = (editor: TiptapEditor) => {
     const { from, to, empty } = editor.state.selection;
     if (empty) {
@@ -220,7 +230,6 @@ export default function AdminExplanationEditor({
   const handleSaveHotspot = (data: HotspotModalData) => {
     if (!explanation) return;
 
-    // This is the new "Connect" logic
     if (activeEditor) {
       activeEditor
         .chain()
@@ -240,10 +249,8 @@ export default function AdminExplanationEditor({
     };
 
     if (existingIndex > -1) {
-      // Update existing hotspot
       newBank[existingIndex] = hotspotToSave;
     } else {
-      // Add new hotspot
       newBank.push(hotspotToSave);
     }
     setExplanation((prev) => ({ ...prev!, hotspotBank: newBank }));
@@ -256,7 +263,6 @@ export default function AdminExplanationEditor({
     if (!explanation || !modalData) return;
     const termToDelete = modalData.term;
 
-    // This is the new "Disconnect" logic
     if (activeEditor) {
       activeEditor.chain().focus().unsetMark('hotspot').run();
     }
@@ -277,18 +283,16 @@ export default function AdminExplanationEditor({
     setActiveEditor(null);
   };
 
-  // --- Main Save Function (Unchanged, but now works) ---
+  // --- Main Save Function ---
   const handleSaveToFirestore = async () => {
     if (!explanation) {
       toast.error('No explanation to save.');
       return;
     }
-    // Before saving, ensure all editors are blurred
     setEditingBlock(null);
     setIsSaving(true);
 
     try {
-      // A small delay to allow editors to blur and update state
       setTimeout(async () => {
         await onSave(explanation);
         toast.success('Explanation saved successfully!');
@@ -301,6 +305,7 @@ export default function AdminExplanationEditor({
     }
   };
 
+  // This guard is crucial. It shows a loader until the state is initialized.
   if (!explanation) {
     return (
       <div className="p-12 flex items-center justify-center">
@@ -310,198 +315,205 @@ export default function AdminExplanationEditor({
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      {/* --- 1. Main Header Bar (Professional) --- */}
-      <div className="flex justify-between items-center gap-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
-          Admin Explanation Editor
-        </h2>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={onClose}
-            className="btn px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSaveToFirestore}
-            disabled={isSaving}
-            className="btn px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center justify-center disabled:bg-gray-400 min-w-[90px]"
-          >
-            {isSaving ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Save className="w-5 h-5 sm:mr-2" />
-            )}
-            <span className="hidden sm:inline">
-              {isSaving ? 'Saving...' : 'Save'}
-            </span>
-          </button>
+    <Tooltip.Provider delayDuration={300}>
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* --- 1. Main Header Bar (Professional) --- */}
+        <div className="flex justify-between items-center gap-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+            Admin Explanation Editor
+          </h2>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={onClose}
+              className="btn px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveToFirestore}
+              disabled={isSaving}
+              className="btn px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center justify-center disabled:bg-gray-400 min-w-[90px]"
+            >
+              {isSaving ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Save className="w-5 h-5 sm:mr-2" />
+              )}
+              <span className="hidden sm:inline">
+                {isSaving ? 'Saving...' : 'Save'}
+              </span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* --- 2. Collapsible Control Room (Professional) --- */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <button
-          onClick={() => setIsControlRoomOpen(!isControlRoomOpen)}
-          className="w-full p-4 text-left font-semibold text-gray-700 flex justify-between items-center hover:bg-gray-50 rounded-t-lg"
-        >
-          Admin Control Room
-          {isControlRoomOpen ? (
-            <ChevronDown className="w-5 h-5" />
-          ) : (
-            <ChevronRight className="w-5 h-5" />
-          )}
-        </button>
-        {isControlRoomOpen && (
-          <div className="p-4 sm:p-6 border-t border-gray-200 space-y-4 bg-gray-50/50 rounded-b-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Step 1 & 2 */}
-              <div className="space-y-4">
-                <div>
+        {/* --- 2. Collapsible Control Room (Professional) --- */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+          <button
+            onClick={() => setIsControlRoomOpen(!isControlRoomOpen)}
+            className="w-full p-4 text-left font-semibold text-gray-700 flex justify-between items-center hover:bg-gray-50 rounded-t-lg"
+          >
+            Admin Control Room
+            {isControlRoomOpen ? (
+              <ChevronDown className="w-5 h-5" />
+            ) : (
+              <ChevronRight className="w-5 h-5" />
+            )}
+          </button>
+          {isControlRoomOpen && (
+            <div className="p-4 sm:p-6 border-t border-gray-200 space-y-4 bg-gray-50/50 rounded-b-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Step 1 & 2 */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Step 1: Generate Prompt
+                    </label>
+                    <button
+                      onClick={handleGeneratePrompt}
+                      className="btn w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center gap-2"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Generate & Copy Prompt
+                    </button>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="ai-response"
+                      className="block text-sm font-semibold text-gray-700 mb-1"
+                    >
+                      Step 2: Paste AI JSON Response
+                    </label>
+                    <textarea
+                      id="ai-response"
+                      value={rawAiResponse}
+                      onChange={(e) => setRawAiResponse(e.target.value)}
+                      rows={8}
+                      className="w-full border border-gray-300 rounded-md p-2 font-mono text-xs shadow-inner"
+                      placeholder="Paste AI JSON here..."
+                    />
+                  </div>
+                </div>
+                {/* Step 3 */}
+                <div className="flex flex-col">
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Step 1: Generate Prompt
+                    Step 3: Parse & Load
                   </label>
                   <button
-                    onClick={handleGeneratePrompt}
-                    className="btn w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center gap-2"
+                    onClick={handleParse}
+                    className="btn w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center gap-2"
                   >
-                    <Copy className="w-4 h-4" />
-                    Generate & Copy Prompt
+                    <Download className="w-4 h-4" />
+                    Parse & Load Workspace
                   </button>
-                </div>
-                <div>
-                  <label
-                    htmlFor="ai-response"
-                    className="block text-sm font-semibold text-gray-700 mb-1"
-                  >
-                    Step 2: Paste AI JSON Response
-                  </label>
-                  <textarea
-                    id="ai-response"
-                    value={rawAiResponse}
-                    onChange={(e) => setRawAiResponse(e.target.value)}
-                    rows={8}
-                    className="w-full border border-gray-300 rounded-md p-2 font-mono text-xs shadow-inner"
-                    placeholder="Paste AI JSON here..."
-                  />
-                </div>
-              </div>
-              {/* Step 3 */}
-              <div className="flex flex-col">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Step 3: Parse & Load
-                </label>
-                <button
-                  onClick={handleParse}
-                  className="btn w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Parse & Load Workspace
-                </button>
-                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800 text-sm">
-                  <strong className="font-semibold">Note:</strong> Clicking
-                  "Parse" will overwrite any unsaved changes in the workspace
-                  below.
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800 text-sm">
+                    <strong className="font-semibold">Note:</strong> Clicking
+                    "Parse" will overwrite any unsaved changes in the workspace
+                    below.
+                  </div>
                 </div>
               </div>
             </div>
+          )}
+        </div>
+
+        {/* --- 3. "HYBRID" Soulful Editor (Professional & Fixed) --- */}
+        <div className="space-y-6">
+          {/* --- Block 1: howToThink --- */}
+          <div
+            className={`border rounded-lg shadow-inner transition-all ${
+              editingBlock === 'howToThink'
+                ? 'bg-white border-blue-400 ring-2 ring-blue-200'
+                : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+            }`}
+            // 💎 FIX: We now call handleEditClick on the wrapper
+            onClick={() => handleEditClick('howToThink')}
+          >
+            <h3 className="font-bold text-lg text-gray-800 mb-2 flex items-center p-4">
+              <Brain className="w-5 h-5 mr-2 text-blue-600" />
+              🧠 Topper's Mental Model
+            </h3>
+            <div
+              className={`editor-container ${
+                editingBlock !== 'howToThink' ? 'cursor-pointer' : ''
+              }`}
+            >
+              <MagicEditor
+                content={explanation.howToThink}
+                onChange={(html) => handleContentChange('howToThink', html)}
+                onConnectClick={handleConnectClick}
+                isEditable={editingBlock === 'howToThink'}
+                // 💎 FIX: Pass autoFocus when this block is clicked
+                autoFocus={editingBlock === 'howToThink'}
+              />
+            </div>
           </div>
-        )}
+
+          {/* --- Block 2: coreAnalysis --- */}
+          <div
+            className={`border-l-4 rounded-r-lg shadow-inner transition-all ${
+              editingBlock === 'coreAnalysis'
+                ? 'bg-white border-blue-500 ring-2 ring-blue-200'
+                : 'bg-blue-50 border-blue-200 hover:border-blue-300'
+            }`}
+            onClick={() => handleEditClick('coreAnalysis')}
+          >
+            <h3 className="font-bold text-lg text-blue-900 mb-2 flex items-center p-4">
+              <Target className="w-5 h-5 mr-2 text-blue-600" />
+              🎯 Core Analysis
+            </h3>
+            <div
+              className={`editor-container ${
+                editingBlock !== 'coreAnalysis' ? 'cursor-pointer' : ''
+              }`}
+            >
+              <MagicEditor
+                content={explanation.coreAnalysis}
+                onChange={(html) => handleContentChange('coreAnalysis', html)}
+                onConnectClick={handleConnectClick}
+                isEditable={editingBlock === 'coreAnalysis'}
+                autoFocus={editingBlock === 'coreAnalysis'}
+              />
+            </div>
+          </div>
+
+          {/* --- Block 3: adminProTip --- */}
+          <div
+            className={`border rounded-lg shadow-inner transition-all ${
+              editingBlock === 'adminProTip'
+                ? 'bg-white border-blue-400 ring-2 ring-blue-200'
+                : 'bg-blue-100 border-blue-200 hover:border-blue-300'
+            }`}
+            onClick={() => handleEditClick('adminProTip')}
+          >
+            <h3 className="font-bold text-lg text-blue-900 mb-2 flex items-center p-4">
+              <Pen className="w-5 h-5 mr-2 text-blue-600" />
+              ✍️ Mentor's Pro-Tip
+            </h3>
+            <div
+              className={`editor-container ${
+                editingBlock !== 'adminProTip' ? 'cursor-pointer' : ''
+              }`}
+            >
+              <MagicEditor
+                content={explanation.adminProTip}
+                onChange={(html) => handleContentChange('adminProTip', html)}
+                onConnectClick={handleConnectClick}
+                isEditable={editingBlock === 'adminProTip'}
+                autoFocus={editingBlock === 'adminProTip'}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* --- 4. Hotspot Modal (Unchanged) --- */}
+        <HotspotModal
+          isOpen={isModalOpen}
+          onClose={closeModal}
+          onSave={handleSaveHotspot}
+          onDelete={modalData?.definition ? handleDeleteHotspot : undefined}
+          initialData={modalData}
+        />
       </div>
-
-      {/* --- 3. "HYBRID" Soulful Editor (Professional & Fixed) --- */}
-      <div className="space-y-6">
-        {/* --- Block 1: howToThink --- */}
-        <div
-          className={`border rounded-lg shadow-inner transition-all ${
-            editingBlock === 'howToThink'
-              ? 'bg-white border-blue-400 ring-2 ring-blue-200'
-              : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-          }`}
-          onClick={() => handleEditClick('howToThink')}
-        >
-          <h3 className="font-bold text-lg text-gray-800 mb-2 flex items-center p-4">
-            <Brain className="w-5 h-5 mr-2 text-blue-600" />
-            🧠 Topper's Mental Model
-          </h3>
-          <div
-            className={`editor-container ${
-              editingBlock !== 'howToThink' ? 'cursor-pointer' : ''
-            }`}
-          >
-            <MagicEditor
-              content={explanation.howToThink}
-              onChange={(html) => handleContentChange('howToThink', html)}
-              onConnectClick={handleConnectClick}
-              isEditable={editingBlock === 'howToThink'}
-            />
-          </div>
-        </div>
-
-        {/* --- Block 2: coreAnalysis --- */}
-        <div
-          className={`border-l-4 rounded-r-lg shadow-inner transition-all ${
-            editingBlock === 'coreAnalysis'
-              ? 'bg-white border-blue-500 ring-2 ring-blue-200'
-              : 'bg-blue-50 border-blue-200 hover:border-blue-300'
-          }`}
-          onClick={() => handleEditClick('coreAnalysis')}
-        >
-          <h3 className="font-bold text-lg text-blue-900 mb-2 flex items-center p-4">
-            <Target className="w-5 h-5 mr-2 text-blue-600" />
-            🎯 Core Analysis
-          </h3>
-          <div
-            className={`editor-container ${
-              editingBlock !== 'coreAnalysis' ? 'cursor-pointer' : ''
-            }`}
-          >
-            <MagicEditor
-              content={explanation.coreAnalysis}
-              onChange={(html) => handleContentChange('coreAnalysis', html)}
-              onConnectClick={handleConnectClick}
-              isEditable={editingBlock === 'coreAnalysis'}
-            />
-          </div>
-        </div>
-
-        {/* --- Block 3: adminProTip --- */}
-        <div
-          className={`border rounded-lg shadow-inner transition-all ${
-            editingBlock === 'adminProTip'
-              ? 'bg-white border-blue-400 ring-2 ring-blue-200'
-              : 'bg-blue-100 border-blue-200 hover:border-blue-300'
-          }`}
-          onClick={() => handleEditClick('adminProTip')}
-        >
-          <h3 className="font-bold text-lg text-blue-900 mb-2 flex items-center p-4">
-            <Pen className="w-5 h-5 mr-2 text-blue-600" />
-            ✍️ Mentor's Pro-Tip
-          </h3>
-          <div
-            className={`editor-container ${
-              editingBlock !== 'adminProTip' ? 'cursor-pointer' : ''
-            }`}
-          >
-            <MagicEditor
-              content={explanation.adminProTip}
-              onChange={(html) => handleContentChange('adminProTip', html)}
-              onConnectClick={handleConnectClick}
-              isEditable={editingBlock === 'adminProTip'}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* --- 4. Hotspot Modal (Unchanged) --- */}
-      <HotspotModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        onSave={handleSaveHotspot}
-        onDelete={modalData?.definition ? handleDeleteHotspot : undefined}
-        initialData={modalData}
-      />
-    </div>
+    </Tooltip.Provider>
   );
 }

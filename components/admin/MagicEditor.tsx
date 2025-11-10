@@ -1,6 +1,6 @@
 // components/admin/MagicEditor.tsx
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   EditorContent,
   useEditor,
@@ -13,7 +13,7 @@ import {
   Bold,
   Italic,
   Underline,
-  Link,
+  Link, // This is the icon for "Connect"
   Highlighter,
   List,
   ListOrdered,
@@ -23,10 +23,12 @@ interface MagicEditorProps {
   content: string;
   onChange: (html: string) => void;
   onConnectClick: (editor: TiptapEditor) => void;
-  isEditable: boolean; // <-- The new "Hybrid" mode prop
+  isEditable: boolean; // <-- The "Hybrid" mode prop
   autoFocus?: boolean;
 }
 
+// This is the actual Tiptap component.
+// We've moved all logic inside here.
 const TiptapEditorComponent = ({
   content,
   onChange,
@@ -34,53 +36,70 @@ const TiptapEditorComponent = ({
   isEditable,
   autoFocus,
 }: MagicEditorProps) => {
-  const editor = useEditor({
-    extensions,
-    content,
-    editable: isEditable,
+  // 1. Use `useState` to hold the editor instance.
+  const [editor, setEditor] = useState<TiptapEditor | null>(null);
 
-    // --- 💎 THIS IS THE FIX 💎 ---
-    // This explicitly tells Tiptap to wait for the client
-    // to render, avoiding the SSR hydration error.
-    immediatelyRender: false,
-    // --- 💎 END OF FIX 💎 ---
+  // 2. Initialize the editor inside `useEffect` to run ONLY on the client.
+  useEffect(() => {
+    const tiptapEditor = new TiptapEditor({
+      extensions,
+      content,
+      editable: isEditable,
 
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
-    },
-
-    editorProps: {
-      attributes: {
-        class: 'ProseMirror',
+      editorProps: {
+        attributes: {
+          class: 'ProseMirror', // Your global styling class
+        },
       },
-    },
 
-    autofocus: autoFocus,
-  });
+      // 3. Update the parent component's state on every change.
+      onUpdate: ({ editor }) => {
+        onChange(editor.getHTML());
+      },
+    });
 
-  // This "Hybrid" hook ensures that if the isEditable prop changes
+    setEditor(tiptapEditor);
+
+    // 4. Clean up the editor instance when the component unmounts.
+    return () => {
+      tiptapEditor.destroy();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount.
+
+  // 5. This "Hybrid" hook ensures that if the `isEditable` prop changes,
+  //    the editor's state is updated to match.
   useEffect(() => {
     if (editor && editor.isEditable !== isEditable) {
       editor.setEditable(isEditable);
-      if (isEditable) {
+      if (isEditable && autoFocus) {
         editor.commands.focus();
       }
     }
-  }, [editor, isEditable]);
+  }, [editor, isEditable, autoFocus]);
 
-  // This hook ensures content is updated from the parser
+  // 6. This hook updates the editor's content if the `content` prop
+  //    changes (e.g., after your "Parse" button is clicked).
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
+      // `setContent` updates the editor's content from the outside.
+      // `emitUpdate: false` prevents an infinite loop.
       editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [content, editor]);
 
+  // Don't render anything until the editor is initialized on the client.
   if (!editor) {
     return null;
   }
 
   return (
     <>
+      {/*
+        7. This Bubble Menu will now work. It shows:
+           - When the editor is editable.
+           - When you have selected text (selection is not empty).
+      */}
       <BubbleMenu
         editor={editor}
         shouldShow={({ state, editor }) =>
@@ -88,6 +107,7 @@ const TiptapEditorComponent = ({
         }
         className="bg-white shadow-lg border border-gray-200 rounded-lg p-1 flex items-center divide-x divide-gray-200"
       >
+        {/* This is your "Connect" button for hotspots */}
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
@@ -97,6 +117,8 @@ const TiptapEditorComponent = ({
         >
           <Link className="w-4 h-4" />
         </button>
+        
+        {/* Standard formatting buttons */}
         <div className="flex items-center px-1">
           <button
             type="button"
@@ -176,9 +198,11 @@ const TiptapEditorComponent = ({
   );
 };
 
+// The wrapper component is now just a simple pass-through.
 export default function MagicEditor(props: MagicEditorProps) {
   return (
     <div className="magic-editor-wrapper relative">
+      {/* We pass all props to the client-side editor component */}
       <TiptapEditorComponent {...props} />
     </div>
   );

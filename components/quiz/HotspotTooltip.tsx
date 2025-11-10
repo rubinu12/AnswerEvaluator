@@ -17,7 +17,7 @@ const HotspotTooltip: React.FC<HotspotTooltipProps> = ({
   hotspot,
   onClick,
 }) => {
-  // ... (getColors and getArrowColor functions are unchanged) ...
+  // Helper to get the correct colors for the "Pen Type"
   const getColors = () => {
     switch (hotspot.type) {
       case 'green':
@@ -31,6 +31,7 @@ const HotspotTooltip: React.FC<HotspotTooltipProps> = ({
     }
   };
 
+  // Helper for the Radix Arrow
   const getArrowColor = () => {
     switch (hotspot.type) {
       case 'green':
@@ -45,22 +46,25 @@ const HotspotTooltip: React.FC<HotspotTooltipProps> = ({
   };
 
   return (
-    // --- 1. THE <Tooltip.Provider> IS REMOVED FROM HERE ---
     <Tooltip.Root>
+      {/* --- 💎 THIS IS THE FIX 💎 --- */}
+      {/* The onClick is moved to the Trigger, and the extra <span> is removed. */}
       <Tooltip.Trigger asChild onClick={() => onClick && onClick(hotspot)}>
-        {/*
-          The 'asChild' prop passes the trigger's functionality
-          down to the {children}, which is the <span>
-          RenderWithRadixHotspots creates.
-        */}
         {children}
       </Tooltip.Trigger>
+      {/* --- 💎 END OF FIX 💎 --- */}
       <Tooltip.Portal>
         <Tooltip.Content
           sideOffset={5}
           className={`z-[99] max-w-sm rounded-lg shadow-xl border-2 ProseMirror ${getColors()} ${
             onClick ? 'cursor-pointer' : ''
           }`}
+          // Stop propagation to prevent modal from closing if admin clicks tooltip
+          onPointerDownOutside={(e) => {
+            if (onClick) {
+              e.preventDefault();
+            }
+          }}
         >
           <div className="p-4">
             <h4 className="text-lg font-bold !mt-0 !mb-2">{hotspot.term}</h4>
@@ -73,7 +77,6 @@ const HotspotTooltip: React.FC<HotspotTooltipProps> = ({
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
-    // --- 2. END OF REMOVAL ---
   );
 };
 
