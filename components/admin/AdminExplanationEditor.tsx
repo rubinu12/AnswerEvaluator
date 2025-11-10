@@ -25,14 +25,11 @@ import {
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 
-// Our new, stable "Hybrid" editor
 import MagicEditor from '@/components/admin/MagicEditor';
-// The modal for creating/editing hotspots
 import HotspotModal, {
   HotspotModalData,
 } from '@/components/admin/HotspotModal';
 
-// This is the empty state for a new explanation
 const EMPTY_EXPLANATION: UltimateExplanation = {
   howToThink: '',
   coreAnalysis: '',
@@ -40,12 +37,6 @@ const EMPTY_EXPLANATION: UltimateExplanation = {
   hotspotBank: [],
 };
 
-/**
- * --- 💎 THE "FIXED" PARSER HELPER 💎 ---
- * This function takes the raw HTML from the AI and the hotspotBank,
- * finds all [Terms] in the HTML, and replaces them with the
- * <span class="hotspot-mark">...</span> tag that Tiptap/CSS understands.
- */
 const convertBracketsToSpans = (
   html: string,
   hotspotBank: Hotspot[]
@@ -54,27 +45,16 @@ const convertBracketsToSpans = (
   
   let processedHtml = html;
   
-  // Create a sorted list of hotspots, longest term first.
-  // This prevents bugs where a short term (e.g., "UPSC") replaces
-  // part of a longer term (e.g., "UPSC Mains").
   const sortedBank = [...hotspotBank].sort((a, b) => b.term.length - a.term.length);
 
   for (const hotspot of sortedBank) {
-    // Escape special regex characters in the term
     const escapedTerm = hotspot.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
-    // Create a regex to find the term wrapped in square brackets
-    // We use a "negative lookbehind" (?<!) to ensure we don't double-replace
-    // a term that's already inside an HTML tag.
-    // It looks for [Term] that is NOT preceded by `>`
     const regex = new RegExp(`(?<!>)\\[${escapedTerm}\\]`, 'g');
-    
     const replacement = `<span class="hotspot-mark" data-type="${hotspot.type}">${hotspot.term}</span>`;
     processedHtml = processedHtml.replace(regex, replacement);
   }
   return processedHtml;
 };
-// --- 💎 END OF "FIXED" PARSER HELPER 💎 ---
 
 interface AdminExplanationEditorProps {
   question: Question;
@@ -89,37 +69,54 @@ export default function AdminExplanationEditor({
 }: AdminExplanationEditorProps) {
   const { user } = useAuthContext();
 
-  // --- Core State ---
   const [explanation, setExplanation] = useState<UltimateExplanation | null>(
     null
   );
   const [rawAiResponse, setRawAiResponse] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- "Hybrid Editor" State ---
   const [editingBlock, setEditingBlock] = useState<
     'howToThink' | 'coreAnalysis' | 'adminProTip' | null
   >(null);
 
-  // --- Control Room State ---
   const [isControlRoomOpen, setIsControlRoomOpen] = useState(false);
-
-  // --- Hotspot Modal State ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalData, setModalData] = useState<HotspotModalData | null>(null);
   const [activeEditor, setActiveEditor] = useState<TiptapEditor | null>(null);
 
-  // This "Smart Check" logic correctly loads an existing explanation
-  // or prepares an empty one.
+  // --- 💎 THIS IS THE FIX for the "data disappears" bug 💎 ---
   useEffect(() => {
+    let loadedExplanation: UltimateExplanation | null = null;
+
     if (isUltimateExplanation(question.explanation)) {
-      setExplanation(question.explanation);
+      // CASE 1: The prop is *already* the correct object (e.g., after a save)
+      loadedExplanation = question.explanation;
+    } else if (typeof question.explanation === 'string') {
+      // CASE 2: The prop is a STRING (from localStorage/stale store)
+      // We try to parse it.
+      try {
+        const parsed = JSON.parse(question.explanation);
+        if (isUltimateExplanation(parsed)) {
+          // It was a string, but it's the correct object!
+          loadedExplanation = parsed;
+        }
+      } catch (e) {
+        // It was a string, but not valid JSON (e.g., "No explanation yet")
+        // We'll let it fall through to the empty state.
+      }
+    }
+
+    // Now we set the state based on what we found
+    if (loadedExplanation) {
+      setExplanation(loadedExplanation);
       setIsControlRoomOpen(false); // Hide controls if already done
     } else {
+      // Fallback: It's empty, a bad string, or not an explanation object
       setExplanation(EMPTY_EXPLANATION);
       setIsControlRoomOpen(true); // Show controls to start
     }
-  }, [question]);
+  }, [question]); // This dependency is correct
+  // --- 💎 END OF FIX 💎 ---
 
   // --- Control Room Functions ---
   const handleGeneratePrompt = () => {
@@ -136,8 +133,9 @@ export default function AdminExplanationEditor({
     }
   };
 
-  // --- 💎 "BROKEN PARSE" FUNCTION (NOW FIXED) 💎 ---
-  // This function is the same as yours, which is correct.
+  // --- "Parse & Load" Function ---
+  // This logic was already correct and will now work
+  // because the editor will be in the correct initial state.
   const handleParse = () => {
     if (!rawAiResponse.trim()) {
       toast.error('Paste JSON response from AI first.');
@@ -145,7 +143,6 @@ export default function AdminExplanationEditor({
     }
     let parsedData: any;
     try {
-      // Clean up markdown code blocks if AI wrapped the JSON
       const cleanedResponse = rawAiResponse
         .replace(/^```json\s*/, '')
         .replace(/```$/, '');
@@ -155,11 +152,9 @@ export default function AdminExplanationEditor({
       return;
     }
 
-    // Now we check against our "v4" schema
     if (isUltimateExplanation(parsedData)) {
       const bank = parsedData.hotspotBank || [];
 
-      // Use our new helper function to process the HTML
       const processed: UltimateExplanation = {
         howToThink: convertBracketsToSpans(parsedData.howToThink || '', bank),
         coreAnalysis: convertBracketsToSpans(
@@ -173,20 +168,18 @@ export default function AdminExplanationEditor({
         hotspotBank: bank,
       };
 
-      // THIS IS THE KEY: This state update feeds the MagicEditor components
       setExplanation(processed); 
       
       toast.success('AI Response Parsed! Loading workspace...');
       setRawAiResponse('');
       setIsControlRoomOpen(false);
-      setEditingBlock(null); // Ensure all editors are in read-only mode
+      setEditingBlock(null);
     } else {
       toast.error(
         'Parse Error: JSON missing "soulful" fields (howToThink, coreAnalysis, etc.)'
       );
     }
   };
-  // --- 💎 END OF "BROKEN PARSE" FIX 💎 ---
 
   // --- Editor Content Change Handler ---
   const handleContentChange = (
@@ -216,7 +209,7 @@ export default function AdminExplanationEditor({
       return;
     }
     const selectedText = editor.state.doc.textBetween(from, to, ' ');
-    setActiveEditor(editor); // Save editor to apply mark later
+    setActiveEditor(editor);
     const existingHotspot = explanation?.hotspotBank?.find(
       (h) => h.term === selectedText
     );
@@ -238,7 +231,6 @@ export default function AdminExplanationEditor({
         .run();
     }
 
-    // Update the bank
     const newBank = [...explanation.hotspotBank];
     const existingIndex = newBank.findIndex((h) => h.term === data.term);
 
@@ -267,7 +259,6 @@ export default function AdminExplanationEditor({
       activeEditor.chain().focus().unsetMark('hotspot').run();
     }
 
-    // Update the bank
     const newBank = explanation.hotspotBank.filter(
       (h) => h.term !== termToDelete
     );
@@ -293,6 +284,7 @@ export default function AdminExplanationEditor({
     setIsSaving(true);
 
     try {
+      // This timeout is a good idea to let the UI update
       setTimeout(async () => {
         await onSave(explanation);
         toast.success('Explanation saved successfully!');
@@ -305,7 +297,6 @@ export default function AdminExplanationEditor({
     }
   };
 
-  // This guard is crucial. It shows a loader until the state is initialized.
   if (!explanation) {
     return (
       <div className="p-12 flex items-center justify-center">
@@ -425,7 +416,6 @@ export default function AdminExplanationEditor({
                 ? 'bg-white border-blue-400 ring-2 ring-blue-200'
                 : 'bg-gray-50 border-gray-200 hover:border-gray-300'
             }`}
-            // 💎 FIX: We now call handleEditClick on the wrapper
             onClick={() => handleEditClick('howToThink')}
           >
             <h3 className="font-bold text-lg text-gray-800 mb-2 flex items-center p-4">
@@ -442,7 +432,6 @@ export default function AdminExplanationEditor({
                 onChange={(html) => handleContentChange('howToThink', html)}
                 onConnectClick={handleConnectClick}
                 isEditable={editingBlock === 'howToThink'}
-                // 💎 FIX: Pass autoFocus when this block is clicked
                 autoFocus={editingBlock === 'howToThink'}
               />
             </div>

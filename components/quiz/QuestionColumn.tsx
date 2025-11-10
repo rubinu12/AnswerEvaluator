@@ -6,9 +6,8 @@ import { useQuizStore } from '@/lib/quizStore';
 import { Question, isUltimateExplanation } from '@/lib/quizTypes'; // "Perfectly" imported
 import QuestionPalette from './QuestionPalette';
 import { Bookmark, Flag, Grid, X } from 'lucide-react';
-import { useAuthContext } from '@/lib/AuthContext';
+// import { useAuthContext } from '@/lib/AuthContext'; // <-- 💎 REMOVED
 import UltimateExplanationUI from './UltimateExplanationUI'; // "Perfect" Magic UI
-// --- 💎 "PERFECT" FIX: The old modal import is "perfectly" GONE 💎 ---
 
 // --- Individual Question Card ---
 const QuestionCard = ({
@@ -24,19 +23,14 @@ const QuestionCard = ({
     toggleMarkForReview,
     bookmarkedQuestions,
     toggleBookmark,
-    // --- 💎 "PERFECT" FIX: `openExplanationEditor` is "perfectly" GONE 💎 ---
   } = useQuizStore();
 
   const isLongOption = question.options.some((opt) => opt.text.length > 50);
 
-  const { userProfile } = useAuthContext();
-  const isAdmin = userProfile?.subscriptionStatus === 'ADMIN';
-
-  // --- 💎 "PERFECT" NEW HANDLER 💎 ---
-  // This is the "perfect" new redirect logic for our "perfect" new architecture.
-  const handleAdminEditClick = () => {
-    window.open(`/admin/editor/${question.id}`, '_blank');
-  };
+  // --- 💎 ALL ADMIN LOGIC REMOVED AS REQUESTED 💎 ---
+  // const { userProfile } = useAuthContext(); // <-- GONE
+  // const isAdmin = userProfile?.subscriptionStatus === 'ADMIN'; // <-- GONE
+  // const handleAdminEditClick = () => { ... }; // <-- GONE
 
   return (
     <div
@@ -47,17 +41,10 @@ const QuestionCard = ({
           : 'bg-white border-gray-200'
       }`}
     >
-      {/* This button is now "perfectly" connected */}
-      {isAdmin && (
-        <button
-          onClick={handleAdminEditClick} // <-- "PERFECT" FIX
-          className="absolute top-2 right-2 p-2 bg-yellow-400 text-yellow-900 rounded-full hover:bg-yellow-500 shadow-sm"
-          title="Admin: Edit Explanation"
-        >
-          <Flag className="w-4 h-4" />
-        </button>
-      )}
+      {/* --- 💎 ADMIN BUTTON BLOCK REMOVED 💎 --- */}
+      {/* {isAdmin && ( ... )} */}
 
+      {/* This div is now the stable, single child for all users */}
       <div className="flex items-start gap-4">
         <div className="flex flex-col items-center flex-shrink-0">
           <div className="bg-gray-800 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
@@ -114,6 +101,7 @@ const QuestionCard = ({
 };
 
 // --- Main Question Column Component ---
+// (No changes in this part, it's all correct)
 const QuestionColumn = () => {
   const {
     questions,
