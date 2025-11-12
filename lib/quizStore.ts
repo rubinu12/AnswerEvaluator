@@ -8,11 +8,12 @@ import {
   UserAnswer,
   QuizFilter,
   QuizError,
-  UltimateExplanation, // <-- Import our new type
-} from './quizTypes'; // We use our existing types
-import { auth } from '@/lib/firebase'; // We need this for the auth token
+  UltimateExplanation,
+} from './quizTypes'; // Import the updated types
+import { auth } from '@/lib/firebase'; 
+import { useQuizUIStore } from './quizUIStore'; // Import the new UI store
 
-// --- Helper: Get Auth Token ---
+// --- Helper: Get Auth Token (Unchanged) ---
 const getAuthHeader = async () => {
   const user = auth.currentUser;
   if (!user) return null;
@@ -20,8 +21,7 @@ const getAuthHeader = async () => {
   return { Authorization: `Bearer ${token}` };
 };
 
-// --- Initial State Definition ---
-// This uses your 129-line file as the base, so it's "perfect"
+// --- Initial "Data" State ---
 const initialState: QuizState = {
   // Core Data
   questions: [],
@@ -38,17 +38,10 @@ const initialState: QuizState = {
   timeLeft: 0,
   totalTime: 0,
 
-  // UI & Interaction
-  currentQuestionNumberInView: 1,
-  currentViewAnswer: null,
-  isPageScrolled: false,
-  isTopBarVisible: true,
-
   // Grouping
   quizTitle: '',
   quizGroupBy: null,
   isGroupingEnabled: false,
-  currentGroupInView: null,
 
   // Review
   bookmarkedQuestions: new Set<string>(),
@@ -57,16 +50,14 @@ const initialState: QuizState = {
   // Notifications
   toast: { show: false, message: '', type: 'info' },
   
-  // --- 💎 "PERFECT" ADMIN STATE 💎 ---
+  // Admin
   editingQuestionId: null,
 
-  // --- 💎 MODAL SHEET LOGIC (AS DISCUSSED) 💎 ---
-  explanationModalQuestionId: null, // <-- NEW
-
+  // Stats
   performanceStats: null,
 };
 
-// --- Create the Zustand Store ---
+// --- Create the "Data" Store ---
 export const useQuizStore = create<QuizStore>()(
   persist(
     (set, get) => ({
@@ -77,6 +68,8 @@ export const useQuizStore = create<QuizStore>()(
       loadAndStartQuiz: async (filter: QuizFilter) => {
         // WIPE PREVIOUS SESSION
         useQuizStore.persist.clearStorage();
+        // 💎 --- RESET THE UI STORE --- 💎
+        useQuizUIStore.getState().resetUIState(); 
 
         set({ ...initialState, isLoading: true, quizError: null });
 
@@ -102,38 +95,28 @@ export const useQuizStore = create<QuizStore>()(
             throw new Error(errorData.message || 'Failed to fetch questions.');
           }
 
-          // Fetch raw questions
           const { questions: rawQuestions, quizTitle, totalTime } = await response.json();
 
           if (!rawQuestions || rawQuestions.length === 0) {
             throw new Error('No questions were found for your selection.');
           }
 
-          // --- 💎 THIS IS THE FIX 💎 ---
-          // The data from /api/quizzes (rawQuestions) is *already* in the correct format.
-          // Your `app/api/quizzes/route.ts` file's `transformFirestoreDocToQuestion`
-          // function already prepared it. We just need to trust it and pass it through.
-          
-          // We still map it just to be 100% safe and ensure defaults.
+          // Process and set data (this logic is correct)
           const processedQuestions: Question[] = rawQuestions.map((q: any, index: number) => {
-            
             const explanationContent: string | UltimateExplanation = 
-              q.explanation || ""; // Use the explanation from the API, or fallback
+              q.explanation || ""; 
 
             return {
-              ...q, // Pass through all fields from the API (like subject, topic, etc.)
-              
-              id: q.id, // <-- FIX: Use the `id` field from the API
-              questionNumber: q.questionNumber || index + 1, // Use number from API or fallback
-              text: q.text, // Use text from API
-              options: q.options, // <-- FIX: Use the `options` array from the API
-              correctAnswer: q.correctAnswer, // Use correctAnswer from API
-              
+              ...q, 
+              id: q.id, 
+              questionNumber: q.questionNumber || index + 1, 
+              text: q.text, 
+              options: q.options, 
+              correctAnswer: q.correctAnswer, 
               explanation: explanationContent,
-              questionType: q.questionType || 'SingleChoice', // Default fallback
+              questionType: q.questionType || 'SingleChoice', 
             };
           });
-          // --- 💎 END OF FIX 💎 ---
 
           set({
             questions: processedQuestions,
@@ -160,6 +143,8 @@ export const useQuizStore = create<QuizStore>()(
 
       startTest: () => {
         console.log("startTest action called");
+        // 💎 --- RESET THE UI STORE --- 💎
+        useQuizUIStore.getState().resetUIState();
         set((state) => ({
           isTestMode: true,
           showReport: false,
@@ -178,7 +163,8 @@ export const useQuizStore = create<QuizStore>()(
       resetTest: () => {
         console.log("resetTest action called");
         set({ ...initialState, isLoading: false }); 
-        // WIPE SESSION ON EXIT
+        // 💎 --- RESET THE UI STORE --- 💎
+        useQuizUIStore.getState().resetUIState();
         useQuizStore.persist.clearStorage();
       },
 
@@ -219,32 +205,19 @@ export const useQuizStore = create<QuizStore>()(
           return { markedForReview: newMarked };
         });
       },
-
-      // --- Navigation & UI (unchanged) ---
+      
       handleDetailedSolution: () => {
         console.log("handleDetailedSolution action called");
         set({ showReport: false, showDetailedSolution: true });
       },
-      viewAnswer: (questionId: string) => {
-        console.log(`viewAnswer: ${questionId}`);
-        set({ currentViewAnswer: questionId });
-      },
-      closeAnswerView: () => {
-        console.log("closeAnswerView action called");
-        set({ currentViewAnswer: null });
-      },
-      setCurrentQuestionNumberInView: (questionNumber: number) => {
-        set({ currentQuestionNumberInView: questionNumber });
-      },
-      setIsPageScrolled: (isScrolled: boolean) => {
-        set({ isPageScrolled: isScrolled });
-      },
-      setIsTopBarVisible: (isVisible: boolean) => {
-        set({ isTopBarVisible: isVisible });
-      },
-      setCurrentGroupInView: (groupName: string | null) => {
-        set({ currentGroupInView: groupName });
-      },
+      
+      // --- 💎 ALL UI ACTIONS HAVE BEEN MOVED --- 💎
+      // viewAnswer, closeAnswerView, setCurrentQuestionNumberInView,
+      // setIsPageScrolled, setIsTopBarVisible, setCurrentGroupInView,
+      // openExplanationModal, closeExplanationModal
+      // ARE ALL GONE FROM THIS FILE.
+
+      // --- Actions that remain ---
       setIsGroupingEnabled: (isEnabled: boolean) => {
         set({ isGroupingEnabled: isEnabled });
       },
@@ -257,34 +230,14 @@ export const useQuizStore = create<QuizStore>()(
       hideToast: () => {
         set({ toast: { show: false, message: '', type: 'info' } });
       },
-
-      // --- 💎 MODAL SHEET LOGIC (AS DISCUSSED) 💎 ---
-      openExplanationModal: (questionId: string) => {
-        console.log(`openExplanationModal: ${questionId}`);
-        set({ 
-          explanationModalQuestionId: questionId,
-          currentViewAnswer: null // Defensively set old state to null
-        });
-      },
-      
-      closeExplanationModal: () => {
-        console.log('closeExplanationModal');
-        set({ explanationModalQuestionId: null });
-      },
-      // --- 💎 END OF NEW ACTIONS 💎 ---
-
-      // --- 💎 "PERFECT" ADMIN ACTIONS 💎 ---
-      // These actions now match lib/quizTypes.ts "perfectly"
       openExplanationEditor: (questionId: string) => {
         console.log(`openExplanationEditor: ${questionId}`);
         set({ editingQuestionId: questionId });
       },
-
       closeExplanationEditor: () => {
         console.log('closeExplanationEditor');
         set({ editingQuestionId: null });
       },
-
       updateQuestionExplanation: (
         questionId: string,
         newExplanation: UltimateExplanation
@@ -297,12 +250,22 @@ export const useQuizStore = create<QuizStore>()(
           editingQuestionId: null,
         }));
       },
+      
+      // These are deprecated but might be used by old components.
+      // We'll have them call the new UI store.
+      viewAnswer: (questionId: string) => {
+        console.warn("Legacy `viewAnswer` called");
+        useQuizUIStore.getState().openExplanationModal(questionId);
+      },
+      closeAnswerView: () => {
+        console.warn("Legacy `closeAnswerView` called");
+        useQuizUIStore.getState().closeExplanationModal();
+      },
+
     }),
     {
-      name: 'quiz-session', // Name of the item in localStorage
-      
+      name: 'quiz-session', 
       storage: createJSONStorage(() => localStorage, {
-        // replacer is used when SAVING (stringify)
         replacer: (key, value) => {
           if (value instanceof Set) {
             return {
@@ -312,7 +275,6 @@ export const useQuizStore = create<QuizStore>()(
           }
           return value;
         },
-        // reviver is used when LOADING (parse)
         reviver: (key, value) => {
           if (typeof value === 'object' && value !== null && (value as any)._type === 'Set') {
             return new Set((value as any).value);

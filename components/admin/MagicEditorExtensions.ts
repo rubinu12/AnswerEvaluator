@@ -1,8 +1,6 @@
 // components/admin/MagicEditorExtensions.ts
-import { Mark, mergeAttributes, RawCommands, CommandProps, Editor, Node } from '@tiptap/core';
+import { Mark, mergeAttributes, RawCommands, CommandProps, Editor } from '@tiptap/core';
 import { MarkType } from '@tiptap/pm/model';
-import { ReactNodeViewRenderer } from '@tiptap/react';
-import { HotspotNodeView } from './MagicEditor'; // We will create this component in MagicEditor.tsx
 
 // --- 1. IMPORT STARTERKIT'S PIECES MANUALLY ---
 import { Blockquote } from '@tiptap/extension-blockquote';
@@ -34,36 +32,42 @@ import { Superscript } from '@tiptap/extension-superscript';
 import { FontFamily } from '@tiptap/extension-font-family';
 // --- END IMPORTS ---
 
-// --- TYPE DECLARATION ---
+// --- TYPE DECLARATION (Unchanged) ---
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     hotspot: {
-      // This is updated to insert a node
-      setHotspot: (attributes: { term: string; type: string }) => ReturnType;
+      setHotspot: (attributes: { type: string }) => ReturnType;
+      toggleHotspot: (attributes: { type: string }) => ReturnType;
+      unsetHotspot: () => ReturnType;
     };
   }
 }
 
 /**
- * --- 💎 THE NEW HOTSPOT NODE 💎 ---
- * We are switching from a Mark to a Node.
- * This lets us render a full React component.
+ * Our original custom Tiptap Mark for "Hotspots".
  */
-export const HotspotNode = Node.create({
+export const HotspotMark = Mark.create({
   name: 'hotspot',
-  group: 'inline',
-  inline: true,
-  atom: true, // Treat as a single "atomic" unit
+  priority: 1001, // <-- This is the PARSER FIX
+
+  parseHTML() {
+    return [
+      {
+        tag: 'span.hotspot-mark[data-type]',
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, { class: 'hotspot-mark' }),
+      0,
+    ];
+  },
 
   addAttributes() {
     return {
-      term: {
-        default: '',
-        parseHTML: (element) => element.textContent,
-        renderHTML: (attributes) => ({
-          'data-term': attributes.term,
-        }),
-      },
       type: {
         default: 'green',
         parseHTML: (element) => element.getAttribute('data-type'),
@@ -74,52 +78,27 @@ export const HotspotNode = Node.create({
     };
   },
 
-  parseHTML() {
-    return [
-      {
-        // This is crucial: it parses the *existing* HTML
-        // that your `convertBracketsToSpans` function creates.
-        tag: 'span.hotspot-mark[data-type]',
-        getAttrs: (dom) => {
-          const element = dom as HTMLElement;
-          return {
-            type: element.getAttribute('data-type'),
-            term: element.textContent,
-          };
-        },
-      },
-    ];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    // This defines how it's saved to the database (and parsed back)
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes, { class: 'hotspot-mark' }),
-      HTMLAttributes.term, // Render the term as the content
-    ];
-  },
-
-  addNodeView() {
-    // This is the magic: it tells Tiptap to render this
-    // node using our React component.
-    return ReactNodeViewRenderer(HotspotNodeView);
-  },
-
   addCommands() {
     return {
       setHotspot:
-        (attributes) =>
-        ({ commands }) => {
-          return commands.insertContent({
-            type: this.name,
-            attrs: attributes,
-          });
+        (attributes: { type: string }) =>
+        ({ commands }: CommandProps) => {
+          return commands.setMark(this.name, attributes);
+        },
+      toggleHotspot:
+        (attributes: { type: string }) =>
+        ({ commands }: CommandProps) => {
+          return commands.toggleMark(this.name, attributes);
+        },
+      unsetHotspot:
+        () =>
+        ({ commands }: CommandProps) => {
+          return commands.unsetMark(this.name);
         },
     };
   },
 });
-// --- END OF HOTSPOT NODE ---
+// --- END OF HOTSPOT MARK ---
 
 // --- 3. CONFIGURE AND EXPORT THE FULL LIST ---
 export const extensions = [
@@ -173,11 +152,9 @@ export const extensions = [
   Heading,
   
   // --- Our Other Extensions (Order Matters!) ---
+  HotspotMark, // Our custom Mark
   
-  // Load our custom HotspotNode first
-  HotspotNode,
-  
-  // Now load the standard `span` extensions
+  // Standard `span` extensions
   TextStyle,
   Color,
   FontFamily,

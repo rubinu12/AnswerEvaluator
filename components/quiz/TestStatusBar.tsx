@@ -6,9 +6,15 @@ import { useQuizStore } from '@/lib/quizStore'; // 1. Use our Zustand Store
 
 // --- The Timer logic now lives here ---
 const Timer = () => {
-  // 2. Get all timer-related state and actions
-  const { totalTime, timeLeft, setTimeLeft, submitTest, showToast } =
-    useQuizStore();
+  // --- 💎 --- THIS IS THE FIX (Atomic Selectors) --- 💎 ---
+  // We select each piece of state atomically to prevent
+  // the "getSnapshot" infinite loop.
+  const totalTime = useQuizStore((state) => state.totalTime);
+  const timeLeft = useQuizStore((state) => state.timeLeft);
+  const setTimeLeft = useQuizStore((state) => state.setTimeLeft);
+  const submitTest = useQuizStore((state) => state.submitTest);
+  const showToast = useQuizStore((state) => state.showToast);
+  // --- 💎 --- END OF FIX --- 💎 ---
     
   // This ref tracks which notifications we've already sent
   const notificationFlags = useRef({ half: false, ten: false, one: false });
@@ -91,8 +97,10 @@ const Timer = () => {
 
 // --- Main Status Bar Component ---
 const TestStatusBar = () => {
-  // 6. Get the state and actions for the bar
-  const { isTestMode, submitTest } = useQuizStore();
+  // --- 💎 --- THIS IS THE FIX (Atomic Selectors) --- 💎 ---
+  const isTestMode = useQuizStore((state) => state.isTestMode);
+  const submitTest = useQuizStore((state) => state.submitTest);
+  // --- 💎 --- END OF FIX --- 💎 ---
 
   // 7. If not in Test Mode, render nothing.
   if (!isTestMode) {

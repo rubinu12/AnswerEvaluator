@@ -55,7 +55,6 @@ const validateExplanationJSON = (
       return { isValid: false, error: `JSON is missing required key: "${key}"` };
     }
   }
-  // ... (rest of your validation logic is fine) ...
   if (typeof data.howToThink !== 'string') {
     return { isValid: false, error: 'Key "howToThink" must be a string.' };
   }
@@ -96,15 +95,12 @@ const convertBracketsToSpans = (
 ): string => {
   if (!html || !hotspotBank) return html;
   let processedHtml = html;
-  // Sort to prevent partial matches (e.g., "India" before "Indian Ocean")
   const sortedBank = [...hotspotBank].sort(
     (a, b) => b.term.length - a.term.length
   );
   for (const hotspot of sortedBank) {
     const escapedTerm = hotspot.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Regex to find [Term] but not inside an HTML tag
     const regex = new RegExp(`(?<!>)\\[${escapedTerm}\\]`, 'g');
-    // This creates the HTML that our new HotspotNode's `parseHTML` will read
     const replacement = `<span class="hotspot-mark" data-type="${hotspot.type}">${hotspot.term}</span>`;
     processedHtml = processedHtml.replace(regex, replacement);
   }
@@ -134,12 +130,7 @@ export default function AdminExplanationEditor({
   const [isControlRoomOpen, setIsControlRoomOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalData, setModalData] = useState<HotspotModalData | null>(null);
-  
-  // --- 💎 NEW STATE ---
-  // We now store the active editor *and* the node's position
   const [activeEditor, setActiveEditor] = useState<TiptapEditor | null>(null);
-  const [activeNodePos, setActiveNodePos] = useState<number | null>(null);
-  // --- 💎 END NEW STATE ---
 
   useEffect(() => {
     let loadedExplanation: UltimateExplanation | null = null;
@@ -259,42 +250,48 @@ export default function AdminExplanationEditor({
     }
   };
 
-  const handleEditClick = (
+  // --- 💎 --- NEW "SMART CLICK" HANDLER --- 💎 ---
+  const handleBlockClick = (
+    e: React.MouseEvent<HTMLDivElement>,
     field: 'howToThink' | 'coreAnalysis' | 'adminProTip'
   ) => {
-    setEditingBlock(field);
-  };
-  
-  // --- 💎 REFACTORED MODAL HANDLERS 💎 ---
-
-  /**
-   * This ONE function handles opening the modal for
-   * BOTH creating a new hotspot AND editing an existing one.
-   */
-  const handleHotspotModalOpen = (
-    data: HotspotModalData,
-    getPos: () => number | undefined,
-    editor: TiptapEditor
-  ) => {
-    const pos = getPos();
-    if (typeof pos === 'number') {
-      // This is an EXISTING node ("click-to-edit")
-      setActiveNodePos(pos);
-    } else {
-      // This is a NEW selection (from Bubble Menu)
-      // activeNodePos is already null, which is correct
-    }
+    // Check if the user clicked *on* a hotspot span
+    const hotspotSpan = (e.target as HTMLElement).closest('.hotspot-mark');
     
-    setActiveEditor(editor);
-    setModalData(data);
-    setIsModalOpen(true);
+    // Only intercept if the block is NOT already being edited
+    if (hotspotSpan && editingBlock !== field && explanation) {
+      // --- 1. CLICKED ON A HOTSPOT ---
+      e.stopPropagation(); // Stop the click from triggering the edit mode
+      const term = hotspotSpan.textContent;
+      if (!term) return;
+
+      const hotspotData = explanation.hotspotBank.find((h) => h.term === term);
+      
+      if (hotspotData) {
+        // Found it! Open the modal in EDIT mode.
+        setModalData(hotspotData);
+        setIsModalOpen(true);
+        // We set activeEditor to null because we are editing
+        // via the modal, not the Bubble Menu.
+        setActiveEditor(null); 
+      } else {
+        toast.error(`Hotspot data for "${term}" not found in bank.`);
+      }
+      
+    } else {
+      // --- 2. CLICKED ON WHITESPACE (or in an active editor) ---
+      // This is your original, correct flow.
+      setEditingBlock(field);
+    }
   };
+  // --- 💎 --- END OF "SMART CLICK" HANDLER --- 💎 ---
+
 
   /**
-   * This is the function passed to the Bubble Menu's "Connect" button
-   * It prepares the data for a NEW hotspot.
+   * This function is now ONLY for CREATING new hotspots
+   * from the Bubble Menu.
    */
-  const handleCreateHotspotClick = (editor: TiptapEditor) => {
+  const handleConnectClick = (editor: TiptapEditor) => {
     const { from, to, empty } = editor.state.selection;
     if (empty) {
       toast.error('Please select text to create a hotspot.');
@@ -302,22 +299,34 @@ export default function AdminExplanationEditor({
     }
     const selectedText = editor.state.doc.textBetween(from, to, ' ');
     
+    // This is the key: we save *which* editor is active
+    // so `handleSaveHotspot` knows where to apply the mark.
+    setActiveEditor(editor);
+    
     const existingHotspot = explanation?.hotspotBank?.find(
       (h) => h.term === selectedText
     );
     
-    const data: HotspotModalData =
-      existingHotspot || { term: selectedText, type: 'green', definition: '' };
-
-    // Call the master handler, passing `undefined` for getPos
-    handleHotspotModalOpen(data, () => undefined, editor);
+    setModalData(
+      existingHotspot || { term: selectedText, type: 'green', definition: '' }
+    );
+    setIsModalOpen(true);
   };
 
-
   const handleSaveHotspot = (data: HotspotModalData) => {
-    if (!explanation || !activeEditor) return;
-
-    // 1. Update the Hotspot Bank (always)
+    if (!explanation) return;
+    
+    // 1. Update the Tiptap <span> (if we are creating a new one)
+    // `activeEditor` is ONLY set when creating via Bubble Menu.
+    if (activeEditor) {
+      activeEditor
+        .chain()
+        .focus()
+        .setMark('hotspot', { type: data.type })
+        .run();
+    }
+    
+    // 2. Update the Hotspot Bank (always)
     const newBank = [...explanation.hotspotBank];
     const existingIndex = newBank.findIndex((h) => h.term === data.term);
     const hotspotToSave: Hotspot = {
@@ -330,37 +339,14 @@ export default function AdminExplanationEditor({
     } else {
       newBank.push(hotspotToSave);
     }
-    // Set state to trigger re-render in all editors
     setExplanation((prev) => ({ ...prev!, hotspotBank: newBank }));
 
-    // 2. Update the Tiptap Editor
-    const { from, to } = activeEditor.state.selection;
-    
-    if (activeNodePos !== null) {
-      // We are EDITING an existing node
-      activeEditor
-        .chain()
-        .focus()
-        // Update the node's attributes at its saved position
-        .command(({ tr }) => {
-          tr.setNodeMarkup(activeNodePos, undefined, { term: data.term, type: data.type });
-          return true;
-        })
-        .run();
-    } else {
-      // We are CREATING a new node
-      activeEditor
-        .chain()
-        .focus()
-        .deleteRange({ from, to }) // Delete the selected text
-        .insertContent({
-          type: 'hotspot', // Insert our new node
-          attrs: {
-            term: data.term,
-            type: data.type,
-          },
-        })
-        .run();
+    // 3. Manually update the other read-only editors
+    // This is a "force refresh" to make the text in the *other*
+    // blocks reflect the new `hotspotBank` data.
+    // This is a subtle but important fix.
+    if (!activeEditor) {
+      setExplanation((prev) => ({...prev!}));
     }
 
     toast.success(`Hotspot "${data.term}" saved!`);
@@ -368,24 +354,24 @@ export default function AdminExplanationEditor({
   };
 
   const handleDeleteHotspot = () => {
-    if (!explanation || !modalData || !activeEditor) return;
-    
+    if (!explanation || !modalData) return;
     const termToDelete = modalData.term;
+    
+    // 1. Remove Mark from Tiptap editor (if it's active)
+    if (activeEditor) {
+      activeEditor.chain().focus().unsetMark('hotspot').run();
+    }
+    // We also need to find and remove the span from the *other*
+    // editors' content. This is complex. A simpler way is
+    // to just update the bank and let the user re-parse if
+    // they want to remove all spans.
+    // For now, we just update the bank.
 
-    // 1. Delete from the bank
+    // 2. Update the bank
     const newBank = explanation.hotspotBank.filter(
       (h) => h.term !== termToDelete
     );
     setExplanation((prev) => ({ ...prev!, hotspotBank: newBank }));
-
-    // 2. Delete the node from the editor
-    if (activeNodePos !== null) {
-      // If we clicked a node, delete it by its position
-      activeEditor.chain().focus().deleteNodeAt(activeNodePos).run();
-    } else {
-      // If we just selected text, delete the selection
-      activeEditor.chain().focus().deleteSelection().run();
-    }
 
     toast.success(`Hotspot "${termToDelete}" deleted.`);
     closeModal();
@@ -395,11 +381,7 @@ export default function AdminExplanationEditor({
     setIsModalOpen(false);
     setModalData(null);
     setActiveEditor(null);
-    setActiveNodePos(null); // <-- Reset node position
   };
-  
-  // --- 💎 END REFACTORED HANDLERS 💎 ---
-
 
   const handleSaveToFirestore = async () => {
     if (!explanation) {
@@ -531,7 +513,7 @@ export default function AdminExplanationEditor({
           )}
         </div>
 
-        {/* --- 3. "HYBRID" Soulful Editor (Professional & Fixed) --- */}
+        {/* --- 3. "HYBRID" Soulful Editor (Original Flow) --- */}
         <div className="space-y-6">
           {/* --- Block 1: howToThink --- */}
           <div
@@ -540,8 +522,7 @@ export default function AdminExplanationEditor({
                 ? 'bg-white border-blue-400 ring-2 ring-blue-200'
                 : 'bg-gray-50 border-gray-200 hover:border-gray-300'
             }`}
-            // We still use onClick on the *wrapper* to enable editing
-            onClick={() => handleEditClick('howToThink')}
+            onClick={(e) => handleBlockClick(e, 'howToThink')}
           >
             <h3 className="font-bold text-lg text-gray-800 mb-2 flex items-center p-4">
               <Brain className="w-5 h-5 mr-2 text-blue-600" />
@@ -555,12 +536,9 @@ export default function AdminExplanationEditor({
               <MagicEditor
                 content={explanation.howToThink}
                 onChange={(html) => handleContentChange('howToThink', html)}
-                onConnectClick={handleCreateHotspotClick}
+                onConnectClick={handleConnectClick}
                 isEditable={editingBlock === 'howToThink'}
                 autoFocus={editingBlock === 'howToThink'}
-                // --- 💎 PASS NEW PROPS ---
-                hotspotBank={explanation.hotspotBank}
-                onHotspotClick={handleHotspotModalOpen}
               />
             </div>
           </div>
@@ -572,7 +550,7 @@ export default function AdminExplanationEditor({
                 ? 'bg-white border-blue-500 ring-2 ring-blue-200'
                 : 'bg-blue-50 border-blue-200 hover:border-blue-300'
             }`}
-            onClick={() => handleEditClick('coreAnalysis')}
+            onClick={(e) => handleBlockClick(e, 'coreAnalysis')}
           >
             <h3 className="font-bold text-lg text-blue-900 mb-2 flex items-center p-4">
               <Target className="w-5 h-5 mr-2 text-blue-600" />
@@ -586,12 +564,9 @@ export default function AdminExplanationEditor({
               <MagicEditor
                 content={explanation.coreAnalysis}
                 onChange={(html) => handleContentChange('coreAnalysis', html)}
-                onConnectClick={handleCreateHotspotClick}
+                onConnectClick={handleConnectClick}
                 isEditable={editingBlock === 'coreAnalysis'}
                 autoFocus={editingBlock === 'coreAnalysis'}
-                // --- 💎 PASS NEW PROPS ---
-                hotspotBank={explanation.hotspotBank}
-                onHotspotClick={handleHotspotModalOpen}
               />
             </div>
           </div>
@@ -603,7 +578,7 @@ export default function AdminExplanationEditor({
                 ? 'bg-white border-blue-400 ring-2 ring-blue-200'
                 : 'bg-blue-100 border-blue-200 hover:border-blue-300'
             }`}
-            onClick={() => handleEditClick('adminProTip')}
+            onClick={(e) => handleBlockClick(e, 'adminProTip')}
           >
             <h3 className="font-bold text-lg text-blue-900 mb-2 flex items-center p-4">
               <Pen className="w-5 h-5 mr-2 text-blue-600" />
@@ -617,12 +592,9 @@ export default function AdminExplanationEditor({
               <MagicEditor
                 content={explanation.adminProTip}
                 onChange={(html) => handleContentChange('adminProTip', html)}
-                onConnectClick={handleCreateHotspotClick}
+                onConnectClick={handleConnectClick}
                 isEditable={editingBlock === 'adminProTip'}
                 autoFocus={editingBlock === 'adminProTip'}
-                // --- 💎 PASS NEW PROPS ---
-                hotspotBank={explanation.hotspotBank}
-                onHotspotClick={handleHotspotModalOpen}
               />
             </div>
           </div>
@@ -633,7 +605,7 @@ export default function AdminExplanationEditor({
           isOpen={isModalOpen}
           onClose={closeModal}
           onSave={handleSaveHotspot}
-          onDelete={modalData?.term ? handleDeleteHotspot : undefined} // Allow delete if term exists
+          onDelete={modalData?.definition ? handleDeleteHotspot : undefined}
           initialData={modalData}
         />
       </div>

@@ -3,7 +3,8 @@
 
 import { useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { useQuizStore } from '@/lib/quizStore';
+import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
+import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
 import { QuizFilter } from '@/lib/quizTypes';
 import { X } from 'lucide-react';
 
@@ -33,6 +34,8 @@ export default function QuizPage() {
   
   const { user, loading: authLoading } = useAuthContext();
 
+  // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
+  // 1. Get "Data" from the main store
   const {
     isLoading: quizLoading,
     quizError,
@@ -40,24 +43,20 @@ export default function QuizPage() {
     isTestMode,
     showReport,
     questions,
-    
-    explanationModalQuestionId,
-    closeExplanationModal,
   } = useQuizStore();
 
-  // --- 💎 THIS IS THE FIX 💎 ---
+  // 2. Get "UI" state from the new UI store
+  const {
+    explanationModalQuestionId,
+    closeExplanationModal,
+  } = useQuizUIStore();
+  // --- 💎 --- END OF STATE SPLIT --- 💎 ---
+
+  // This is your original, correct logic
   useEffect(() => {
-    // Wait for Firebase auth to be ready
     if (authLoading) {
       return; 
     }
-
-    // --- 💎 REMOVED THE FAULTY CHECK 💎 ---
-    // We are *REMOVING* the `if (questions.length > 0)` check.
-    // We *WANT* loadAndStartQuiz to run every single time to ensure
-    // we clear localStorage (via its own internal call) and fetch fresh data.
-    // This is the only way to guarantee we clear out the "broken"
-    // student state that is crashing the app.
 
     const filter: QuizFilter = {};
     const type = params.type as string;
@@ -77,11 +76,9 @@ export default function QuizPage() {
     loadAndStartQuiz(filter);
     useQuizStore.setState({ isTestMode: false });
     
-  // 💎 We REMOVE `questions.length` from the dependency array
-  // to prevent this from re-running when questions are loaded.
   }, [params, loadAndStartQuiz, authLoading, user]); 
-  // --- 💎 END OF FIX 💎 ---
 
+  // This is your original, correct logic
   const questionForModal = useMemo(() => {
     if (!explanationModalQuestionId) return null;
     return questions.find((q) => q.id === explanationModalQuestionId) || null;
@@ -119,20 +116,24 @@ export default function QuizPage() {
 
       </main>
 
+      {/* This `if` check prevents the crash */ }
       {questionForModal && (
         <div 
           className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 lg:p-8"
-          onMouseDown={closeExplanationModal}
+          onMouseDown={closeExplanationModal} // <-- This is now from useQuizUIStore
         >
           <div 
             className="w-full max-w-4xl max-h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex-1 overflow-y-auto custom-scrollbar">
+              {/* --- 💎 --- THIS IS THE FIX --- 💎 --- */}
+              {/* We pass the full `question` object, not a string */}
               <ExplanationController 
                 question={questionForModal} 
                 onClose={closeExplanationModal} 
               />
+              {/* --- 💎 --- END OF FIX --- 💎 --- */}
             </div>
           </div>
         </div>

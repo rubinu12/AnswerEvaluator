@@ -1,86 +1,91 @@
 // components/quiz/QuestionPalette.tsx
-"use client";
-
-import React, { FC, useEffect, useRef } from 'react';
-import { useQuizStore } from '@/lib/quizStore'; // 1. Use the new Zustand store
+'use client';
+import React, { useCallback } from 'react';
+import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
+import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
+import { X, Flag, Bookmark } from 'lucide-react';
+import { Question } from '@/lib/quizTypes';
 
 interface QuestionPaletteProps {
-    onClose: () => void;
+  onClose: () => void;
 }
 
-const QuestionPalette: FC<QuestionPaletteProps> = ({ onClose }) => {
-    // 2. Select all necessary state (using our 1-based number)
-    const { 
-      questions, 
-      userAnswers, 
-      markedForReview, // Added this back
-      currentQuestionNumberInView, // Use 1-based number
-      setCurrentQuestionNumberInView // Use 1-based setter
-    } = useQuizStore();
-    
-    const paletteContainerRef = useRef<HTMLDivElement>(null);
+export default function QuestionPalette({ onClose }: QuestionPaletteProps) {
+  // --- 💎 --- THIS IS THE FIX (Atomic Selectors) --- 💎 ---
+  // 1. Get "Data" state
+  const questions = useQuizStore((state) => state.questions);
+  const userAnswers = useQuizStore((state) => state.userAnswers);
+  const markedForReview = useQuizStore((state) => state.markedForReview);
+  const bookmarkedQuestions = useQuizStore((state) => state.bookmarkedQuestions);
 
-    // 3. Updated to watch the 1-based number
-    useEffect(() => {
-        if (paletteContainerRef.current) {
-            const activeButton = paletteContainerRef.current.querySelector(
-              `#palette-btn-${currentQuestionNumberInView}` // Find 1-based ID
-            );
-            if (activeButton) {
-                activeButton.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        }
-    }, [currentQuestionNumberInView]);
+  // 2. Get "UI" state AND actions
+  const currentQuestionNumberInView = useQuizUIStore(
+    (state) => state.currentQuestionNumberInView
+  );
+  const setCurrentQuestionNumberInView = useQuizUIStore(
+    (state) => state.setCurrentQuestionNumberInView
+  );
+  // --- 💎 --- END OF FIX --- 💎 ---
 
-    // 4. Updated to take and set the 1-based question number
-    const scrollToQuestion = (questionNumber: number) => {
-        setCurrentQuestionNumberInView(questionNumber); // Set 1-based number
-        const questionElement = document.getElementById(
-          `question-card-${questionNumber}` // Find 1-based card
-        );
-        if (questionElement) {
-            questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        onClose(); // Close the palette after selection
-    };
+  const userAnswersMap = new Map(
+    userAnswers.map((ua) => [ua.questionId, ua.answer])
+  );
 
-    // 5. Refactored to get status based on 1-based number
-    const getStatusClass = (qNumber: number): string => {
-        const questionId = questions[qNumber - 1]?.id; // Use qNumber-1 to index array
-        if (currentQuestionNumberInView === qNumber) 
-          return 'bg-blue-100 border-blue-500 text-blue-600';
-        if (markedForReview.has(questionId)) // Added this back
-          return 'bg-purple-100 border-purple-300 text-purple-700';
-        if (userAnswers.some(a => a.questionId === questionId)) 
-          return 'bg-green-100 border-green-300 text-green-700';
-        return 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50';
-    };
+  const scrollToQuestion = useCallback((qNum: number) => {
+    const qElement = document.getElementById(`question-card-${qNum}`);
+    if (qElement) {
+      qElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setCurrentQuestionNumberInView(qNum); // <-- Calls UI Store
+      onClose(); // Close palette on click
+    }
+  }, [setCurrentQuestionNumberInView, onClose]);
 
-    const gridCols = questions.length > 50 ? 'grid-cols-6' : 'grid-cols-5';
+  const getStatusClass = (q: Question) => { 
+    if (currentQuestionNumberInView === q.questionNumber) {
+      return 'bg-blue-600 text-white border-blue-700';
+    }
+    if (markedForReview.has(q.id)) {
+      return 'bg-purple-100 text-purple-800 border-purple-300';
+    }
+    if (userAnswersMap.has(q.id)) {
+      return 'bg-green-100 text-green-800 border-green-300';
+    }
+    return 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50';
+  };
 
-    return (
-        <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose}>
-            <div 
-                className="absolute bottom-24 right-6 p-4 bg-gray-50 w-auto rounded-xl shadow-2xl border"
-                onClick={(e) => e.stopPropagation()}
+  return (
+    <div className="absolute bottom-20 right-0 w-72 h-96 bg-white border border-gray-200 rounded-lg shadow-xl flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center p-3 border-b border-gray-200">
+        <h3 className="font-semibold text-gray-800">Question Palette</h3>
+        <button
+          onClick={onClose}
+          className="p-1 rounded-full hover:bg-gray-100"
+        >
+          <X className="w-5 h-5 text-gray-600" />
+        </button>
+      </div>
+
+      {/* Grid */}
+      <div className="flex-1 overflow-y-auto p-3">
+        <div className="grid grid-cols-5 gap-2">
+          {questions.map((q) => (
+            <button
+              key={q.id}
+              onClick={() => scrollToQuestion(q.questionNumber)}
+              className={`w-10 h-10 flex items-center justify-center rounded-md border text-sm font-medium ${getStatusClass(
+                q
+              )}`}
             >
-                <h3 className="text-md font-semibold text-center text-gray-800 mb-4">All Questions</h3>
-                <div ref={paletteContainerRef} className={`grid ${gridCols} gap-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar`}>
-                    {/* 6. Looping and passing the 1-based question number */}
-                    {questions.map((q) => (
-                        <button
-                            key={q.id}
-                            id={`palette-btn-${q.questionNumber}`}
-                            onClick={() => scrollToQuestion(q.questionNumber)}
-                            className={`btn w-12 h-12 flex-shrink-0 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-200 border ${getStatusClass(q.questionNumber)}`}
-                        >
-                            {q.questionNumber}
-                        </button>
-                    ))}
-                </div>
-            </div>
+              {bookmarkedQuestions.has(q.id) ? (
+                <Bookmark className="w-4 h-4" />
+              ) : (
+                q.questionNumber
+              )}
+            </button>
+          ))}
         </div>
-    );
-};
-
-export default QuestionPalette;
+      </div>
+    </div>
+  );
+}

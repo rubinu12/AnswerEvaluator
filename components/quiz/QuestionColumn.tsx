@@ -2,12 +2,12 @@
 'use client';
 
 import React, { useEffect, useRef, useMemo, useState } from 'react';
-import { useQuizStore } from '@/lib/quizStore';
-import { Question, isUltimateExplanation } from '@/lib/quizTypes'; // "Perfectly" imported
+import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
+import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
+import { Question, isUltimateExplanation } from '@/lib/quizTypes';
 import QuestionPalette from './QuestionPalette';
 import { Bookmark, Flag, Grid, X } from 'lucide-react';
-// import { useAuthContext } from '@/lib/AuthContext'; // <-- 💎 REMOVED
-import UltimateExplanationUI from './UltimateExplanationUI'; // "Perfect" Magic UI
+import UltimateExplanationUI from './UltimateExplanationUI';
 
 // --- Individual Question Card ---
 const QuestionCard = ({
@@ -17,34 +17,26 @@ const QuestionCard = ({
   question: Question;
   displayNumber: number;
 }) => {
-  const {
-    currentQuestionNumberInView,
-    markedForReview,
-    toggleMarkForReview,
-    bookmarkedQuestions,
-    toggleBookmark,
-  } = useQuizStore();
+  // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
+  // 1. Get "Data" state
+  const { markedForReview, toggleMarkForReview, bookmarkedQuestions, toggleBookmark } =
+    useQuizStore();
+  
+  // 2. Get "UI" state
+  const { currentQuestionNumberInView } = useQuizUIStore();
+  // --- 💎 --- END OF STATE SPLIT --- 💎 ---
 
   const isLongOption = question.options.some((opt) => opt.text.length > 50);
-
-  // --- 💎 ALL ADMIN LOGIC REMOVED AS REQUESTED 💎 ---
-  // const { userProfile } = useAuthContext(); // <-- GONE
-  // const isAdmin = userProfile?.subscriptionStatus === 'ADMIN'; // <-- GONE
-  // const handleAdminEditClick = () => { ... }; // <-- GONE
 
   return (
     <div
       id={`question-card-${displayNumber}`}
       className={`rounded-xl p-6 border relative transition-all duration-300 mb-6 ${
-        currentQuestionNumberInView === displayNumber
+        currentQuestionNumberInView === displayNumber // <-- Reads from UI store
           ? 'bg-blue-50 border-blue-300'
           : 'bg-white border-gray-200'
       }`}
     >
-      {/* --- 💎 ADMIN BUTTON BLOCK REMOVED 💎 --- */}
-      {/* {isAdmin && ( ... )} */}
-
-      {/* This div is now the stable, single child for all users */}
       <div className="flex items-start gap-4">
         <div className="flex flex-col items-center flex-shrink-0">
           <div className="bg-gray-800 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
@@ -101,26 +93,31 @@ const QuestionCard = ({
 };
 
 // --- Main Question Column Component ---
-// (No changes in this part, it's all correct)
 const QuestionColumn = () => {
+  // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
+  // 1. Get "Data" state from the main store
   const {
     questions,
-    currentViewAnswer,
-    closeAnswerView,
+    quizGroupBy,
+    isGroupingEnabled,
+  } = useQuizStore();
+
+  // 2. Get "UI" state AND actions from the UI store
+  const {
     setCurrentQuestionNumberInView,
     setIsPageScrolled,
     setCurrentGroupInView,
-    quizGroupBy,
-    isGroupingEnabled,
     isTopBarVisible,
     setIsTopBarVisible,
-  } = useQuizStore();
+  } = useQuizUIStore();
+  // --- 💎 --- END OF STATE SPLIT --- 💎 ---
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const questionObserverRef = useRef<IntersectionObserver | null>(null);
   const groupObserverRef = useRef<IntersectionObserver | null>(null);
 
+  // This logic is all correct
   const questionsByGroup = useMemo(() => {
     if (!quizGroupBy || !isGroupingEnabled) return null;
     return questions.reduce((acc, q) => {
@@ -142,6 +139,7 @@ const QuestionColumn = () => {
   }, [questionsByGroup]);
 
   // Header "driver" logic
+  // This now only calls lightweight UI actions
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -161,6 +159,7 @@ const QuestionColumn = () => {
   }, [setIsPageScrolled, isTopBarVisible, setIsTopBarVisible]);
 
   // Group Scrolling Observer
+  // This now only calls a lightweight UI action
   useEffect(() => {
     if (groupObserverRef.current) groupObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
@@ -179,7 +178,7 @@ const QuestionColumn = () => {
           if (entry.isIntersecting) {
             const groupName = entry.target.getAttribute('data-group');
             if (groupName) {
-              setCurrentGroupInView(groupName);
+              setCurrentGroupInView(groupName); // <-- Updates UI Store
               break;
             }
           }
@@ -199,6 +198,8 @@ const QuestionColumn = () => {
   ]);
 
   // Question Sync-Scroll Observer
+  // This now only calls a lightweight UI action.
+  // THIS WILL NO LONGER CAUSE LAG.
   useEffect(() => {
     if (questionObserverRef.current) questionObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
@@ -210,7 +211,7 @@ const QuestionColumn = () => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const cardId = entry.target.id.replace('question-card-', '');
-            setCurrentQuestionNumberInView(Number(cardId));
+            setCurrentQuestionNumberInView(Number(cardId)); // <-- Updates UI Store
           }
         });
       },
@@ -226,70 +227,18 @@ const QuestionColumn = () => {
     return () => questionObserverRef.current?.disconnect();
   }, [questions, setCurrentQuestionNumberInView, isGroupingEnabled]);
 
-  // "Perfect" Explanation Renderer
-  const renderExplanation = (question: Question) => {
-    if (isUltimateExplanation(question.explanation)) {
-      return <UltimateExplanationUI explanation={question.explanation} />;
-    }
-    if (
-      typeof question.explanation === 'string' &&
-      question.explanation.trim()
-    ) {
-      return (
-        <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-          {question.explanation}
-        </p>
-      );
-    }
-    return (
-      <p className="mt-4 text-gray-600">
-        No detailed explanation available for this question.
-      </p>
-    );
-  };
 
-  // "VIEW ANSWER" MODE
-  if (currentViewAnswer) {
-    const question = questions.find((q) => q.id === currentViewAnswer);
-    if (!question) return null;
-    const displayNumber = questions.indexOf(question) + 1;
+  // --- 💎 --- REMOVED --- 💎 ---
+  // The "VIEW ANSWER" MODE logic has been removed from this
+  // component. It is now correctly handled by the modal
+  // in `page.tsx`.
+  // --- 💎 --- END OF REMOVAL --- 💎 ---
 
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Detailed Solution for Q{displayNumber}
-          </h3>
-          <button
-            onClick={closeAnswerView}
-            className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-            title="Close Solution"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-          <div className="space-y-6">
-            <div>
-              <p className="font-semibold text-lg mb-4 whitespace-pre-line">
-                Q{displayNumber}: {question.text}
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-lg mb-2">Explanation:</h4>
-              {renderExplanation(question)}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // DEFAULT QUESTION LIST VIEW
   let questionCounter = 0;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col relative overflow-hidden">
-      {/* --- 💎 "PERFECT" FIX: The modal is "perfectly" GONE from here 💎 --- */}
       
       <div
         ref={scrollContainerRef}

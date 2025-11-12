@@ -16,6 +16,7 @@
     "@headlessui/react": "^2.2.7",
     "@lottiefiles/react-lottie-player": "^3.6.0",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@tanstack/react-virtual": "^3.13.12",
     "@tiptap/core": "^3.10.1",
     "@tiptap/extension-blockquote": "^3.10.4",
     "@tiptap/extension-bold": "^3.10.4",

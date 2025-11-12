@@ -2,7 +2,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useQuizStore } from '@/lib/quizStore'; // <-- Use Zustand Store
+import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
+import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
+import { Question } from '@/lib/quizTypes';
 
 // Import the specialized bar components
 import TopicFocusBar from '@/components/quiz/TopicFocusBar';
@@ -11,13 +13,17 @@ import { useRouter } from 'next/navigation';
 
 // This component for group navigation is unchanged internally
 const GroupNavigation = () => {
-  const {
-    questions,
-    quizGroupBy,
-    isGroupingEnabled,
-    setIsGroupingEnabled,
-    currentGroupInView,
-  } = useQuizStore();
+  // --- 💎 --- THIS IS THE FIX (Atomic Selectors) --- 💎 ---
+  // We select each piece of state individually.
+  // This is fast and type-safe.
+  const questions = useQuizStore((state) => state.questions);
+  const quizGroupBy = useQuizStore((state) => state.quizGroupBy);
+  const isGroupingEnabled = useQuizStore((state) => state.isGroupingEnabled);
+  const setIsGroupingEnabled = useQuizStore((state) => state.setIsGroupingEnabled);
+  
+  const currentGroupInView = useQuizUIStore((state) => state.currentGroupInView);
+  const setCurrentGroupInView = useQuizUIStore((state) => state.setCurrentGroupInView);
+  // --- 💎 --- END OF FIX --- 💎 ---
 
   const sortedGroups = useMemo(() => {
     if (!quizGroupBy || !isGroupingEnabled) return [];
@@ -38,6 +44,7 @@ const GroupNavigation = () => {
     const groupElement = document.getElementById(`group-${groupName}`);
     if (groupElement) {
       groupElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setCurrentGroupInView(String(groupName)); // <-- Call UI Store action
     }
   };
 
@@ -63,9 +70,6 @@ const GroupNavigation = () => {
   );
 
   return (
-    // --- THIS IS THE "PIXEL-PERFECT" FIX ---
-    // This div no longer has any animation or position classes.
-    // It's now flexible and fills the space given by the parent.
     <div className="flex items-center justify-between w-full h-full">
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className="text-xs font-semibold text-gray-600">Group:</span>
@@ -94,18 +98,21 @@ const GroupNavigation = () => {
 
 // The main controller component
 const DynamicQuizCommandBar: React.FC = () => {
-  const {
-    isTestMode,
-    showReport,
-    showDetailedSolution,
-    isGroupingEnabled,
-    questions,
-    currentQuestionNumberInView,
-  } = useQuizStore();
+  // --- 💎 --- THIS IS THE FIX (Atomic Selectors) --- 💎 ---
+  const isTestMode = useQuizStore((state) => state.isTestMode);
+  const showReport = useQuizStore((state) => state.showReport);
+  const showDetailedSolution = useQuizStore((state) => state.showDetailedSolution);
+  const isGroupingEnabled = useQuizStore((state) => state.isGroupingEnabled);
+  const questions = useQuizStore((state) => state.questions);
+    
+  const currentQuestionNumberInView = useQuizUIStore(
+    (state) => state.currentQuestionNumberInView
+  );
+  // --- 💎 --- END OF FIX --- 💎 ---
 
   const currentQuestion = useMemo(() => {
     if (questions.length > 0 && currentQuestionNumberInView > 0) {
-      return questions[currentQuestionNumberInView - 1];
+      return questions[currentQuestionNumberInView - 1] as Question | null;
     }
     return null;
   }, [questions, currentQuestionNumberInView]);

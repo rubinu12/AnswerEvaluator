@@ -2,31 +2,37 @@
 'use client';
 
 import React, { useCallback, useMemo, useEffect, useRef } from 'react';
-import { useQuizStore } from '@/lib/quizStore';
+import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
+import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
 import { Question } from '@/lib/quizTypes';
 import { Check, X, Flag, Bookmark, Eye } from 'lucide-react';
 
 const AnswerColumn = () => {
-  // --- 1. USE ZUSTAND STORE (with correct state/actions) ---
+  // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
+  // 1. Get "Data" state from the main store
   const {
     questions,
-    userAnswers, // This is an array: { questionId: string, answer: string }[]
+    userAnswers,
     markedForReview,
     bookmarkedQuestions,
     isTestMode,
     showReport,
     showDetailedSolution,
-    handleAnswerSelect, // This is the action for selection
-    // viewAnswer, // <-- OLD ACTION (REMOVED)
-    openExplanationModal, // <-- 💎 NEW ACTION (ADDED)
+    handleAnswerSelect,
+  } = useQuizStore();
+
+  // 2. Get "UI" state AND actions from the UI store
+  const {
+    openExplanationModal,
     currentQuestionNumberInView,
     setCurrentQuestionNumberInView,
-  } = useQuizStore();
+  } = useQuizUIStore();
+  // --- 💎 --- END OF STATE SPLIT --- 💎 ---
+
 
   const answerListRef = useRef<HTMLDivElement>(null);
 
-  // --- 2. Find Current Answer (Helper) ---
-  // Memoized for performance, uses the correct array structure
+  // Find Current Answer (Helper) (Unchanged)
   const userAnswersMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const ua of userAnswers) {
@@ -35,24 +41,25 @@ const AnswerColumn = () => {
     return map;
   }, [userAnswers]);
 
-  // --- 3. Scroll-to-Question Logic (from rootrise) ---
+  // Scroll-to-Question Logic (Unchanged)
   const scrollToQuestion = useCallback((qNum: number) => {
     const qElement = document.getElementById(`question-card-${qNum}`);
     if (qElement) {
       qElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       // Manually set for instant feedback
-      setCurrentQuestionNumberInView(qNum);
+      setCurrentQuestionNumberInView(qNum); // <-- Calls UI Store
     }
   }, [setCurrentQuestionNumberInView]);
 
-  // --- 4. Get Button Class Logic (Adapted for your state) ---
+  // Get Button Class Logic (Unchanged)
+  // This logic is all correct and now reads `currentQuestionNumberInView`
+  // from the UI store.
   const getButtonClass = useCallback(
     (q: Question, qNum: number, optionLabel: string) => {
       const selectedAnswer = userAnswersMap.get(q.id);
       const isSelected = selectedAnswer === optionLabel;
       const isCurrent = currentQuestionNumberInView === qNum;
 
-      // Default state
       let baseClass =
         'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400';
 
@@ -65,26 +72,20 @@ const AnswerColumn = () => {
           baseClass = 'bg-blue-600 border-blue-600 text-white';
         }
       } else {
-        // Practice Mode (before report)
         if (isSelected && !showReport && !showDetailedSolution) {
-          // Use green like your original code for practice mode
           baseClass = 'bg-green-600 border-green-700 text-white';
         }
       }
 
-      // Report Card / Detailed Solution Mode
       if (showReport || showDetailedSolution) {
         const isCorrect = q.correctAnswer === optionLabel;
         if (isCorrect) {
-          // Is the correct answer
           baseClass = 'bg-green-100 border-green-300 text-green-800';
         }
         if (isSelected && !isCorrect) {
-          // Is the user's WRONG answer
           baseClass = 'bg-red-100 border-red-300 text-red-800';
         }
         if (isSelected && isCorrect) {
-          // Is the user's RIGHT answer
           baseClass = 'bg-green-600 border-green-600 text-white';
         }
       }
@@ -94,7 +95,7 @@ const AnswerColumn = () => {
     [userAnswersMap, currentQuestionNumberInView, isTestMode, showReport, showDetailedSolution]
   );
 
-  // --- 5. Get Indicator Logic (Adapted for your state) ---
+  // Get Indicator Logic (Unchanged)
   const getIndicator = useCallback(
     (q: Question, optionLabel: string) => {
       if (!showReport && !showDetailedSolution) return null;
@@ -114,19 +115,20 @@ const AnswerColumn = () => {
     [userAnswersMap, showReport, showDetailedSolution]
   );
 
-  // --- 6. Handle Click Logic (Using your action) ---
+  // Handle Click Logic (Unchanged)
   const onAnswerClick = (questionId: string, optionLabel: string) => {
     if (isTestMode) {
       handleAnswerSelect(questionId, optionLabel);
     } else {
-      // In practice mode, clicking an answer is final
       if (!userAnswersMap.has(questionId)) {
         handleAnswerSelect(questionId, optionLabel);
       }
     }
   };
 
-  // --- 7. Sync-Scroll listener (from your original code) ---
+  // Sync-Scroll listener (Unchanged)
+  // This now reads `currentQuestionNumberInView` from the UI store
+  // and will be perfectly in sync.
   useEffect(() => {
     if (answerListRef.current) {
       const activeCard = answerListRef.current.querySelector(
@@ -138,7 +140,7 @@ const AnswerColumn = () => {
     }
   }, [currentQuestionNumberInView]);
 
-  // --- 8. Memoized Question List (Performance) ---
+  // Memoized Question List (Unchanged)
   const questionDatalist = useMemo(() => {
     return questions.map((q, index) => ({
       id: q.id,
@@ -148,7 +150,7 @@ const AnswerColumn = () => {
     }));
   }, [questions]);
 
-  // --- 9. The "Pixel-Perfect" JSX (from rootrise) ---
+  // JSX (Unchanged)
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
       {/* Header */}
@@ -208,9 +210,8 @@ const AnswerColumn = () => {
                     </div>
                   </div>
 
-                  {/* --- 💎 MODIFIED VIEW BUTTON (AS REQUESTED) 💎 --- */}
                   <button
-                    onClick={() => openExplanationModal(id)} // <-- This is the new "Modal Sheet" trigger
+                    onClick={() => openExplanationModal(id)} // <-- Calls UI Store
                     className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
                   >
                     <Eye className="w-4 h-4" />
@@ -230,7 +231,7 @@ const AnswerColumn = () => {
                         }
                         scrollToQuestion(qNum);
                       }}
-      disabled={showReport || showDetailedSolution || (isAnswered && !isTestMode)}
+                      disabled={showReport || showDetailedSolution || (isAnswered && !isTestMode)}
                       className={`h-10 flex items-center justify-center rounded-lg border font-semibold text-sm
                         ${getButtonClass(question, qNum, option.label)}
                         ${(showReport || showDetailedSolution) ? 'cursor-default' : 'transform active:scale-95'}

@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Hotspot } from '@/lib/quizTypes'; // We will use our existing Hotspot type
+import { Hotspot } from '@/lib/quizTypes';
+import MagicEditor from './MagicEditor'; // <-- 💎 NEW IMPORT 💎
 
 // This data is passed *to* the modal when it opens
 export interface HotspotModalData {
@@ -38,120 +39,114 @@ export default function HotspotModal({
       setTerm(initialData.term);
       setType(initialData.type);
       setDefinition(initialData.definition);
-    } else {
-      // Reset form when opening for a "new" hotspot
-      setTerm('');
-      setType('green');
-      setDefinition('');
     }
-  }, [initialData, isOpen]);
+  }, [initialData]);
 
+  // Helper function to handle saving
   const handleSave = () => {
     onSave({ term, type, definition });
-    onClose();
   };
 
+  // Helper function to handle deletion
   const handleDelete = () => {
     if (onDelete) {
       onDelete();
     }
-    onClose();
   };
 
   if (!isOpen) {
     return null;
   }
 
-  // This is a simple modal using fixed position and a backdrop
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
-        <h2 className="text-2xl font-bold mb-4">Hotspot Editor</h2>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+        <div className="space-y-4">
+          {/* Modal Header */}
+          <h2 className="text-xl font-bold text-gray-900">
+            {onDelete ? 'Edit Hotspot' : 'Create Hotspot'}
+          </h2>
 
-        {/* Term (Read-only, it's the text you selected) */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Term
-          </label>
-          <input
-            type="text"
-            value={term}
-            readOnly
-            className="w-full p-2 border rounded-md bg-gray-100"
-          />
-        </div>
-
-        {/* Pen Type */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Pen Type
-          </label>
-          <div className="flex space-x-2">
-            {(['green', 'blue', 'red'] as const).map((penType) => (
-              <button
-                key={penType}
-                onClick={() => setType(penType)}
-                className={`px-4 py-2 rounded-md ${
-                  type === penType
-                    ? 'text-white shadow-md'
-                    : 'bg-gray-100 hover:bg-gray-200'
-                } ${
-                  penType === 'green' && type === 'green'
-                    ? 'bg-green-600'
-                    : ''
-                } ${
-                  penType === 'blue' && type === 'blue' ? 'bg-blue-600' : ''
-                } ${penType === 'red' && type === 'red' ? 'bg-red-600' : ''}`}
-              >
-                {penType.charAt(0).toUpperCase() + penType.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Definition */}
-        <div className="mb-6">
-          <label
-            htmlFor="definition"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Definition
-          </label>
-          <textarea
-            id="definition"
-            rows={4}
-            value={definition}
-            onChange={(e) => setDefinition(e.target.value)}
-            className="w-full p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter the 'Deeper Knowledge', 'Connection', or 'Trap'..."
-          ></textarea>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-between">
+          {/* Term (Read-only) */}
           <div>
-            {onDelete && (
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 font-medium text-red-600 bg-transparent rounded-md hover:bg-red-50"
-              >
-                Delete
-              </button>
-            )}
+            <label className="block text-sm font-medium text-gray-700">
+              Hotspot Term (Selected Text)
+            </label>
+            <input
+              type="text"
+              value={term}
+              readOnly
+              className="w-full p-2 border rounded-md bg-gray-100 text-gray-500"
+            />
           </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+
+          {/* Type Selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Pen Type (Color)
+            </label>
+            <select
+              value={type}
+              onChange={(e) =>
+                setType(e.target.value as 'green' | 'blue' | 'red')
+              }
+              className="w-full p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              <option value="green">✅ Green (Info / Distractor)</option>
+              <option value="blue">🌀 Blue (Connection)</option>
+              <option value="red">❌ Red (Trap / Misconception)</option>
+            </select>
+          </div>
+
+          {/* --- 💎 --- RICH DEFINITION EDITOR --- 💎 --- */}
+          <div>
+            <label
+              htmlFor="definition"
+              className="block text-sm font-medium text-gray-700"
             >
-              Save Hotspot
-            </button>
+              Definition
+            </label>
+            {/* We replace the <textarea> with your MagicEditor */}
+            <div className="editor-container border border-gray-300 rounded-md shadow-inner bg-white">
+              <MagicEditor
+                content={definition}
+                onChange={(html) => setDefinition(html)}
+                isEditable={true}
+                autoFocus={true}
+                // We OMIT `onConnectClick` here to disable
+                // the "Connect" button in the Bubble Menu
+              />
+            </div>
+          </div>
+          {/* --- 💎 --- END OF FIX --- 💎 --- */}
+
+
+          {/* Action Buttons */}
+          <div className="flex justify-between">
+            <div>
+              {onDelete && (
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 font-medium text-red-600 bg-transparent rounded-md hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       </div>
