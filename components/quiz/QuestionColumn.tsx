@@ -10,7 +10,6 @@ import { Bookmark, Flag, Grid, X } from 'lucide-react';
 import UltimateExplanationUI from './UltimateExplanationUI';
 
 // --- Individual Question Card ---
-// (This is YOUR original, correct QuestionCard component)
 const QuestionCard = ({
   question,
   displayNumber,
@@ -18,14 +17,9 @@ const QuestionCard = ({
   question: Question;
   displayNumber: number;
 }) => {
-  // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
-  // 1. Get "Data" state
   const { markedForReview, toggleMarkForReview, bookmarkedQuestions, toggleBookmark } =
     useQuizStore();
-  
-  // 2. Get "UI" state
   const { currentQuestionNumberInView } = useQuizUIStore();
-  // --- 💎 --- END OF STATE SPLIT --- 💎 ---
 
   const isLongOption = question.options.some((opt) => opt.text.length > 50);
 
@@ -33,9 +27,9 @@ const QuestionCard = ({
     <div
       id={`question-card-${displayNumber}`}
       className={`rounded-xl p-6 border relative transition-all duration-300 mb-6 ${
-        currentQuestionNumberInView === displayNumber // <-- This is your "bluish" highlight
-          ? 'bg-blue-50 border-blue-300'
-          : 'bg-white border-gray-200'
+        currentQuestionNumberInView === displayNumber
+          ? 'bg-white border-blue-500 shadow-lg' // <-- Gold Standard Active
+          : 'bg-gray-50 border-transparent' // <-- Gold Standard Inactive
       }`}
     >
       <div className="flex items-start gap-4">
@@ -69,9 +63,13 @@ const QuestionCard = ({
           </div>
         </div>
         <div className="flex-1 min-w-0">
+          {/* --- 💎 --- THIS IS THE CLEANUP --- 💎 --- */}
+          {/* We remove the "|| 'Error...'" fallback, as the store now handles this */}
           <p className="text-lg text-gray-900 font-semibold leading-relaxed whitespace-pre-line">
             {question.text}
           </p>
+          {/* --- 💎 --- END OF CLEANUP --- 💎 --- */}
+          
           <div
             className={`pt-4 grid ${
               isLongOption ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'
@@ -79,7 +77,7 @@ const QuestionCard = ({
           >
             {question.options.map((option) => (
               <div
-                key={option.label}
+                key={question.id + option.label} // This key is correct
                 className="p-4 rounded-lg border bg-white border-gray-300 text-left font-medium"
               >
                 <span className="font-bold mr-2">{option.label}.</span>
@@ -94,9 +92,8 @@ const QuestionCard = ({
 };
 
 // --- Main Question Column Component ---
+// (This component's logic is unchanged and correct)
 const QuestionColumn = () => {
-  // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
-  // (This is YOUR original, correct state logic)
   const {
     questions,
     quizGroupBy,
@@ -110,14 +107,12 @@ const QuestionColumn = () => {
     isTopBarVisible,
     setIsTopBarVisible,
   } = useQuizUIStore();
-  // --- 💎 --- END OF STATE SPLIT --- 💎 ---
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const questionObserverRef = useRef<IntersectionObserver | null>(null);
   const groupObserverRef = useRef<IntersectionObserver | null>(null);
 
-  // (This is YOUR original, correct logic)
   const questionsByGroup = useMemo(() => {
     if (!quizGroupBy || !isGroupingEnabled) return null;
     return questions.reduce((acc, q) => {
@@ -128,7 +123,6 @@ const QuestionColumn = () => {
     }, {} as Record<string, Question[]>);
   }, [questions, quizGroupBy, isGroupingEnabled]);
 
-  // (This is YOUR original, correct logic)
   const sortedGroups = useMemo(() => {
     if (!questionsByGroup) return [];
     const keys = Object.keys(questionsByGroup);
@@ -140,7 +134,6 @@ const QuestionColumn = () => {
   }, [questionsByGroup]);
 
   // Header "driver" logic
-  // (This is YOUR original, correct scroll handler)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -160,7 +153,6 @@ const QuestionColumn = () => {
   }, [setIsPageScrolled, isTopBarVisible, setIsTopBarVisible]);
 
   // Group Scrolling Observer
-  // (This is YOUR original, correct observer)
   useEffect(() => {
     if (groupObserverRef.current) groupObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
@@ -199,7 +191,6 @@ const QuestionColumn = () => {
   ]);
 
   // Question Sync-Scroll Observer
-  // (This is YOUR original, correct observer)
   useEffect(() => {
     if (questionObserverRef.current) questionObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
@@ -228,18 +219,14 @@ const QuestionColumn = () => {
   }, [questions, setCurrentQuestionNumberInView, isGroupingEnabled]);
 
 
-  // (This is YOUR original, correct layout)
   let questionCounter = 0;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col relative overflow-hidden">
       
-      {/* --- 💎 --- THIS IS THE ONLY FIX --- 💎 --- */}
-      {/* I have changed `flex-1` to `h-full` to make the div scrollable */}
       <div
         ref={scrollContainerRef}
         className="h-full p-6 overflow-y-auto custom-scrollbar"
       >
-      {/* --- 💎 --- END OF FIX --- 💎 --- */}
       
         <div className="space-y-6">
           {isGroupingEnabled &&

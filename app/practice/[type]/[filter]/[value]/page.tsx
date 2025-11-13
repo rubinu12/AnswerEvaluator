@@ -2,9 +2,9 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation'; // This import is correct for Next.js
-import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
-import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
+import { useParams } from 'next/navigation';
+import { useQuizStore } from '@/lib/quizStore';
+import { useQuizUIStore } from '@/lib/quizUIStore';
 import { QuizFilter } from '@/lib/quizTypes';
 import { X } from 'lucide-react';
 
@@ -14,7 +14,7 @@ import Header from '@/components/quiz/Header';
 import QuestionColumn from '@/components/quiz/QuestionColumn';
 import AnswerColumn from '@/components/quiz/AnswerColumn';
 import TestStatusBar from '@/components/quiz/TestStatusBar';
-import ReportCard from '@/components/quiz/ReportCard';
+import DynamicQuizCommandBar from '@/components/quiz/DynamicQuizCommandBar';
 import ExplanationController from '@/components/quiz/ExplanationController'; 
 
 const LoadingScreen = ({ message }: { message?: string }) => (
@@ -34,29 +34,31 @@ export default function QuizPage() {
   
   const { user, loading: authLoading } = useAuthContext();
 
-  // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
-  // (This is YOUR original, correct state logic)
   const {
     isLoading: quizLoading,
     quizError,
     loadAndStartQuiz,
-    isTestMode, // <-- We use this for the layout fix
-    showReport,
+    isTestMode,
     questions,
+    // We no longer need clearQuizSession here
   } = useQuizStore();
 
-  // (This is YOUR original, correct state logic)
   const {
     explanationModalQuestionId,
     closeExplanationModal,
+    isTopBarVisible,
   } = useQuizUIStore();
-  // --- 💎 --- END OF STATE SPLIT --- 💎 ---
 
-  // (This is YOUR original, correct useEffect)
   useEffect(() => {
     if (authLoading) {
       return; 
     }
+
+    // --- 💎 --- THIS IS THE FIX --- 💎 ---
+    // We are no longer clearing the session here.
+    // We just create the filter and load the quiz.
+    // The store's "smart" loadAndStartQuiz will handle the rest.
+    // --- 💎 --- END OF FIX --- 💎 ---
 
     const filter: QuizFilter = {};
     const type = params.type as string;
@@ -74,11 +76,9 @@ export default function QuizPage() {
     }
 
     loadAndStartQuiz(filter);
-    useQuizStore.setState({ isTestMode: false });
     
-  }, [params, loadAndStartQuiz, authLoading, user]); 
+  }, [params, loadAndStartQuiz, authLoading, user]); // Removed clearQuizSession
 
-  // (This is YOUR original, correct useMemo)
   const questionForModal = useMemo(() => {
     if (!explanationModalQuestionId) return null;
     return questions.find((q) => q.id === explanationModalQuestionId) || null;
@@ -89,30 +89,34 @@ export default function QuizPage() {
     return <LoadingScreen message="Authenticating..." />;
   }
   
-  if (quizLoading) {
+  // This loading logic is correct
+  if (quizLoading && questions.length === 0) {
     return <LoadingScreen />;
   }
 
   if (quizError) {
-    // (This is YOUR original, correct error handling)
     return <ErrorDisplay message={quizError.message} />;
   }
 
-  // --- THIS IS THE CORRECTED LAYOUT ---
+  const mainPadding = isTestMode
+    ? 'pt-[69px]' 
+    : isTopBarVisible
+      ? 'pt-32'
+      : 'pt-16';
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
       
-      {/* 1. Header controller is unchanged */}
-      <Header />
-      
-      {/* 2. <TestStatusBar /> is REMOVED (Correct) */}
-      {/* 3. {showReport && <ReportCard />} is REMOVED (Correct) */}
+      {isTestMode ? (
+        <TestStatusBar />
+      ) : (
+        <>
+          <Header />
+          <DynamicQuizCommandBar />
+        </>
+      )}
 
-      {/* --- 💎 --- FIX --- 💎 --- */}
-      {/* The <main> tag now dynamically sets its padding-top */}
-      <main className={`flex-1 flex flex-col lg:flex-row overflow-hidden ${
-        isTestMode ? 'pt-[69px]' : 'pt-40'
-      }`}>
+      <main className={`flex-1 flex flex-col lg:flex-row overflow-hidden ${mainPadding}`}>
         
         <div className="flex-1 min-w-0 h-full">
           <QuestionColumn />
@@ -123,10 +127,7 @@ export default function QuizPage() {
         </div>
 
       </main>
-      {/* --- 💎 --- END OF FIX --- 💎 --- */}
 
-
-      {/* (This is YOUR original, correct modal logic) */}
       {questionForModal && (
         <div 
           className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 lg:p-8"
@@ -137,7 +138,6 @@ export default function QuizPage() {
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-              {/* (This is YOUR original, correct component call) */}
               <ExplanationController 
                 question={questionForModal} 
                 onClose={closeExplanationModal} 

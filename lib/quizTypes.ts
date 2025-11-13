@@ -80,7 +80,7 @@ export interface PerformanceStats {
 }
 
 // ==================================================================
-// --- 💎 --- "DATA" STORE TYPES --- 💎 ---
+// --- 虫 --- "DATA" STORE TYPES --- 虫 ---
 // ==================================================================
 
 export interface QuizState {
@@ -94,6 +94,8 @@ export interface QuizState {
   showReport: boolean;
   showDetailedSolution: boolean;
   quizError: QuizError | null;
+
+  
   
   // Timer
   timeLeft: number;
@@ -129,6 +131,10 @@ export interface QuizActions {
   showToast: (message: string, type: 'info' | 'warning') => void;
   hideToast: () => void;
   
+  // --- 💎 --- THIS IS THE FIX --- 💎 ---
+  clearQuizSession: () => void; // <-- I forgot to add this line
+  // --- 💎 --- END OF FIX --- 💎 ---
+  
   // Admin Actions
   openExplanationEditor: (questionId: string) => void;
   closeExplanationEditor: () => void;
@@ -145,7 +151,7 @@ export type QuizStore = QuizState & QuizActions;
 
 
 // ==================================================================
-// --- 💎 --- NEW "UI" STORE TYPES --- 💎 ---
+// --- 虫 --- NEW "UI" STORE TYPES --- 虫 ---
 // ==================================================================
 
 export interface QuizUIState {

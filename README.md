@@ -133,7 +133,7 @@ One Step at a Time: Do not move on until the user confirms the current step has 
 
 Complete Code Only: Always provide complete, runnable files. Do not use ... or // rest of the code. you will ask me for the current code of that files and then you will give me update of this file without altering any exiting logic unless it change throughly discuss and agreed.
 
-in every response you will give me biref info about what you do , does this step complete ? 
+in every response at last you will give me biref info about what you do , does this step complete ? 
 and way forward
 
 your first task is to analyze given codeBase and prompt in detailed and give me your understanding on project and admin't vision. 

@@ -6,7 +6,7 @@ import { useQuizStore } from '@/lib/quizStore';
 import { useQuizUIStore } from '@/lib/quizUIStore';
 
 // --- INLINE ICONS ---
-// We include these here to be self-contained
+// (These are from your file)
 
 const ChevronUpIcon = ({ className }: { className?: string }) => (
   <svg
@@ -45,7 +45,7 @@ const RefreshIcon = ({ className }: { className?: string }) => (
 );
 
 // --- STYLED COMPONENTS ---
-// We include these here to be self-contained
+// (These are from your file)
 
 const IconButton = ({ onClick, children, className = '' }: {
   onClick?: () => void;
@@ -66,7 +66,7 @@ const StyledButton = ({ onClick, children, variant = 'primary', className = '' }
   variant?: 'primary' | 'outline';
   className?: string;
 }) => {
-  const baseClasses = 'px-4 py-2 rounded-md font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
+  const baseClasses = 'px-4 py-2 rounded-md font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 text-sm';
   const primaryClasses = 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500';
   const outlineClasses = 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-blue-500';
 
@@ -80,44 +80,53 @@ const StyledButton = ({ onClick, children, variant = 'primary', className = '' }
   );
 };
 
-
+// --- HELPER FUNCTION (NEW) ---
 /**
- * This is the new "Sub-Header" component.
- * It animates its position from `top-20` (below main header) to `top-0` (stuck)
- * based on the `isTopBarVisible` state from the scroll listener.
- * It also renders different content based on Practice vs. Review mode.
+ * Formats seconds into a "m:ss" string.
+ * e.g., 95 seconds -> "1:35"
  */
+const formatTime = (seconds: number) => {
+  if (isNaN(seconds) || seconds < 0) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+};
+// --- END OF HELPER ---
+
+
 export default function DynamicQuizCommandBar() {
   // --- STATE ---
-  // UI State (Atomic selectors)
   const isTopBarVisible = useQuizUIStore(s => s.isTopBarVisible);
   const setIsTopBarVisible = useQuizUIStore(s => s.setIsTopBarVisible);
 
-  // Data State (Atomic selectors)
   const showReport = useQuizStore(s => s.showReport);
   const questions = useQuizStore(s => s.questions);
   const currentQuestionNumberInView = useQuizUIStore(s => s.currentQuestionNumberInView);
+  
+  const stats = useQuizStore(s => s.performanceStats);
 
-  // Get the question based *only* on the scrolled question in view.
-  // We provide a fallback to the first question (index 0) if it's not ready.
   const questionInView = questions[currentQuestionNumberInView - 1] || questions[0];
-
   const subject = questionInView?.subject || 'Loading...';
   const topic = questionInView?.topic || 'Loading...';
 
   // --- RENDER ---
-  
-  // This is the core "stick" animation.
   const barClasses = [
-    'fixed left-0 right-0 z-10 flex h-20 w-full items-center border-b border-gray-200 bg-white px-6 transition-all duration-300 ease-in-out',
-    isTopBarVisible ? 'top-20' : 'top-0 shadow-md'
+    'fixed left-0 right-0 z-10 flex w-full items-center border-b border-gray-200 bg-white px-6 transition-all duration-300 ease-in-out',
+    'h-16', 
+    isTopBarVisible ? 'top-16' : 'top-0 shadow-md'
   ].join(' ');
 
-  // This animates the arrow button itself
   const arrowClasses = [
     'h-5 w-5 text-gray-600 transition-transform duration-300',
     isTopBarVisible ? 'rotate-0' : 'rotate-180'
   ].join(' ');
+  
+  // --- PACING COLOR LOGIC ---
+  const paceColor = {
+    "Ahead": "text-green-600",
+    "On Pace": "text-gray-800",
+    "Behind": "text-red-600",
+  }[stats?.pacing || "On Pace"];
 
   return (
     <div className={barClasses}>
@@ -132,7 +141,7 @@ export default function DynamicQuizCommandBar() {
       {/* 2. Mode-Dependent Content */}
       <div className="flex flex-1 items-center justify-between">
         {!showReport ? (
-          // --- Practice Mode Content ---
+          // --- Practice Mode Content (Unchanged) ---
           <>
             <div>
               <span className="text-xs font-medium uppercase text-blue-600">
@@ -148,34 +157,35 @@ export default function DynamicQuizCommandBar() {
             </StyledButton>
           </>
         ) : (
-          // --- Review Mode Content ---
-          // This is the NEW logic with PLACEHOLDERS
+          // --- 💎 --- REVIEW MODE CONTENT (FIXED) --- 💎 ---
           <div className="flex w-full items-center justify-around space-x-4">
             <div className="text-center">
               <span className="text-xs font-medium uppercase text-gray-500">Score</span>
               <h2 className="text-lg font-semibold text-blue-600">
-                [Score]%
+                {/* This is the fix: 'score' -> 'finalScore' */}
+                {stats?.finalScore ?? 0}%
               </h2>
             </div>
             <div className="text-center">
               <span className="text-xs font-medium uppercase text-gray-500">Accuracy</span>
               <h2 className="text-lg font-semibold text-gray-800">
-                [Acc]%
+                {stats?.accuracy ?? 0}%
               </h2>
             </div>
             <div className="text-center">
               <span className="text-xs font-medium uppercase text-gray-500">Avg. Time</span>
               <h2 className="text-lg font-semibold text-gray-800">
-                [Time]
+                {formatTime(stats?.avgTimePerQuestion ?? 0)}
               </h2>
             </div>
             <div className="text-center">
               <span className="text-xs font-medium uppercase text-gray-500">Pacing</span>
-              <h2 className="text-lg font-semibold text-green-600">
-                [Pace]
+              <h2 className={`text-lg font-semibold ${paceColor}`}>
+                {stats?.pacing ?? 'On Pace'}
               </h2>
             </div>
           </div>
+          // --- 💎 --- END OF FIX --- 💎 ---
         )}
       </div>
     </div>

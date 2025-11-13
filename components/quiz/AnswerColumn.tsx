@@ -2,14 +2,12 @@
 'use client';
 
 import React, { useCallback, useMemo, useEffect, useRef } from 'react';
-import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
-import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
+import { useQuizStore } from '@/lib/quizStore';
+import { useQuizUIStore } from '@/lib/quizUIStore';
 import { Question } from '@/lib/quizTypes';
 import { Check, X, Flag, Bookmark, Eye } from 'lucide-react';
 
 const AnswerColumn = () => {
-  // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
-  // 1. Get "Data" state from the main store
   const {
     questions,
     userAnswers,
@@ -21,18 +19,15 @@ const AnswerColumn = () => {
     handleAnswerSelect,
   } = useQuizStore();
 
-  // 2. Get "UI" state AND actions from the UI store
   const {
     openExplanationModal,
     currentQuestionNumberInView,
     setCurrentQuestionNumberInView,
   } = useQuizUIStore();
-  // --- 💎 --- END OF STATE SPLIT --- 💎 ---
 
 
   const answerListRef = useRef<HTMLDivElement>(null);
 
-  // Find Current Answer (Helper) (Unchanged)
   const userAnswersMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const ua of userAnswers) {
@@ -41,24 +36,21 @@ const AnswerColumn = () => {
     return map;
   }, [userAnswers]);
 
-  // Scroll-to-Question Logic (Unchanged)
   const scrollToQuestion = useCallback((qNum: number) => {
     const qElement = document.getElementById(`question-card-${qNum}`);
     if (qElement) {
       qElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Manually set for instant feedback
-      setCurrentQuestionNumberInView(qNum); // <-- Calls UI Store
+      setCurrentQuestionNumberInView(qNum); 
     }
   }, [setCurrentQuestionNumberInView]);
 
-  // Get Button Class Logic (Unchanged)
-  // This logic is all correct and now reads `currentQuestionNumberInView`
-  // from the UI store.
+  // --- 💎 --- "REVEALS ALL" BUG FIX --- 💎 ---
   const getButtonClass = useCallback(
     (q: Question, qNum: number, optionLabel: string) => {
       const selectedAnswer = userAnswersMap.get(q.id);
       const isSelected = selectedAnswer === optionLabel;
       const isCurrent = currentQuestionNumberInView === qNum;
+      const isAnswered = !!selectedAnswer; // Has this specific question been answered?
 
       let baseClass =
         'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400';
@@ -71,36 +63,45 @@ const AnswerColumn = () => {
         if (isSelected) {
           baseClass = 'bg-blue-600 border-blue-600 text-white';
         }
-      } else {
-        if (isSelected && !showReport && !showDetailedSolution) {
-          baseClass = 'bg-green-600 border-green-700 text-white';
-        }
-      }
-
-      if (showReport || showDetailedSolution) {
+      } 
+      
+      // This is the new, correct logic for Practice and Review modes
+      // We check `isAnswered` to ensure we only color the buttons *for that question*
+      if (showReport || (showDetailedSolution && isAnswered)) {
         const isCorrect = q.correctAnswer === optionLabel;
-        if (isCorrect) {
+        
+        if (isCorrect && isSelected) {
+          // User selected the correct answer
+          baseClass = 'bg-green-600 border-green-600 text-white';
+        } else if (isCorrect && !isSelected) {
+          // This is the correct answer, but user selected something else
           baseClass = 'bg-green-100 border-green-300 text-green-800';
-        }
-        if (isSelected && !isCorrect) {
+        } else if (!isCorrect && isSelected) {
+          // User selected this incorrect answer
           baseClass = 'bg-red-100 border-red-300 text-red-800';
         }
-        if (isSelected && isCorrect) {
-          baseClass = 'bg-green-600 border-green-600 text-white';
-        }
+        // If !isCorrect && !isSelected (just a regular wrong option), it keeps the baseClass
+      }
+      
+      // Override for Test Mode to keep selected answer blue
+      if (isTestMode && isSelected) {
+         baseClass = 'bg-blue-600 border-blue-600 text-white';
       }
       
       return `transition-all duration-150 ease-in-out ${baseClass}`;
     },
     [userAnswersMap, currentQuestionNumberInView, isTestMode, showReport, showDetailedSolution]
   );
+  // --- 💎 --- END OF FIX --- 💎 ---
 
-  // Get Indicator Logic (Unchanged)
   const getIndicator = useCallback(
     (q: Question, optionLabel: string) => {
-      if (!showReport && !showDetailedSolution) return null;
-
       const selectedAnswer = userAnswersMap.get(q.id);
+      const isAnswered = !!selectedAnswer;
+
+      // Only show indicators if this question has been answered
+      if (!isAnswered || (!showReport && !showDetailedSolution)) return null;
+
       const isSelected = selectedAnswer === optionLabel;
       const isCorrect = q.correctAnswer === optionLabel;
 
@@ -115,20 +116,10 @@ const AnswerColumn = () => {
     [userAnswersMap, showReport, showDetailedSolution]
   );
 
-  // Handle Click Logic (Unchanged)
   const onAnswerClick = (questionId: string, optionLabel: string) => {
-    if (isTestMode) {
-      handleAnswerSelect(questionId, optionLabel);
-    } else {
-      if (!userAnswersMap.has(questionId)) {
-        handleAnswerSelect(questionId, optionLabel);
-      }
-    }
+    handleAnswerSelect(questionId, optionLabel);
   };
 
-  // Sync-Scroll listener (Unchanged)
-  // This now reads `currentQuestionNumberInView` from the UI store
-  // and will be perfectly in sync.
   useEffect(() => {
     if (answerListRef.current) {
       const activeCard = answerListRef.current.querySelector(
@@ -140,7 +131,6 @@ const AnswerColumn = () => {
     }
   }, [currentQuestionNumberInView]);
 
-  // Memoized Question List (Unchanged)
   const questionDatalist = useMemo(() => {
     return questions.map((q, index) => ({
       id: q.id,
@@ -150,10 +140,8 @@ const AnswerColumn = () => {
     }));
   }, [questions]);
 
-  // JSX (Unchanged)
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
-      {/* Header */}
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Answer Palette</h3>
@@ -162,8 +150,6 @@ const AnswerColumn = () => {
           </p>
         </div>
       </div>
-
-      {/* Answer Grid (Scrollable) */}
       <div
         ref={answerListRef}
         className="flex-1 p-3 overflow-y-auto custom-scrollbar space-y-2"
@@ -176,14 +162,13 @@ const AnswerColumn = () => {
             <div
               key={id}
               id={`answer-card-${qNum}`}
-              className={`p-3 rounded-lg border-2 transition-all duration-300 ${
+              className={`p-3 rounded-lg border transition-all duration-300 ${
                 currentQuestionNumberInView === qNum
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-transparent bg-white'
+                  ? 'bg-white border-blue-500 shadow-lg'
+                  : 'bg-gray-50 border-transparent'
               }`}
             >
               <div className="flex flex-col gap-2">
-                {/* Row 1: Q#, Status, and View Button */}
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <button
@@ -193,7 +178,8 @@ const AnswerColumn = () => {
                           ? 'bg-blue-600 text-white'
                           : 'bg-gray-200 text-gray-800'
                       } ${
-                        isAnswered && !showReport
+                        // This logic seems correct for the Q# button
+                        isAnswered && !showReport && !isTestMode
                           ? 'ring-2 ring-offset-1 ring-green-500'
                           : ''
                       }`}
@@ -210,31 +196,32 @@ const AnswerColumn = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => openExplanationModal(id)} // <-- Calls UI Store
-                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View
-                  </button>
+                  {!isTestMode && (
+                    <button
+                      onClick={() => openExplanationModal(id)}
+                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View
+                    </button>
+                  )}
                 </div>
 
-                {/* Row 2: Answer Buttons (A, B, C, D) */}
                 <div className="grid grid-cols-4 gap-2">
                   {options.map((option) => (
                     <button
                       key={option.label}
                       onClick={(e) => {
-                        e.stopPropagation(); // Prevent card click
-                        if (!showReport && !showDetailedSolution) {
+                        e.stopPropagation(); 
+                        if (!showReport && !isAnswered) { 
                           onAnswerClick(id, option.label);
                         }
                         scrollToQuestion(qNum);
                       }}
-                      disabled={showReport || showDetailedSolution || (isAnswered && !isTestMode)}
+                      disabled={showReport || isAnswered} 
                       className={`h-10 flex items-center justify-center rounded-lg border font-semibold text-sm
                         ${getButtonClass(question, qNum, option.label)}
-                        ${(showReport || showDetailedSolution) ? 'cursor-default' : 'transform active:scale-95'}
+                        ${(showReport || isAnswered) ? 'cursor-not-allowed' : 'transform active:scale-95'}
                       `}
                       title={`Select Answer ${option.label}`}
                     >
@@ -246,8 +233,7 @@ const AnswerColumn = () => {
                   ))}
                 </div>
 
-                {/* Row 3: Report Card Status (if applicable) */}
-                {(showReport || showDetailedSolution) && isAnswered && (
+                {(showReport || (showDetailedSolution && isAnswered)) && (
                   <div className="pt-2 text-xs font-bold text-right">
                     {selectedAnswer === question.correctAnswer ? (
                       <span className="text-green-600">Correct</span>
@@ -260,7 +246,6 @@ const AnswerColumn = () => {
             </div>
           );
         })}
-        {/* Spacer at the bottom */}
         <div className="h-[30vh]" />
       </div>
     </div>
