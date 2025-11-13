@@ -1,134 +1,183 @@
 // components/quiz/DynamicQuizCommandBar.tsx
-'use client';
+"use client";
 
-import React, { useMemo } from 'react';
-import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
-import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
-import { Question } from '@/lib/quizTypes';
+import Image from 'next/image';
+import { useQuizStore } from '@/lib/quizStore';
+import { useQuizUIStore } from '@/lib/quizUIStore';
 
-// Import the specialized bar components
-import TopicFocusBar from '@/components/quiz/TopicFocusBar';
-import PerformanceAnalyticsBar from './PerformanceAnalyticsBar';
-import { useRouter } from 'next/navigation';
+// --- INLINE ICONS ---
+// We include these here to be self-contained
 
-// This component for group navigation is unchanged internally
-const GroupNavigation = () => {
-  // --- 💎 --- THIS IS THE FIX (Atomic Selectors) --- 💎 ---
-  // We select each piece of state individually.
-  // This is fast and type-safe.
-  const questions = useQuizStore((state) => state.questions);
-  const quizGroupBy = useQuizStore((state) => state.quizGroupBy);
-  const isGroupingEnabled = useQuizStore((state) => state.isGroupingEnabled);
-  const setIsGroupingEnabled = useQuizStore((state) => state.setIsGroupingEnabled);
-  
-  const currentGroupInView = useQuizUIStore((state) => state.currentGroupInView);
-  const setCurrentGroupInView = useQuizUIStore((state) => state.setCurrentGroupInView);
-  // --- 💎 --- END OF FIX --- 💎 ---
+const ChevronUpIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <polyline points="18 15 12 9 6 15"></polyline>
+  </svg>
+);
 
-  const sortedGroups = useMemo(() => {
-    if (!quizGroupBy || !isGroupingEnabled) return [];
-    const groups = Array.from(
-      new Set(questions.map((q) => q[quizGroupBy]).filter(Boolean))
-    ) as (string | number)[];
-    if (groups.length === 0) return [];
-    
-    const isNumeric = !isNaN(Number(groups[0]));
-    return groups.sort((a, b) =>
-      isNumeric
-        ? Number(b) - Number(a)
-        : String(a).localeCompare(String(b))
-    );
-  }, [questions, quizGroupBy, isGroupingEnabled]);
+const RefreshIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M3 2v6h6M21 22v-6h-6" />
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+  </svg>
+);
 
-  const scrollToGroup = (groupName: string | number) => {
-    const groupElement = document.getElementById(`group-${groupName}`);
-    if (groupElement) {
-      groupElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setCurrentGroupInView(String(groupName)); // <-- Call UI Store action
-    }
-  };
+// --- STYLED COMPONENTS ---
+// We include these here to be self-contained
 
-  const ToggleSwitch = ({
-    enabled,
-    onChange,
-  }: {
-    enabled: boolean;
-    onChange: (enabled: boolean) => void;
-  }) => (
-    <button
-      onClick={() => onChange(!enabled)}
-      className={`${
-        enabled ? 'bg-blue-600' : 'bg-gray-200'
-      } relative inline-flex items-center h-6 rounded-full w-11 transition-colors flex-shrink-0`}
-    >
-      <span
-        className={`${
-          enabled ? 'translate-x-6' : 'translate-x-1'
-        } inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}
-      />
-    </button>
-  );
+const IconButton = ({ onClick, children, className = '' }: {
+  onClick?: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center justify-center p-2 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+  >
+    {children}
+  </button>
+);
+
+const StyledButton = ({ onClick, children, variant = 'primary', className = '' }: {
+  onClick?: () => void;
+  children: React.ReactNode;
+  variant?: 'primary' | 'outline';
+  className?: string;
+}) => {
+  const baseClasses = 'px-4 py-2 rounded-md font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
+  const primaryClasses = 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500';
+  const outlineClasses = 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-blue-500';
 
   return (
-    <div className="flex items-center justify-between w-full h-full">
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <span className="text-xs font-semibold text-gray-600">Group:</span>
-        <ToggleSwitch enabled={isGroupingEnabled} onChange={setIsGroupingEnabled} />
-      </div>
-      <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar whitespace-nowrap h-full">
-        {sortedGroups.map((group) => (
-          <React.Fragment key={group}>
-            <div className="border-l border-gray-300 h-4"></div>
-            <button
-              onClick={() => scrollToGroup(group)}
-              className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                currentGroupInView === String(group)
-                  ? 'bg-blue-100 text-blue-700 font-bold'
-                  : 'text-gray-600 hover:text-blue-600 font-semibold'
-              }`}
-            >
-              {group}
-            </button>
-          </React.Fragment>
-        ))}
+    <button
+      onClick={onClick}
+      className={`${baseClasses} ${variant === 'primary' ? primaryClasses : outlineClasses} ${className}`}
+    >
+      {children}
+    </button>
+  );
+};
+
+
+/**
+ * This is the new "Sub-Header" component.
+ * It animates its position from `top-20` (below main header) to `top-0` (stuck)
+ * based on the `isTopBarVisible` state from the scroll listener.
+ * It also renders different content based on Practice vs. Review mode.
+ */
+export default function DynamicQuizCommandBar() {
+  // --- STATE ---
+  // UI State (Atomic selectors)
+  const isTopBarVisible = useQuizUIStore(s => s.isTopBarVisible);
+  const setIsTopBarVisible = useQuizUIStore(s => s.setIsTopBarVisible);
+
+  // Data State (Atomic selectors)
+  const showReport = useQuizStore(s => s.showReport);
+  const questions = useQuizStore(s => s.questions);
+  const currentQuestionNumberInView = useQuizUIStore(s => s.currentQuestionNumberInView);
+
+  // Get the question based *only* on the scrolled question in view.
+  // We provide a fallback to the first question (index 0) if it's not ready.
+  const questionInView = questions[currentQuestionNumberInView - 1] || questions[0];
+
+  const subject = questionInView?.subject || 'Loading...';
+  const topic = questionInView?.topic || 'Loading...';
+
+  // --- RENDER ---
+  
+  // This is the core "stick" animation.
+  const barClasses = [
+    'fixed left-0 right-0 z-10 flex h-20 w-full items-center border-b border-gray-200 bg-white px-6 transition-all duration-300 ease-in-out',
+    isTopBarVisible ? 'top-20' : 'top-0 shadow-md'
+  ].join(' ');
+
+  // This animates the arrow button itself
+  const arrowClasses = [
+    'h-5 w-5 text-gray-600 transition-transform duration-300',
+    isTopBarVisible ? 'rotate-0' : 'rotate-180'
+  ].join(' ');
+
+  return (
+    <div className={barClasses}>
+      {/* 1. The Arrow Button */}
+      <IconButton
+        className="mr-2"
+        onClick={() => setIsTopBarVisible(!isTopBarVisible)}
+      >
+        <ChevronUpIcon className={arrowClasses} />
+      </IconButton>
+
+      {/* 2. Mode-Dependent Content */}
+      <div className="flex flex-1 items-center justify-between">
+        {!showReport ? (
+          // --- Practice Mode Content ---
+          <>
+            <div>
+              <span className="text-xs font-medium uppercase text-blue-600">
+                {subject}
+              </span>
+              <h2 className="truncate text-lg font-semibold text-gray-800">
+                {topic}
+              </h2>
+            </div>
+            <StyledButton variant="outline" className="flex items-center">
+              <RefreshIcon className="mr-2 h-4 w-4" />
+              Practice this topic
+            </StyledButton>
+          </>
+        ) : (
+          // --- Review Mode Content ---
+          // This is the NEW logic with PLACEHOLDERS
+          <div className="flex w-full items-center justify-around space-x-4">
+            <div className="text-center">
+              <span className="text-xs font-medium uppercase text-gray-500">Score</span>
+              <h2 className="text-lg font-semibold text-blue-600">
+                [Score]%
+              </h2>
+            </div>
+            <div className="text-center">
+              <span className="text-xs font-medium uppercase text-gray-500">Accuracy</span>
+              <h2 className="text-lg font-semibold text-gray-800">
+                [Acc]%
+              </h2>
+            </div>
+            <div className="text-center">
+              <span className="text-xs font-medium uppercase text-gray-500">Avg. Time</span>
+              <h2 className="text-lg font-semibold text-gray-800">
+                [Time]
+              </h2>
+            </div>
+            <div className="text-center">
+              <span className="text-xs font-medium uppercase text-gray-500">Pacing</span>
+              <h2 className="text-lg font-semibold text-green-600">
+                [Pace]
+              </h2>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-// The main controller component
-const DynamicQuizCommandBar: React.FC = () => {
-  // --- 💎 --- THIS IS THE FIX (Atomic Selectors) --- 💎 ---
-  const isTestMode = useQuizStore((state) => state.isTestMode);
-  const showReport = useQuizStore((state) => state.showReport);
-  const showDetailedSolution = useQuizStore((state) => state.showDetailedSolution);
-  const isGroupingEnabled = useQuizStore((state) => state.isGroupingEnabled);
-  const questions = useQuizStore((state) => state.questions);
-    
-  const currentQuestionNumberInView = useQuizUIStore(
-    (state) => state.currentQuestionNumberInView
-  );
-  // --- 💎 --- END OF FIX --- 💎 ---
-
-  const currentQuestion = useMemo(() => {
-    if (questions.length > 0 && currentQuestionNumberInView > 0) {
-      return questions[currentQuestionNumberInView - 1] as Question | null;
-    }
-    return null;
-  }, [questions, currentQuestionNumberInView]);
-
-  // The logic for *what* to show is unchanged
-  if (isTestMode) {
-    return null;
-  }
-  if (showReport || showDetailedSolution) {
-    return <PerformanceAnalyticsBar />;
-  }
-  if (isGroupingEnabled) {
-    return <GroupNavigation />;
-  }
-  
-  return <TopicFocusBar currentQuestion={currentQuestion} />;
-};
-
-export default DynamicQuizCommandBar;
+}

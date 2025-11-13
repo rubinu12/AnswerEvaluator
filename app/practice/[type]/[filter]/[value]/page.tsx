@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams } from 'next/navigation'; // This import is correct for Next.js
 import { useQuizStore } from '@/lib/quizStore'; // <-- The "Data Store"
 import { useQuizUIStore } from '@/lib/quizUIStore'; // <-- 💎 NEW "UI Store"
 import { QuizFilter } from '@/lib/quizTypes';
@@ -35,24 +35,24 @@ export default function QuizPage() {
   const { user, loading: authLoading } = useAuthContext();
 
   // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
-  // 1. Get "Data" from the main store
+  // (This is YOUR original, correct state logic)
   const {
     isLoading: quizLoading,
     quizError,
     loadAndStartQuiz,
-    isTestMode,
+    isTestMode, // <-- We use this for the layout fix
     showReport,
     questions,
   } = useQuizStore();
 
-  // 2. Get "UI" state from the new UI store
+  // (This is YOUR original, correct state logic)
   const {
     explanationModalQuestionId,
     closeExplanationModal,
   } = useQuizUIStore();
   // --- 💎 --- END OF STATE SPLIT --- 💎 ---
 
-  // This is your original, correct logic
+  // (This is YOUR original, correct useEffect)
   useEffect(() => {
     if (authLoading) {
       return; 
@@ -78,7 +78,7 @@ export default function QuizPage() {
     
   }, [params, loadAndStartQuiz, authLoading, user]); 
 
-  // This is your original, correct logic
+  // (This is YOUR original, correct useMemo)
   const questionForModal = useMemo(() => {
     if (!explanationModalQuestionId) return null;
     return questions.find((q) => q.id === explanationModalQuestionId) || null;
@@ -94,17 +94,25 @@ export default function QuizPage() {
   }
 
   if (quizError) {
+    // (This is YOUR original, correct error handling)
     return <ErrorDisplay message={quizError.message} />;
   }
 
+  // --- THIS IS THE CORRECTED LAYOUT ---
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
+      
+      {/* 1. Header controller is unchanged */}
       <Header />
-      <TestStatusBar />
+      
+      {/* 2. <TestStatusBar /> is REMOVED (Correct) */}
+      {/* 3. {showReport && <ReportCard />} is REMOVED (Correct) */}
 
-      {showReport && <ReportCard />}
-
-      <main className="flex-1 flex flex-col lg:flex-row p-4 lg:p-6 gap-6 overflow-hidden">
+      {/* --- 💎 --- FIX --- 💎 --- */}
+      {/* The <main> tag now dynamically sets its padding-top */}
+      <main className={`flex-1 flex flex-col lg:flex-row overflow-hidden ${
+        isTestMode ? 'pt-[69px]' : 'pt-40'
+      }`}>
         
         <div className="flex-1 min-w-0 h-full">
           <QuestionColumn />
@@ -115,25 +123,25 @@ export default function QuizPage() {
         </div>
 
       </main>
+      {/* --- 💎 --- END OF FIX --- 💎 --- */}
 
-      {/* This `if` check prevents the crash */ }
+
+      {/* (This is YOUR original, correct modal logic) */}
       {questionForModal && (
         <div 
           className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 lg:p-8"
-          onMouseDown={closeExplanationModal} // <-- This is now from useQuizUIStore
+          onMouseDown={closeExplanationModal} 
         >
           <div 
             className="w-full max-w-4xl max-h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-              {/* --- 💎 --- THIS IS THE FIX --- 💎 --- */}
-              {/* We pass the full `question` object, not a string */}
+              {/* (This is YOUR original, correct component call) */}
               <ExplanationController 
                 question={questionForModal} 
                 onClose={closeExplanationModal} 
               />
-              {/* --- 💎 --- END OF FIX --- 💎 --- */}
             </div>
           </div>
         </div>

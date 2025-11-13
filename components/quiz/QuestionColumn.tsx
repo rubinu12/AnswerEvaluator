@@ -10,6 +10,7 @@ import { Bookmark, Flag, Grid, X } from 'lucide-react';
 import UltimateExplanationUI from './UltimateExplanationUI';
 
 // --- Individual Question Card ---
+// (This is YOUR original, correct QuestionCard component)
 const QuestionCard = ({
   question,
   displayNumber,
@@ -32,7 +33,7 @@ const QuestionCard = ({
     <div
       id={`question-card-${displayNumber}`}
       className={`rounded-xl p-6 border relative transition-all duration-300 mb-6 ${
-        currentQuestionNumberInView === displayNumber // <-- Reads from UI store
+        currentQuestionNumberInView === displayNumber // <-- This is your "bluish" highlight
           ? 'bg-blue-50 border-blue-300'
           : 'bg-white border-gray-200'
       }`}
@@ -95,14 +96,13 @@ const QuestionCard = ({
 // --- Main Question Column Component ---
 const QuestionColumn = () => {
   // --- 💎 --- STATE IS NOW SPLIT --- 💎 ---
-  // 1. Get "Data" state from the main store
+  // (This is YOUR original, correct state logic)
   const {
     questions,
     quizGroupBy,
     isGroupingEnabled,
   } = useQuizStore();
 
-  // 2. Get "UI" state AND actions from the UI store
   const {
     setCurrentQuestionNumberInView,
     setIsPageScrolled,
@@ -117,7 +117,7 @@ const QuestionColumn = () => {
   const questionObserverRef = useRef<IntersectionObserver | null>(null);
   const groupObserverRef = useRef<IntersectionObserver | null>(null);
 
-  // This logic is all correct
+  // (This is YOUR original, correct logic)
   const questionsByGroup = useMemo(() => {
     if (!quizGroupBy || !isGroupingEnabled) return null;
     return questions.reduce((acc, q) => {
@@ -128,6 +128,7 @@ const QuestionColumn = () => {
     }, {} as Record<string, Question[]>);
   }, [questions, quizGroupBy, isGroupingEnabled]);
 
+  // (This is YOUR original, correct logic)
   const sortedGroups = useMemo(() => {
     if (!questionsByGroup) return [];
     const keys = Object.keys(questionsByGroup);
@@ -139,7 +140,7 @@ const QuestionColumn = () => {
   }, [questionsByGroup]);
 
   // Header "driver" logic
-  // This now only calls lightweight UI actions
+  // (This is YOUR original, correct scroll handler)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -159,7 +160,7 @@ const QuestionColumn = () => {
   }, [setIsPageScrolled, isTopBarVisible, setIsTopBarVisible]);
 
   // Group Scrolling Observer
-  // This now only calls a lightweight UI action
+  // (This is YOUR original, correct observer)
   useEffect(() => {
     if (groupObserverRef.current) groupObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
@@ -198,8 +199,7 @@ const QuestionColumn = () => {
   ]);
 
   // Question Sync-Scroll Observer
-  // This now only calls a lightweight UI action.
-  // THIS WILL NO LONGER CAUSE LAG.
+  // (This is YOUR original, correct observer)
   useEffect(() => {
     if (questionObserverRef.current) questionObserverRef.current.disconnect();
     const container = scrollContainerRef.current;
@@ -228,22 +228,19 @@ const QuestionColumn = () => {
   }, [questions, setCurrentQuestionNumberInView, isGroupingEnabled]);
 
 
-  // --- 💎 --- REMOVED --- 💎 ---
-  // The "VIEW ANSWER" MODE logic has been removed from this
-  // component. It is now correctly handled by the modal
-  // in `page.tsx`.
-  // --- 💎 --- END OF REMOVAL --- 💎 ---
-
-
-  // DEFAULT QUESTION LIST VIEW
+  // (This is YOUR original, correct layout)
   let questionCounter = 0;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col relative overflow-hidden">
       
+      {/* --- 💎 --- THIS IS THE ONLY FIX --- 💎 --- */}
+      {/* I have changed `flex-1` to `h-full` to make the div scrollable */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 p-6 overflow-y-auto custom-scrollbar"
+        className="h-full p-6 overflow-y-auto custom-scrollbar"
       >
+      {/* --- 💎 --- END OF FIX --- 💎 --- */}
+      
         <div className="space-y-6">
           {isGroupingEnabled &&
             questionsByGroup &&
@@ -278,7 +275,7 @@ const QuestionColumn = () => {
         </div>
       </div>
 
-      {/* FAB (This logic is correct) */}
+      {/* FAB (This is YOUR original, correct logic) */}
       <div className="absolute bottom-6 right-6">
         {isPaletteOpen && (
           <QuestionPalette onClose={() => setIsPaletteOpen(false)} />

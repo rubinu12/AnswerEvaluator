@@ -41,10 +41,12 @@ export const useQuizUIStore = create<QuizUIStore>()(
     closeExplanationModal: () => {
       set({ explanationModalQuestionId: null });
     },
-    
+
+    // --- ADDED THIS FUNCTION ---
+    // This implements the final action from quizTypes.ts
+    // and resets the UI state to its default values.
     resetUIState: () => {
       set(initialUIState);
-    }
-    
+    },
   })
 );
