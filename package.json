@@ -6,10 +6,10 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "publish:content": "node --env-file=.env.local node_modules/ts-node/dist/bin.js --compiler-options \"{\\\"module\\\": \\\"CommonJS\\\"}\" scripts/publish.ts"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.16.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google-cloud/vision": "^5.3.3",
     "@google/generative-ai": "^0.24.1",
@@ -80,6 +80,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

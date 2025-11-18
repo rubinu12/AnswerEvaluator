@@ -57,7 +57,11 @@ async function getTopicTree(): Promise<TopicTree> {
   try {
     const docRef = adminDb.doc('admin/topic_tree');
     const docSnap = await docRef.get();
-    if (docSnap.exists()) {
+    
+    // --- THIS IS THE FIX ---
+    // 'exists' is a boolean property in the admin-sdk, not a function
+    if (docSnap.exists) {
+    // --- END OF FIX ---
       return (docSnap.data()?.tree || []) as TopicTree;
     }
     return [];
