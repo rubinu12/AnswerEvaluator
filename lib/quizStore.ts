@@ -5,10 +5,7 @@ import {
   QuizStore,
   QuizState,
   Question,
-  UserAnswer,
   QuizFilter,
-  QuizError,
-  UltimateExplanation,
   BackendQuestion,
   ToastState,
   PerformanceStats,
@@ -16,7 +13,7 @@ import {
 import { auth } from '@/lib/firebase'; 
 import { useQuizUIStore } from './quizUIStore';
 
-// --- Helper: Get Auth Token (Unchanged) ---
+// --- Helper: Get Auth Token ---
 const getAuthHeader = async () => {
   const user = auth.currentUser;
   if (!user) return null;
@@ -26,7 +23,6 @@ const getAuthHeader = async () => {
 
 const initialToastState: ToastState = { message: '', type: 'info', show: false };
 
-// --- Initial State (Cleaned) ---
 const initialState: QuizState = {
   questions: [],
   userAnswers: [],
@@ -45,16 +41,18 @@ const initialState: QuizState = {
   editingQuestionId: null,
   toast: initialToastState, 
   performanceStats: null,
+  
+  // NEW: Track which data source we are using
+  dataSource: 'student', // Default to 'student' (RTDB)
 };
 
-
-// --- Helper: Question Formatter (Unchanged from last fix) ---
+// --- Helper: Question Formatter ---
 const formatBackendQuestion = (
   bq: BackendQuestion & { [key: string]: any }, 
   index: number
 ): Question => {
   return {
-    id: bq._id || `q-${index}`,
+    id: bq._id || bq.id || `q-${index}`, // Handle both _id (Mongo-style) and id (RTDB)
     questionNumber: index + 1,
     text: bq.questionText || bq.question_text || bq.text || bq.question || "Error: Failed to load question text.",
     options: bq.options || [
@@ -75,31 +73,55 @@ const formatBackendQuestion = (
   };
 };
 
-// --- The Main \"Data\" Store ---
 export const useQuizStore = create(
   persist<QuizStore>(
     (set, get) => ({
       ...initialState,
 
-      // --- 💎 --- This function now *only* loads the quiz --- 💎 ---
-      // It trusts persistence to handle refreshes.
+      // --- TOGGLE SOURCE ACTION ---
+      setDataSource: (source: 'admin' | 'student') => {
+        set({ dataSource: source });
+        // Optionally reload the quiz immediately if a filter exists
+        // This requires storing the current filter in state, which we aren't doing yet.
+        // For now, the user will just re-navigate or reload.
+      },
+
       loadAndStartQuiz: async (filter: QuizFilter) => {
-        
-        // --- 💎 --- THIS IS THE FIX --- 💎 ---
-        // We only set loading. We *do not* wipe the state here.
-        // This honors your "save on refresh" rule.
         set({ isLoading: true });
-        // --- 💎 --- END OF FIX --- 💎 ---
+        const { dataSource } = get();
         
         try {
-          const headers = (await getAuthHeader()) || {};
-          const queryParams = new URLSearchParams(
-            filter as Record<string, string>
-          ).toString();
-          const res = await fetch(`/api/quizzes?${queryParams}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json', ...headers },
-          });
+          let apiUrl = '';
+          let headers = {};
+
+          // --- DUAL MODE LOGIC ---
+          if (dataSource === 'admin') {
+            // Admin Mode: Fetch from Firestore (Official API)
+            // This requires Auth
+            const authHeaders = await getAuthHeader();
+            if (!authHeaders) throw new Error("Admin mode requires login.");
+            headers = { 'Content-Type': 'application/json', ...authHeaders };
+            
+            const queryParams = new URLSearchParams(
+              filter as Record<string, string>
+            ).toString();
+            apiUrl = `/api/quizzes?${queryParams}`;
+
+          } else {
+            // Student Mode: Fetch from RTDB (Public API)
+            // No Auth required for questions list
+            headers = { 'Content-Type': 'application/json' };
+            
+            // Construct query params for our new get-questions API
+            const queryParams = new URLSearchParams();
+            if (filter.year) queryParams.append('year', filter.year);
+            if (filter.subject) queryParams.append('subject', filter.subject);
+            if (filter.topic) queryParams.append('topic', filter.topic);
+            
+            apiUrl = `/api/get-questions?${queryParams.toString()}`;
+          }
+
+          const res = await fetch(apiUrl, { method: 'GET', headers });
 
           if (!res.ok) {
             const errorData = await res.json();
@@ -107,18 +129,19 @@ export const useQuizStore = create(
           }
 
           const data = await res.json();
-          const formattedQuestions = data.questions.map(formatBackendQuestion);
+          
+          // Handle slightly different response structures
+          const rawQuestions = dataSource === 'admin' ? data.questions : (data.questions || []);
+          const formattedQuestions = rawQuestions.map(formatBackendQuestion);
+          
           const totalQuestions = formattedQuestions.length;
           const newTotalTime = totalQuestions * 72;
           
-          // We just set the data. We DON'T reset userAnswers, showReport, etc.
-          // This will correctly load the user's saved session.
           set({
             questions: formattedQuestions,
-            // Only update time if it's not already set (e.g., in a running test)
             totalTime: get().totalTime || newTotalTime,
             timeLeft: get().timeLeft || newTotalTime,
-            quizTitle: data.quizTitle || 'Custom Quiz',
+            quizTitle: data.quizTitle || (dataSource === 'admin' ? 'Admin Preview' : 'Practice Quiz'),
             quizGroupBy: data.quizGroupBy || 'subject',
             isGroupingEnabled: data.isGroupingEnabled || false,
             isLoading: false,
@@ -136,25 +159,21 @@ export const useQuizStore = create(
         }
       },
 
-      // --- 💎 --- "WIPE ON MODE CHANGE" --- 💎 ---
-      // This is your logic. It's correct.
+      // ... (Rest of actions: startTest, submitTest, etc. remain unchanged)
       startTest: () => {
         set({
           isTestMode: true,
           showReport: false,
-          userAnswers: [], // <-- WIPE
-          showDetailedSolution: false, // <-- WIPE
+          userAnswers: [],
+          showDetailedSolution: false,
           timeLeft: get().totalTime,
           markedForReview: new Set<string>(),
           performanceStats: null,
         });
         useQuizUIStore.getState().resetUIState();
       },
-
-      // (submitTest is unchanged)
       submitTest: () => {
-        // ... all calculation logic ...
-        const { questions, userAnswers, totalTime, timeLeft } = get();
+         const { questions, userAnswers, totalTime, timeLeft } = get();
         const questionMap = new Map<string, Question>();
         questions.forEach(q => questionMap.set(q.id, q));
         let correctCount = 0;
@@ -202,8 +221,6 @@ export const useQuizStore = create(
           performanceStats: stats,
         });
       },
-      
-      // (resetTest is for "Practice Again")
       resetTest: () => {
         set({
           userAnswers: [],
@@ -216,15 +233,10 @@ export const useQuizStore = create(
         });
         useQuizUIStore.getState().resetUIState();
       },
-
-      // --- 💎 --- "WIPE ON LEAVE" --- 💎 ---
-      // This function will be called by the Header
       clearQuizSession: () => {
         set(initialState); 
         useQuizUIStore.getState().resetUIState();
       },
-
-      // (handleAnswerSelect is unchanged)
       handleAnswerSelect: (questionId: string, answer: string) => {
         const { isTestMode, userAnswers } = get();
         if (isTestMode) {
@@ -238,8 +250,6 @@ export const useQuizStore = create(
           }));
         }
       },
-
-      // (Rest of the store is unchanged)
       handleDetailedSolution: () => {
         const { questions } = get();
         const { currentQuestionNumberInView, openExplanationModal } = useQuizUIStore.getState();
@@ -272,7 +282,7 @@ export const useQuizStore = create(
       hideToast: () => set((state) => ({ toast: { ...state.toast, show: false } })),
       openExplanationEditor: (questionId: string | null) => set({ editingQuestionId: questionId }),
       closeExplanationEditor: () => set({ editingQuestionId: null }),
-      updateQuestionExplanation: (questionId: string, newExplanation: UltimateExplanation) => {
+      updateQuestionExplanation: (questionId: string, newExplanation: any) => {
         set((state) => ({
           questions: state.questions.map((q) =>
             q.id === questionId ? { ...q, explanation: newExplanation } : q

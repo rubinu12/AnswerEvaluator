@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation';
 import { useQuizStore } from '@/lib/quizStore';
 import { useQuizUIStore } from '@/lib/quizUIStore';
 import { QuizFilter } from '@/lib/quizTypes';
-import { X } from 'lucide-react';
 
 import { useAuthContext } from '@/lib/AuthContext'; 
 
@@ -32,7 +31,7 @@ const ErrorDisplay = ({ message }: { message: string }) => (
 export default function QuizPage() {
   const params = useParams();
   
-  const { user, loading: authLoading } = useAuthContext();
+  const { user, userProfile, loading: authLoading } = useAuthContext();
 
   const {
     isLoading: quizLoading,
@@ -40,7 +39,8 @@ export default function QuizPage() {
     loadAndStartQuiz,
     isTestMode,
     questions,
-    // We no longer need clearQuizSession here
+    dataSource,    // <--- 1. Get current source state
+    setDataSource, // <--- 2. Get action to change source
   } = useQuizStore();
 
   const {
@@ -49,16 +49,33 @@ export default function QuizPage() {
     isTopBarVisible,
   } = useQuizUIStore();
 
+  // --- 💎 AUTOMATIC MODE DETECTION 💎 ---
+  // This effect runs whenever the user profile loads or changes.
   useEffect(() => {
+    if (authLoading) return;
+
+    // If the user is an ADMIN, switch to 'admin' source (Firestore).
+    // Otherwise, default to 'student' source (RTDB).
+    if (userProfile?.subscriptionStatus === 'ADMIN') {
+      // Only update if it's not already set to avoid infinite loops
+      if (dataSource !== 'admin') {
+        console.log("🔒 Admin detected: Switching to LIVE Firestore data.");
+        setDataSource('admin');
+      }
+    } else {
+      if (dataSource !== 'student') {
+        console.log("🌍 Student detected: Switching to CACHED RTDB data.");
+        setDataSource('student');
+      }
+    }
+  }, [authLoading, userProfile, dataSource, setDataSource]);
+
+  // --- QUIZ LOADING EFFECT ---
+  useEffect(() => {
+    // Wait for auth to settle so we know which "mode" (Source) to use
     if (authLoading) {
       return; 
     }
-
-    // --- 💎 --- THIS IS THE FIX --- 💎 ---
-    // We are no longer clearing the session here.
-    // We just create the filter and load the quiz.
-    // The store's "smart" loadAndStartQuiz will handle the rest.
-    // --- 💎 --- END OF FIX --- 💎 ---
 
     const filter: QuizFilter = {};
     const type = params.type as string;
@@ -75,9 +92,10 @@ export default function QuizPage() {
       filter.topic = filterKey;
     }
 
+    // This will run initially, AND re-run if 'dataSource' changes (e.g., user logs in as admin)
     loadAndStartQuiz(filter);
     
-  }, [params, loadAndStartQuiz, authLoading, user]); // Removed clearQuizSession
+  }, [params, loadAndStartQuiz, authLoading, dataSource]); // Added 'dataSource' dependency
 
   const questionForModal = useMemo(() => {
     if (!explanationModalQuestionId) return null;
@@ -89,7 +107,6 @@ export default function QuizPage() {
     return <LoadingScreen message="Authenticating..." />;
   }
   
-  // This loading logic is correct
   if (quizLoading && questions.length === 0) {
     return <LoadingScreen />;
   }

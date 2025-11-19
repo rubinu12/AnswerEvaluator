@@ -1,12 +1,14 @@
 // app/api/quizzes/route.ts
+// The Admin API for fetching quizzes.
+// UPDATED: Now fetches explanations from the separate 'explanations' collection.
+
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { admin, db } from '@/lib/firebase-admin'; // Using your existing admin setup
+import { admin, db } from '@/lib/firebase-admin';
 import { DecodedIdToken } from 'firebase-admin/auth';
-import { Question } from '@/lib/quizTypes'; // Import the frontend type
+import { Question } from '@/lib/quizTypes';
 
 // Define the structure of the question document in Firestore
-// Based on app/admin/components/BulkAddModal.tsx
 interface FirestoreQuestion {
     questionText: string;
     options: {
@@ -17,31 +19,28 @@ interface FirestoreQuestion {
     topic: string;
     year: number;
     type: 'prelims';
-    // --- This is the new flexible explanation field ---
-    // We will build the system to save data here in Phase 2
+    // Legacy field - kept for fallback
     explanation?: {
         type: 'json' | 'image' | 'pdf';
-        data: string; // This will be the JSON blob or the public URL
+        data: string;
     };
-    // Add other fields like 'exam' if they exist
     exam?: string;
     examYear?: string;
 }
 
 /**
- * Transforms a question from its Firestore data structure to the 
- * frontend 'Question' type defined in lib/quizTypes.ts.
+ * Transforms a question and its separate explanation data into the frontend Question type.
  */
 function transformFirestoreDocToQuestion(
     docId: string, 
     docData: FirestoreQuestion, 
+    explanationData: any, // The data fetched from 'explanations' collection
     index: number
 ): Question {
     
     const optionLabels = ['A', 'B', 'C', 'D'];
-    let correctAnswer = 'A'; // Default
+    let correctAnswer = 'A';
     
-    // Find the correct answer and map options to the frontend structure
     const frontendOptions = docData.options.map((opt, i) => {
         if (opt.isCorrect) {
             correctAnswer = optionLabels[i];
@@ -52,14 +51,18 @@ function transformFirestoreDocToQuestion(
         };
     });
 
-    // --- This is the key logic ---
-    // If the 'explanation' field exists and is valid, pass it to the frontend.
-    // Otherwise, pass a placeholder. This is how we'll load the solution.
-    let explanationData = "No explanation available for this question yet.";
-    if (docData.explanation) {
-        // For now, we'll just pass the raw data.
-        // In the future, the frontend will parse this.
-        explanationData = JSON.stringify(docData.explanation);
+    // --- EXPLANATION LOGIC ---
+    // Priority 1: The separate 'explanations' document (The new standard)
+    // Priority 2: The embedded 'explanation' field (Legacy fallback)
+    // Priority 3: Default placeholder
+    let finalExplanation: any = "No explanation available for this question yet.";
+
+    if (explanationData) {
+        // If it's from the separate collection, it's likely the raw JSON object (UltimateExplanation)
+        finalExplanation = explanationData;
+    } else if (docData.explanation) {
+        // Fallback to legacy embedded data
+        finalExplanation = JSON.stringify(docData.explanation);
     }
     
     return {
@@ -69,22 +72,20 @@ function transformFirestoreDocToQuestion(
       questionType: 'SingleChoice',
       options: frontendOptions,
       correctAnswer: correctAnswer,
-      explanation: explanationData, // Pass the explanation data
+      explanation: finalExplanation, 
       subject: docData.subject,
       topic: docData.topic,
-      exam: docData.exam || 'UPSC', // Default
+      exam: docData.exam || 'UPSC',
       year: docData.year,
       examYear: docData.examYear || `${docData.exam || 'UPSC'}-${docData.year}`,
     };
 }
-
 
 // --- Main API Handler ---
 export async function GET(request: Request) {
     let user: DecodedIdToken;
 
     // 1. === Authentication ===
-    // Using the exact pattern from your /api/evaluate route
     try {
         const authorization = (await headers()).get('Authorization');
         if (!authorization?.startsWith('Bearer ')) {
@@ -97,7 +98,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Unauthorized: Invalid token.' }, { status: 401 });
     }
 
-    // 2. === Query Firestore ===
+    // 2. === Query Firestore (Questions) ===
     try {
         const { searchParams } = new URL(request.url);
         const subject = searchParams.get('subject');
@@ -105,53 +106,58 @@ export async function GET(request: Request) {
         const year = searchParams.get('year');
         const exam = searchParams.get('exam');
 
-        // Start building the query on the 'questions' collection
         let query: FirebaseFirestore.Query = db.collection('questions');
 
-        // Apply filters based on search parameters
-        if (subject) {
-            query = query.where('subject', '==', subject);
-        }
-        if (topic && topic !== 'all') {
-            query = query.where('topic', '==', topic);
-        }
-        if (year && year !== 'all') {
-            query = query.where('year', '==', Number(year));
-        }
-        if (exam) {
-            query = query.where('exam', '==', exam);
-        }
+        if (subject) query = query.where('subject', '==', subject);
+        if (topic && topic !== 'all') query = query.where('topic', '==', topic);
+        if (year && year !== 'all') query = query.where('year', '==', Number(year));
+        if (exam) query = query.where('exam', '==', exam);
 
-        // We only want 'prelims' questions
         query = query.where('type', '==', 'prelims');
 
-        // --- Execute the query ---
         const querySnapshot = await query.get();
 
         if (querySnapshot.empty) {
-            console.warn(`No questions found for filter:`, { subject, topic, year, exam });
             return NextResponse.json({
-                error: "No questions found for your selection.",
-                message: "No questions were found for this filter."
-            }, { status: 404 });
+                questions: [],
+                quizTitle: "No Questions Found",
+                totalTime: 0
+            });
         }
 
-        // 3. === Transform Data for Frontend ===
-        const questions: Question[] = [];
-        let index = 0;
-        querySnapshot.forEach((doc) => {
-            questions.push(
-                transformFirestoreDocToQuestion(
-                    doc.id, 
-                    doc.data() as FirestoreQuestion, 
-                    index++
-                )
+        // 3. === Fetch Explanations (Parallel) ===
+        // Now we fetch the corresponding explanations from the 'explanations' collection
+        const questionDocs = querySnapshot.docs;
+        
+        // Create an array of references to the 'explanations' collection
+        // matching the IDs of the questions we just found.
+        const explanationRefs = questionDocs.map(doc => 
+            db.collection('explanations').doc(doc.id)
+        );
+
+        // Fetch all explanations in one go (efficient)
+        // db.getAll requires at least one reference, which we know we have because snapshot wasn't empty
+        const explanationSnapshots = await db.getAll(...explanationRefs);
+
+        // 4. === Transform & Merge Data ===
+        const questions: Question[] = questionDocs.map((doc, index) => {
+            const qData = doc.data() as FirestoreQuestion;
+            const eSnap = explanationSnapshots[index];
+            
+            // Get explanation data if the document exists
+            const eData = eSnap.exists ? eSnap.data() : null;
+
+            return transformFirestoreDocToQuestion(
+                doc.id, 
+                qData, 
+                eData, 
+                index
             );
         });
 
-        // 4. === Return Successful Response ===
+        // 5. === Return Response ===
         const quizTitle = subject ? `${subject} - ${topic || 'All Topics'}` : 'Custom Quiz';
-        const totalTime = questions.length * 120; // 2 minutes per question
+        const totalTime = questions.length * 120;
 
         return NextResponse.json({
             questions,
@@ -163,7 +169,7 @@ export async function GET(request: Request) {
         console.error(`CRITICAL: Failed to fetch questions for user ${user.uid}:`, error);
         return NextResponse.json({ 
             error: `An error occurred: ${error.message}`,
-            message: "The server encountered an error while fetching questions. Please try again."
+            message: "The server encountered an error while fetching questions."
         }, { status: 500 });
     }
 }

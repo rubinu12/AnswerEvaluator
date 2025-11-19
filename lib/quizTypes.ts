@@ -94,8 +94,6 @@ export interface QuizState {
   showReport: boolean;
   showDetailedSolution: boolean;
   quizError: QuizError | null;
-
-  
   
   // Timer
   timeLeft: number;
@@ -114,7 +112,10 @@ export interface QuizState {
   toast: ToastState;
   editingQuestionId: string | null;
   performanceStats: PerformanceStats | null;
-};
+
+  // --- 💎 NEW: Track Data Source 💎 ---
+  dataSource: 'admin' | 'student';
+}
 
 export interface QuizActions {
   loadAndStartQuiz: (filter: QuizFilter) => Promise<void>;
@@ -131,9 +132,7 @@ export interface QuizActions {
   showToast: (message: string, type: 'info' | 'warning') => void;
   hideToast: () => void;
   
-  // --- 💎 --- THIS IS THE FIX --- 💎 ---
-  clearQuizSession: () => void; // <-- I forgot to add this line
-  // --- 💎 --- END OF FIX --- 💎 ---
+  clearQuizSession: () => void; 
   
   // Admin Actions
   openExplanationEditor: (questionId: string) => void;
@@ -145,6 +144,9 @@ export interface QuizActions {
   
   // Grouping
   setIsGroupingEnabled: (isEnabled: boolean) => void;
+
+  // --- 💎 NEW: Set Data Source 💎 ---
+  setDataSource: (source: 'admin' | 'student') => void;
 }
 
 export type QuizStore = QuizState & QuizActions;

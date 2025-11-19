@@ -1,11 +1,11 @@
 // app/api/get-questions/route.ts
-// The "Operator" API.
-// Fetches filtered lists from Realtime Database (Pillar 2.5) to save costs.
+// The "Operator" API for the Student App.
+// Fetches lightweight question lists from the Realtime Database (Pillar 2.5).
 
 import { NextRequest, NextResponse } from 'next/server';
-import { admin } from '@/lib/firebase-admin';
+import { admin } from '@/lib/firebase-admin'; // Uses the configured Admin SDK
 
-// Force dynamic so we always get fresh data for the filter
+// Force dynamic execution so we always check the latest data
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -15,8 +15,7 @@ export async function GET(request: NextRequest) {
     const topic = searchParams.get('topic');     // e.g., 'parliament'
     const year = searchParams.get('year');       // e.g., '2023'
 
-    // 1. Input Validation
-    // We require at least one major filter to prevent downloading the whole DB
+    // 1. Input Validation: We need at least a Subject or Year to fetch a list
     if (!subject && !year) {
       return NextResponse.json(
         { error: 'At least "subject" or "year" parameter is required.' },
@@ -25,48 +24,49 @@ export async function GET(request: NextRequest) {
     }
 
     const rtdb = admin.database();
-    let questionsMap: Record<string, any> = {};
-    let source = '';
+    let sourcePath = '';
 
-    // 2. Smart Fetching Strategy (Priority: Year > Subject)
-    // We pick the smallest possible "drawer" to open from the RTDB.
-    
+    // 2. Smart Routing (The "Filing Cabinet" Strategy)
+    // We choose the smallest possible index to query.
     if (year) {
-      // Strategy A: Fetch by Year (approx 100 questions - Very Fast)
-      source = `public_index/by_year/${year}`;
+      // If filtering by year, go to the Year cabinet
+      sourcePath = `public_index/by_year/${year}`;
     } else if (subject) {
-      // Strategy B: Fetch by Subject (approx 200-500 questions - Fast)
-      source = `public_index/by_subject/${subject}`;
+      // If filtering by subject, go to the Subject cabinet
+      sourcePath = `public_index/by_subject/${subject}`;
     }
 
-    // Execute the fetch
-    const snapshot = await rtdb.ref(source).once('value');
-    questionsMap = snapshot.val() || {};
+    // 3. Fetch from Realtime Database
+    // This is extremely fast because it's just reading one node
+    const snapshot = await rtdb.ref(sourcePath).once('value');
+    const questionsMap = snapshot.val();
 
-    // 3. Convert to Array & Apply Secondary Filters
-    // We do this in memory on the server (super fast) so the user gets exact results.
+    if (!questionsMap) {
+      // Return empty list if no data found
+      return NextResponse.json({ count: 0, questions: [] });
+    }
+
+    // 4. In-Memory Filtering
+    // We convert the map to an array and apply any extra filters
     let questionsList = Object.values(questionsMap);
 
-    if (year) {
-        questionsList = questionsList.filter((q: any) => String(q.year) === String(year));
+    // Apply 'topic' filter if it exists
+    if (topic && topic !== 'all') {
+        questionsList = questionsList.filter((q: any) => q.topic === topic);
     }
     
-    if (subject) {
+    // Apply 'subject' filter if we started with 'year' but also have a subject
+    if (year && subject && subject !== 'all') {
         questionsList = questionsList.filter((q: any) => q.subject === subject);
     }
 
-    if (topic) {
-        questionsList = questionsList.filter((q: any) => q.topic === topic);
-    }
-
-    // 4. Return the Lightweight List
+    // 5. Return the Result
     return NextResponse.json({
       count: questionsList.length,
       questions: questionsList
     }, {
       headers: {
-        // Cache this response in the browser for 60 seconds to make the app feel instant
-        // if the user switches tabs and comes back.
+        // Cache in browser for 60s for instant navigation
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' 
       }
     });
