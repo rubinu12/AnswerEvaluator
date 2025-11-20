@@ -1,54 +1,59 @@
 // lib/firebase-admin.ts
-// (FIXED: Now includes BOTH storageBucket AND databaseURL)
+// 🛡️ ARCHITECT UPDATE: Hardened Env Validation for Pillar 2.5
 
 import admin from 'firebase-admin';
 
 // 1. Get the secret from the environment variable
 const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
-// 2. Add a strong check with a clear error message if the variable is missing
+// 2. Validate Service Account
 if (!serviceAccountString) {
   throw new Error(
-    "\nCRITICAL: 'FIREBASE_SERVICE_ACCOUNT_JSON' environment variable is not set." +
-    "\nPlease create a .env.local file in your project root and add the following line:" +
-    "\nFIREBASE_SERVICE_ACCOUNT_JSON='{...your service account json...}'\n"
+    "\n❌ CRITICAL ERROR: 'FIREBASE_SERVICE_ACCOUNT_JSON' is missing." +
+    "\nThis is required for the Admin SDK to function." +
+    "\nPlease check your .env.local file.\n"
   );
 }
 
 let serviceAccount: admin.ServiceAccount;
 try {
-  // 3. Parse the string content into a JSON object
   serviceAccount = JSON.parse(serviceAccountString);
 } catch (error: any) {
-  // 4. Add a clear error if the JSON is badly formatted
   throw new Error(
-    "\nCRITICAL: Failed to parse 'FIREBASE_SERVICE_ACCOUNT_JSON'." +
-    "\nCheck your .env.local file for syntax errors (e.g., missing quotes or unescaped characters)." +
+    "\n❌ CRITICAL ERROR: Failed to parse 'FIREBASE_SERVICE_ACCOUNT_JSON'." +
     `\nParse Error: ${error.message}\n`
   );
 }
 
-// 5. Initialize the app (only if not already initialized)
+// 3. 💎 Validate Hybrid Architecture Config 💎
+// We MUST have the Database URL for the Student App (RTDB) to work.
+const databaseURL = process.env.FIREBASE_DATABASE_URL;
+const storageBucket = process.env.GCS_BUCKET_NAME;
+
+if (!databaseURL) {
+  throw new Error(
+    "\n❌ CRITICAL ERROR: 'FIREBASE_DATABASE_URL' is missing." +
+    "\nThe Student App requires this to connect to the Realtime Database (Pillar 2.5)." +
+    "\nAdd this to your .env.local (e.g., https://your-project-id-default-rtdb.firebaseio.com)\n"
+  );
+}
+
+// 4. Initialize the app (Singleton Pattern)
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      
-      // --- 💎 CRITICAL CONFIGURATION 💎 ---
-      // We must have BOTH of these for the Hybrid Architecture to work.
-      
-      // 1. For Pillar 2 (Cloud Storage / Explanations)
-      storageBucket: process.env.GCS_BUCKET_NAME,
-      
-      // 2. For Pillar 2.5 (Realtime Database / Question Index)
-      databaseURL: process.env.FIREBASE_DATABASE_URL
-      
-      // ------------------------------------
+      databaseURL: databaseURL, // Required for admin.database()
+      storageBucket: storageBucket, // Required for admin.storage()
     });
+    console.log("✅ Firebase Admin Initialized (Hybrid Mode Active)");
   } catch (error: any) {
-    console.error('Firebase Admin Initialization Error:', error.message);
+    console.error('❌ Firebase Admin Initialization Failed:', error.message);
+    // We don't throw here to avoid crashing the whole build if only one part fails,
+    // but the individual services will fail if accessed.
   }
 }
 
 const db = admin.firestore();
+// We export the raw admin to access .database() and .storage() elsewhere
 export { admin, db };

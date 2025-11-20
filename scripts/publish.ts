@@ -1,5 +1,5 @@
 // scripts/publish.ts
-// (FIXED: Now sanitizes data to remove 'undefined' values before sending to RTDB)
+// 🛡️ CRASH-PROOF VERSION: Automatically removes 'undefined' values to satisfy RTDB.
 
 import { db, admin } from '../lib/firebase-admin'; 
 import { createCipheriv, randomBytes } from 'crypto';
@@ -42,35 +42,66 @@ async function uploadToGCS(destination: string, data: string | Buffer, contentTy
 }
 
 /**
+ * 🧹 SANITIZER UTILITY
+ * RTDB crashes if you send 'undefined'. This removes those keys.
+ */
+function cleanObject(obj: any) {
+  Object.keys(obj).forEach(key => {
+    if (obj[key] === undefined) {
+      delete obj[key];
+    }
+  });
+  return obj;
+}
+
+/**
  * Fetches all questions from Firestore and strips sensitive/undefined data.
  */
-async function getQuestionsLight() {
+async function getQuestionsForStudentApp() {
   const questionsRef = db.collection('questions');
+  // Fetching ONLY prelims to match your data model
   const snapshot = await questionsRef.where('type', '==', 'prelims').get();
   
-  const questionsLight: any[] = [];
+  const questionsClean: any[] = [];
+  
   snapshot.forEach(doc => {
     const data = doc.data();
     
-    // --- FIX: Create a clean object to avoid 'undefined' errors ---
-    const q: any = {
+    // 1. Construct the raw object
+    // We use || "" to fallback to empty string instead of undefined for critical strings
+    const rawQ: any = {
       id: doc.id,
-      questionText: data.questionText.substring(0, 150) + '...',
-      subject: data.subject,
-      topic: data.topic,
-      exam: data.exam,
-      year: data.year,
+      questionText: data.questionText || data.question || "Error: Text missing",
+      
+      // Options: Ensure we handle cases where options might be missing
+      options: data.options || [
+        { label: 'A', text: data.optionA || '' },
+        { label: 'B', text: data.optionB || '' },
+        { label: 'C', text: data.optionC || '' },
+        { label: 'D', text: data.optionD || '' },
+      ],
+      
+      // 🛡️ FIX: Default to "" if missing. RTDB will accept empty string.
+      correctOption: data.correctOption || data.correctAnswer || data.answer || "",
+      
+      subject: data.subject || "Uncategorized",
+      topic: data.topic || "General",
+      exam: data.exam || "UPSC",
+      year: data.year || new Date().getFullYear(), // Default to current year if missing
+      
+      // Placeholder for UI logic
+      explanation: "Tap 'View Solution' to load explanation." 
     };
 
-    // Only add these if they truly exist. 
-    // If data.questionType is undefined, we simply don't add the key.
-    if (data.questionType) q.questionType = data.questionType;
-    if (data.difficulty) q.difficulty = data.difficulty;
-    if (data.paperQuestionNumber) q.paperQuestionNumber = data.paperQuestionNumber;
+    // Optional fields: Add them only if they exist
+    if (data.questionType) rawQ.questionType = data.questionType;
+    if (data.handwrittenNoteUrl) rawQ.handwrittenNoteUrl = data.handwrittenNoteUrl;
     
-    questionsLight.push(q);
+    // 2. Clean the object (Remove any remaining undefineds)
+    questionsClean.push(cleanObject(rawQ));
   });
-  return questionsLight;
+  
+  return questionsClean;
 }
 
 async function getExplanations() {
@@ -89,8 +120,7 @@ async function getTopicTree() {
 }
 
 async function publish() {
-  console.log('🚀 Starting "Giant Product" Publish Script...');
-  console.log(`Targeting GCS Bucket: ${bucket.name}`);
+  console.log('🚀 Starting Crash-Proof Publish Script...');
   
   try {
     // --- JOB 1: CLEAR OLD DATA ---
@@ -99,13 +129,13 @@ async function publish() {
     console.log('✅ RTDB cleared.');
 
     // --- JOB 2: FETCH DATA ---
-    console.log('Step 2: Fetching all data from Firestore...');
-    const [topicTree, questionsLight, allExplanations] = await Promise.all([
+    console.log('Step 2: Fetching and Sanitizing data from Firestore...');
+    const [topicTree, studentQuestions, allExplanations] = await Promise.all([
       getTopicTree(),
-      getQuestionsLight(),
+      getQuestionsForStudentApp(),
       getExplanations(),
     ]);
-    console.log(`✅ Fetched: ${questionsLight.length} questions.`);
+    console.log(`✅ Fetched & Sanitized: ${studentQuestions.length} questions.`);
 
     // --- JOB 3: UPLOAD TO STORAGE ---
     console.log('Step 3: Uploading files to Cloud Storage...');
@@ -135,15 +165,16 @@ async function publish() {
     const bySubjectIndex: Record<string, any> = {};
     const byYearIndex: Record<string, any> = {};
 
-    for (const q of questionsLight) {
+    for (const q of studentQuestions) {
       // Add to "by_subject" index
-      if (!bySubjectIndex[q.subject]) {
-        bySubjectIndex[q.subject] = {};
+      // (We already sanitized q.subject to default to "Uncategorized" if missing)
+      const subj = q.subject;
+      if (!bySubjectIndex[subj]) {
+        bySubjectIndex[subj] = {};
       }
-      bySubjectIndex[q.subject][q.id] = q;
+      bySubjectIndex[subj][q.id] = q;
 
       // Add to "by_year" index
-      // Ensure year is a string key for RTDB
       const yearKey = String(q.year);
       if (!byYearIndex[yearKey]) {
         byYearIndex[yearKey] = {};
@@ -160,6 +191,7 @@ async function publish() {
     console.log('✅ Realtime Database sync complete.');
 
     console.log('\n🎉 PUBLISH COMPLETE! 🎉');
+    process.exit(0);
 
   } catch (error) {
     console.error('❌ PUBLISH FAILED:', error);
