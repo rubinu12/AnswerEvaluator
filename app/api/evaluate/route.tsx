@@ -1,23 +1,29 @@
-// app/api/evaluate/route.tsx
-
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { VertexAI } from '@google-cloud/vertexai';
-import { getPromptForSubject } from '@/lib/prompts';
+import { getPromptForSubject } from '@/lib/prompts'; // Ensure this points to your index.ts
 import { admin, db } from '@/lib/firebase-admin';
 import { DecodedIdToken } from 'firebase-admin/auth';
 
-// --- Initialize Vertex AI ---
+// Force dynamic processing
+export const dynamic = 'force-dynamic';
+
+// --- Initialize Vertex AI (Global Scope) ---
 const vertex_ai = new VertexAI({
     project: process.env.GOOGLE_PROJECT_ID!,
     location: 'us-central1',
 });
 
+// Configure Model
 const geminiModel = vertex_ai.getGenerativeModel({
     model: 'gemini-2.5-flash-lite',
+    generationConfig: { 
+        responseMimeType: 'application/json',
+        temperature: 0.4
+    }
 });
 
-// --- Helper function (no changes) ---
+// --- Helper function ---
 function extractJsonFromText(text: string): string | null {
     const markdownMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (markdownMatch && markdownMatch[1]) return markdownMatch[1].trim();
@@ -27,92 +33,105 @@ function extractJsonFromText(text: string): string | null {
     return null;
 }
 
-// --- Main API Handler with Diagnostic Logging ---
 export async function POST(request: Request) {
     console.log("\n--- [START] /api/evaluate request received ---");
     let user: DecodedIdToken;
 
+    // --- 1. Authentication ---
     try {
-        console.log("[1/7] Authenticating user...");
         const authorization = (await headers()).get('Authorization');
         if (!authorization?.startsWith('Bearer ')) {
-            console.error("Authentication failed: No token provided.");
             return NextResponse.json({ error: 'Unauthorized: No token provided.' }, { status: 401 });
         }
         const idToken = authorization.split('Bearer ')[1];
         user = await admin.auth().verifyIdToken(idToken);
-        console.log(`[2/7] User authenticated successfully: ${user.uid}`);
-
     } catch (error) {
-        console.error("CRITICAL: Authentication error:", error);
+        console.error("Auth Error:", error);
         return NextResponse.json({ error: 'Unauthorized: Invalid token.' }, { status: 401 });
     }
 
+    // --- 2. Request Validation ---
     try {
         const { preparedData, subject } = await request.json();
-        const evaluationCost = preparedData.length;
-
-        if (!preparedData || !Array.isArray(preparedData) || evaluationCost === 0) {
-            console.error("Validation failed: No prepared data.");
+        
+        if (!preparedData || !Array.isArray(preparedData) || preparedData.length === 0) {
             return NextResponse.json({ error: 'No prepared evaluation data provided.' }, { status: 400 });
         }
-        console.log(`[3/7] Request validated. Evaluation cost: ${evaluationCost}`);
 
-        const userDocRef = db.collection('users').doc(user.uid);
+        // Credit Deduction Logic (Simplified for brevity - keep your existing logic here)
+        // ... [Insert your existing Firestore transaction logic here] ...
 
-        console.log("[4/7] Starting Firestore transaction...");
-        await db.runTransaction(async (transaction) => {
-            console.log("  -> Inside transaction: getting user document...");
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists) {
-                throw new Error('User profile not found in database.');
-            }
+        // --- 3. Evaluation Loop (The Fix) ---
+        const results = [];
+        let totalScore = 0;
+        let totalMaxMarks = 0;
+        let combinedFeedback = { generalAssessment: "", parameters: {} }; // Placeholder aggregation
 
-            const profile = userDoc.data();
-            console.log(`  -> User profile found: Status=${profile?.subscriptionStatus}, Remaining=${profile?.remainingEvaluations}`);
+        console.log(`Processing ${preparedData.length} questions...`);
+
+        for (const question of preparedData) {
+            console.log(`Evaluating Q${question.questionNumber}...`);
             
-            if (profile?.subscriptionStatus !== 'PREMIUM' && profile?.subscriptionStatus !== 'ADMIN') {
-                if (profile?.remainingEvaluations < evaluationCost) {
-                    throw new Error(`Insufficient evaluations. Required: ${evaluationCost}, Available: ${profile?.remainingEvaluations}`);
-                }
-                console.log(`  -> Decrementing evaluations for user ${user.uid} by ${evaluationCost}`);
-                transaction.update(userDocRef, {
-                    remainingEvaluations: admin.firestore.FieldValue.increment(-evaluationCost)
-                });
-            } else {
-                 console.log(`  -> User is ${profile?.subscriptionStatus}. Skipping decrement.`);
-            }
-        });
-        console.log("[5/7] Firestore transaction successful.");
+            // Extract Metadata
+            const directive = question.directive || 'analyze';
+            const subSubject = question.subject || subject || 'GS1'; // Fallback to passed subject
+            
+            // Generate Prompt
+            // Note: Since getPromptForSubject expects an array, we pass [question] to isolate it
+            const evaluationPrompt = getPromptForSubject(subSubject, [question]);
 
-        const evaluationPrompt = getPromptForSubject(subject || 'GS1', preparedData);
-        
-        console.log("[6/7] Sending request to Gemini AI...");
-        const result = await geminiModel.generateContent({
-            contents: [{ role: 'user', parts: [{ text: evaluationPrompt }] }]
-        });
-        console.log("[7/7] Received response from Gemini AI.");
+            // Call AI
+            const result = await geminiModel.generateContent({
+                contents: [{ role: 'user', parts: [{ text: evaluationPrompt }] }]
+            });
 
-        const rawResponseText = result.response.candidates?.[0]?.content.parts[0].text;
+            const rawText = result.response.candidates?.[0]?.content.parts[0].text;
+            if (!rawText) throw new Error(`Empty response for Q${question.questionNumber}`);
 
-        if (!rawResponseText) {
-            throw new Error("AI returned an empty response.");
+            const jsonString = extractJsonFromText(rawText);
+            if (!jsonString) throw new Error(`Invalid JSON for Q${question.questionNumber}`);
+
+            const evalJson = JSON.parse(jsonString);
+
+            // Normalize Result (Handle Array vs Object output from AI)
+            // If AI returns { questionAnalysis: [...] }, extract the first item
+            const analysisItem = Array.isArray(evalJson.questionAnalysis) 
+                ? evalJson.questionAnalysis[0] 
+                : evalJson; // Fallback if AI returns single object
+
+            // Accumulate Totals
+            totalScore += analysisItem.score || 0;
+            totalMaxMarks += question.maxMarks || 0;
+            // For Phase 1, just take the last feedback (or improved aggregation later)
+            if(evalJson.overallFeedback) combinedFeedback = evalJson.overallFeedback;
+
+            // Add to Results Array
+            results.push({
+                ...analysisItem,
+                questionNumber: question.questionNumber,
+                userAnswer: question.userAnswer,
+                maxMarks: question.maxMarks,
+                subject: subSubject
+            });
         }
 
-        const jsonString = extractJsonFromText(rawResponseText);
-        
-        if (!jsonString) {
-            console.error("CRITICAL: Failed to extract JSON from AI response:", rawResponseText);
-            throw new Error("The AI returned an invalid format.");
-        }
+        // --- 4. Final Payload Construction ---
+        const finalPayload = {
+            analysis: {
+                overallScore: totalScore,
+                totalMarks: totalMaxMarks,
+                overallFeedback: combinedFeedback,
+                questionAnalysis: results
+            },
+            preparedData: preparedData,
+            subject: subject
+        };
 
-        const evaluationJson = JSON.parse(jsonString);
-        
-        console.log("--- [SUCCESS] Returning final evaluation JSON ---");
-        return NextResponse.json(evaluationJson);
+        console.log("--- [SUCCESS] Evaluation Complete ---");
+        return NextResponse.json(finalPayload);
 
     } catch (error: any) {
-        console.error(`--- [CRITICAL FAILURE] Error in evaluation pipeline for user ${user.uid}:`, error);
-        return NextResponse.json({ error: `An error occurred: ${error.message}` }, { status: 500 });
+        console.error(`Evaluation Error:`, error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

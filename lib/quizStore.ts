@@ -27,7 +27,9 @@ let cachedMasterKey: string | null = null;
 const initialState: QuizState = {
   questions: [],
   userAnswers: [],
-  isLoading: true, 
+  activeFilter: null,
+  
+  isLoading: true,
   isTestMode: false,
   showReport: false,
   showDetailedSolution: false,
@@ -45,58 +47,58 @@ const initialState: QuizState = {
   dataSource: 'student', 
 };
 
-// --- 🛡️ FINAL DATA NORMALIZER 🛡️ ---
+// --- 🛡️ DATA NORMALIZER 🛡️ ---
 const formatBackendQuestion = (bq: BackendQuestion & { [key: string]: any }, index: number): Question => {
   
-  // 1. PREPARE OPTIONS
   let rawOptions = bq.options;
   if (rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)) {
       rawOptions = Object.values(rawOptions);
   }
   if (!Array.isArray(rawOptions) || rawOptions.length === 0) {
      rawOptions = [
-       { label: 'A', text: bq.optionA || bq.option_a || '' },
-       { label: 'B', text: bq.optionB || bq.option_b || '' },
-       { label: 'C', text: bq.optionC || bq.option_c || '' },
-       { label: 'D', text: bq.optionD || bq.option_d || '' },
+       { label: 'A', text: bq.optionA || '' },
+       { label: 'B', text: bq.optionB || '' },
+       { label: 'C', text: bq.optionC || '' },
+       { label: 'D', text: bq.optionD || '' },
      ];
   }
 
-  // 2. FORMAT OPTIONS
   const formattedOptions = rawOptions.map((opt: any, idx: number) => {
-      const fallbackLabel = String.fromCharCode(65 + idx); // 0->A, 1->B
+      const fallbackLabel = String.fromCharCode(65 + idx); 
       return {
           label: (opt.label || fallbackLabel).toUpperCase().trim(), 
           text: opt.text || opt.value || (typeof opt === 'string' ? opt : "") 
       };
   });
 
-  // 3. 🧠 SMART ANSWER RESOLVER 🧠
-  let rawCorrect = bq.correctOption || bq.correct_option || bq.correctAnswer || bq.answer || "";
+  let cleanCorrect = bq.correctOption || bq.correct_option || bq.correctAnswer || bq.answer || "";
+  let calculatedCorrectAnswer = cleanCorrect;
+
+  // Check for explicit 'isCorrect' flag
+  formattedOptions.forEach((opt: any) => {
+      const originalOpt = rawOptions![formattedOptions.indexOf(opt)];
+      if (originalOpt && (originalOpt.isCorrect === true || originalOpt.isCorrect === "true")) {
+          calculatedCorrectAnswer = opt.label;
+      }
+  });
   
-  // Step A: Clean the string first (Remove "Option", "Ans", parens)
-  let cleanCorrect = String(rawCorrect).trim().replace(/[()]/g, '');
-  if (cleanCorrect.toLowerCase().startsWith("option")) {
-      cleanCorrect = cleanCorrect.split(" ")[1] || cleanCorrect;
-  }
+  cleanCorrect = String(calculatedCorrectAnswer).trim();
   
-  // Step B: Check if the *cleaned* value is a Number (e.g. "3" or 3)
-  // We use formattedOptions length to ensure we don't index out of bounds
-  const numericValue = Number(cleanCorrect);
-  const isNumeric = !isNaN(numericValue) && cleanCorrect !== "";
-  
+  const numericVal = Number(cleanCorrect);
+  const isNumeric = !isNaN(numericVal) && cleanCorrect !== "" && cleanCorrect !== null;
+
   if (isNumeric) {
-      // It's an index! (0, 1, 2, 3)
-      // Check if we have a valid label for this index
-      if (formattedOptions[numericValue]) {
-          cleanCorrect = formattedOptions[numericValue].label; // Use the actual label "D"
+      if (formattedOptions[numericVal]) {
+          cleanCorrect = formattedOptions[numericVal].label;
       } else {
-          // Fallback: Convert 3 -> D
-          cleanCorrect = String.fromCharCode(65 + numericValue);
+          cleanCorrect = String.fromCharCode(65 + numericVal);
       }
   } else {
-      // It's a Letter (A, B, C, D) -> Just normalize casing
-      cleanCorrect = cleanCorrect.toUpperCase();
+      cleanCorrect = String(cleanCorrect || "").trim();
+      if (cleanCorrect.toLowerCase().startsWith("option")) {
+          cleanCorrect = cleanCorrect.split(" ")[1] || "";
+      }
+      cleanCorrect = cleanCorrect.toUpperCase().replace(/[()]/g, '');
   }
 
   return {
@@ -104,7 +106,7 @@ const formatBackendQuestion = (bq: BackendQuestion & { [key: string]: any }, ind
     questionNumber: index + 1,
     text: bq.questionText || bq.question_text || bq.text || bq.question || "Error: Question text missing.",
     options: formattedOptions,
-    correctAnswer: cleanCorrect, // Now definitively "A", "B", "C", or "D"
+    correctAnswer: cleanCorrect,
     explanation: bq.explanation || bq.explanationText || 'Tap "View Solution" to load explanation.', 
     questionType: bq.questionType || 'SingleChoice',
     year: bq.year,
@@ -125,8 +127,17 @@ export const useQuizStore = create(
       setDataSource: (source: 'admin' | 'student') => { set({ dataSource: source }); },
 
       loadAndStartQuiz: async (filter: QuizFilter) => {
-        set({ isLoading: true, quizError: null });
-        const { dataSource } = get();
+        const { activeFilter, questions, dataSource } = get();
+
+        const isSameFilter = JSON.stringify(filter) === JSON.stringify(activeFilter);
+        if (isSameFilter && questions.length > 0) {
+            console.log("🔄 [QuizStore] Refresh Detected. Restoring Session.");
+            set({ isLoading: false });
+            return; 
+        }
+
+        console.log("🚀 [QuizStore] New Quiz. Fetching...");
+        set({ isLoading: true, quizError: null, activeFilter: filter });
         
         try {
           let apiUrl = '';
@@ -141,14 +152,16 @@ export const useQuizStore = create(
           } else {
             headers = { 'Content-Type': 'application/json' };
             const queryParams = new URLSearchParams();
-            console.log("🔧 [QuizStore] Building URL with Filter:", filter);
+            
             if (filter.year) queryParams.append('year', filter.year);
             if (filter.subject) queryParams.append('subject', filter.subject);
             if (filter.topic) queryParams.append('topic', filter.topic);
+            
             apiUrl = `/api/get-questions?${queryParams.toString()}`;
           }
 
           const res = await fetch(apiUrl, { method: 'GET', headers });
+          
           if (!res.ok) {
             const errorData = await res.json().catch(() => ({})); 
             throw new Error(errorData.message || `API Error: ${res.status} ${res.statusText}`);
@@ -158,7 +171,6 @@ export const useQuizStore = create(
           const rawQuestions = dataSource === 'admin' ? data.questions : (data.questions || []);
           
           if (rawQuestions.length === 0) {
-             console.warn("⚠️ API returned 0 questions.");
              set({ isLoading: false, questions: [], quizError: { message: "No questions found.", type: 'generic' } });
              return;
           }
@@ -173,77 +185,159 @@ export const useQuizStore = create(
             quizTitle: data.quizTitle || (dataSource === 'admin' ? 'Admin Preview' : 'Practice Quiz'),
             quizGroupBy: data.quizGroupBy || 'subject',
             isGroupingEnabled: data.isGroupingEnabled || false,
+            
             userAnswers: [],
             showReport: false,
             showDetailedSolution: false,
             bookmarkedQuestions: new Set(),
             markedForReview: new Set(),
             performanceStats: null,
+            isTestMode: false, 
+            
             isLoading: false, 
             quizError: null
           });
 
         } catch (error: any) {
           console.error('❌ Error loading quiz:', error);
-          set({ isLoading: false, quizError: { message: error.message || 'Failed to load quiz.', type: 'generic' } });
+          set({
+            isLoading: false,
+            quizError: { message: error.message || 'Failed to load quiz.', type: 'generic' },
+          });
         }
       },
 
       startTest: () => {
-        set({ isTestMode: true, showReport: false, userAnswers: [], showDetailedSolution: false, timeLeft: get().totalTime, markedForReview: new Set<string>(), performanceStats: null });
+        set({ 
+            isTestMode: true, 
+            showReport: false, 
+            userAnswers: [], 
+            showDetailedSolution: false, 
+            timeLeft: get().totalTime, 
+            markedForReview: new Set<string>(), 
+            performanceStats: null 
+        });
         useQuizUIStore.getState().resetUIState();
       },
 
-      submitTest: () => {
-         const { questions, userAnswers, totalTime, timeLeft } = get();
+      // 💎 UPSC SCORING ENGINE 💎
+      submitTest: async () => {
+        const { questions, userAnswers, totalTime, timeLeft, activeFilter, quizTitle } = get();
+        
+        // Constants for UPSC
+        const MARKS_PER_QUESTION = 2;
+        const NEGATIVE_MULTIPLIER = 1/3; // 0.33 of the marks assigned
+        const NEGATIVE_MARKS = MARKS_PER_QUESTION * NEGATIVE_MULTIPLIER; // 0.666...
+
         let correctCount = 0;
         let incorrectCount = 0;
-        const maxScore = questions.length;
-        const answeredQuestions = userAnswers.length;
+        
+        const responses: Record<string, any> = {};
         const questionMap = new Map(questions.map(q => [q.id, q]));
         
         userAnswers.forEach(ua => {
           const q = questionMap.get(ua.questionId);
-          if (q && q.correctAnswer?.toUpperCase() === ua.answer?.toUpperCase()) correctCount++;
-          else incorrectCount++;
+          let status = 'SKIPPED';
+          
+          if (q) {
+              const isCorrect = q.correctAnswer?.toUpperCase() === ua.answer?.toUpperCase();
+              if (isCorrect) {
+                  correctCount++;
+                  status = 'CORRECT';
+              } else {
+                  incorrectCount++;
+                  status = 'WRONG';
+              }
+              responses[q.id] = { answer: ua.answer, status };
+          }
         });
+
+        const unattemptedCount = questions.length - (correctCount + incorrectCount);
         
-        const unattemptedCount = maxScore - answeredQuestions;
-        const finalScore = maxScore > 0 ? (correctCount / maxScore) * 100 : 0;
-        const accuracy = answeredQuestions > 0 ? (correctCount / answeredQuestions) * 100 : 0;
+        // 🧮 CALCULATION FORMULA
+        // (Correct * 2) - (Wrong * 0.66)
+        const positiveScore = correctCount * MARKS_PER_QUESTION;
+        const negativeScore = incorrectCount * NEGATIVE_MARKS;
+        const rawScore = positiveScore - negativeScore;
+        
+        // Round to 2 decimal places
+        const finalScore = Math.round((rawScore + Number.EPSILON) * 100) / 100;
+        
+        // Total possible marks
+        const maxScore = questions.length * MARKS_PER_QUESTION;
+
+        const accuracy = (correctCount + incorrectCount) > 0 
+            ? (correctCount / (correctCount + incorrectCount)) * 100 
+            : 0;
+            
         const timeTaken = totalTime - timeLeft;
-        const avgTime = answeredQuestions > 0 ? timeTaken / answeredQuestions : 0;
+        const avgTimePerQuestion = (correctCount + incorrectCount) > 0 
+            ? timeTaken / (correctCount + incorrectCount) 
+            : 0;
+        
         let pacing: "Ahead" | "On Pace" | "Behind" = "On Pace";
-        if (maxScore > 0 && totalTime > 0) {
-            const target = totalTime / maxScore;
-            if (avgTime < target * 0.9) pacing = "Ahead";
-            else if (avgTime > target * 1.1) pacing = "Behind";
+        if (questions.length > 0 && totalTime > 0) {
+            const target = totalTime / questions.length;
+            if (avgTimePerQuestion < target * 0.9) pacing = "Ahead";
+            else if (avgTimePerQuestion > target * 1.1) pacing = "Behind";
         }
+
+        const stats: PerformanceStats = { 
+            maxScore, // Now 200 (for 100 questions) instead of 100
+            correctCount, 
+            incorrectCount, 
+            unattemptedCount, 
+            finalScore, // Now 1.34 instead of percentage
+            accuracy: Math.round(accuracy), 
+            avgTimePerQuestion, 
+            pacing 
+        };
+
+        // Update UI
         set({
           isTestMode: false, showReport: true,
-          performanceStats: { maxScore, correctCount, incorrectCount, unattemptedCount, finalScore: Math.round(finalScore), accuracy: Math.round(accuracy), avgTimePerQuestion: avgTime, pacing }
+          performanceStats: stats
         });
+
+        // Send to Cloud
+        try {
+            const authHeaders = await getAuthHeader();
+            if (authHeaders && activeFilter) {
+                fetch('/api/save-result', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders },
+                    body: JSON.stringify({
+                        stats,
+                        responses,
+                        filter: activeFilter,
+                        quizTitle
+                    })
+                });
+                get().showToast("Result saved successfully!", "info");
+            }
+        } catch (e) {
+            console.error("Failed to save result:", e);
+            get().showToast("Failed to save result.", "warning");
+        }
       },
 
       resetTest: () => {
         set({ userAnswers: [], isTestMode: false, showReport: false, showDetailedSolution: false, timeLeft: get().totalTime, markedForReview: new Set<string>(), performanceStats: null });
         useQuizUIStore.getState().resetUIState();
       },
-
-      clearQuizSession: () => { set(initialState); useQuizUIStore.getState().resetUIState(); },
-
+      clearQuizSession: () => { 
+          set(initialState); 
+          useQuizUIStore.getState().resetUIState(); 
+      },
       handleAnswerSelect: (questionId: string, answer: string) => {
         const { isTestMode, userAnswers } = get();
         if (userAnswers.some((ua) => ua.questionId === questionId)) return; 
         set((state) => {
-            const newState: Partial<QuizState> = {
-                userAnswers: [...state.userAnswers, { questionId, answer }]
-            };
+            const newState: Partial<QuizState> = { userAnswers: [...state.userAnswers, { questionId, answer }] };
             if (!isTestMode) newState.showDetailedSolution = true;
             return newState;
         });
       },
-
       viewAnswer: async (questionId: string) => {
         const { questions, dataSource } = get();
         const question = questions.find(q => q.id === questionId);
@@ -266,8 +360,7 @@ export const useQuizStore = create(
                 const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodedPath}?alt=media`;
                 const fileRes = await fetch(fileUrl);
                 if (!fileRes.ok) {
-                    console.warn(`Explanation file missing for ${questionId}`);
-                    get().showToast("Explanation not available yet.", "warning");
+                    get().showToast("Explanation not available.", "warning");
                     return;
                 }
                 const encryptedData = await fileRes.text();
@@ -278,19 +371,16 @@ export const useQuizStore = create(
                     ),
                 }));
             } catch (error) {
-                console.error("Decryption Failed:", error);
                 get().showToast("Solution unavailable.", "warning");
             }
         }
       },
-
       handleDetailedSolution: () => {
         const { questions } = get();
         const { currentQuestionNumberInView } = useQuizUIStore.getState();
         const questionId = questions[currentQuestionNumberInView - 1]?.id;
         if (questionId) get().viewAnswer(questionId);
       },
-
       closeAnswerView: () => useQuizUIStore.getState().closeExplanationModal(),
       setTimeLeft: (t) => set({ timeLeft: t }),
       toggleBookmark: (id) => set(s => { const n = new Set(s.bookmarkedQuestions); n.has(id)?n.delete(id):n.add(id); return {bookmarkedQuestions:n}}),
@@ -304,8 +394,8 @@ export const useQuizStore = create(
       setIsGroupingEnabled: (enabled) => set({ isGroupingEnabled: enabled }),
     }),
     {
-      // 🚨 VERSION 4: FINAL CLEAN CACHE
-      name: 'quiz-session-v4', 
+      // 🚨 VERSION 11: New Scoring System
+      name: 'quiz-session-v11', 
       storage: createJSONStorage(() => localStorage, {
         replacer: (key, value) => { if (value instanceof Set) return { _type: 'Set', value: Array.from(value) }; return value; },
         reviver: (key, value) => { if (typeof value === 'object' && value !== null && (value as any)._type === 'Set') return new Set((value as any).value); return value; },
@@ -318,7 +408,12 @@ export const useQuizStore = create(
         bookmarkedQuestions: state.bookmarkedQuestions,
         markedForReview: state.markedForReview,
         dataSource: state.dataSource,
-      })as unknown as QuizStore,
+        activeFilter: state.activeFilter,
+        isTestMode: state.isTestMode,
+        showReport: state.showReport,
+        showDetailedSolution: state.showDetailedSolution,
+        performanceStats: state.performanceStats,
+      } as unknown as QuizStore),
     }
   )
 );

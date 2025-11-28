@@ -1,5 +1,5 @@
 // lib/quizTypes.ts
-import { auth } from '@/lib/firebase'; // We'll need this for auth
+import { auth } from '@/lib/firebase'; // Used for auth logic if needed within types context
 
 // --- Question & Answer Types ---
 
@@ -10,8 +10,10 @@ export type BackendQuestion = {
   optionB?: string;
   optionC?: string;
   optionD?: string;
-  options?: { label: string; text: string }[];
+  options?: { label: string; text: string; isCorrect?: boolean | string }[]; // Added isCorrect check
   correctOption: string;
+  correctAnswer?: string; // Added fallback
+  answer?: string;        // Added fallback
   explanationText?: string; 
   year?: number;
   subject?: string;
@@ -44,7 +46,7 @@ export interface UserAnswer {
   answer: string;
 }
 
-// --- Quiz Configuration Types (Unchanged) ---
+// --- Quiz Configuration Types ---
 
 export interface QuizFilter {
   exam?: string;
@@ -55,7 +57,7 @@ export interface QuizFilter {
 
 export type GroupByKey = 'topic' | 'examYear';
 
-// --- State & Error Types (Unchanged) ---
+// --- State & Error Types ---
 
 export interface QuizError {
   message: string;
@@ -80,7 +82,7 @@ export interface PerformanceStats {
 }
 
 // ==================================================================
-// --- 虫 --- "DATA" STORE TYPES --- 虫 ---
+// --- 🦁 "DATA" STORE TYPES --- 🦁
 // ==================================================================
 
 export interface QuizState {
@@ -88,6 +90,9 @@ export interface QuizState {
   questions: Question[];
   userAnswers: UserAnswer[];
   
+  // 💎 NEW: Tracks which quiz is currently loaded to handle Refreshes
+  activeFilter: QuizFilter | null;
+
   // Quiz Status
   isLoading: boolean;
   isTestMode: boolean;
@@ -113,7 +118,7 @@ export interface QuizState {
   editingQuestionId: string | null;
   performanceStats: PerformanceStats | null;
 
-  // --- 💎 NEW: Track Data Source 💎 ---
+  // Track Data Source
   dataSource: 'admin' | 'student';
 }
 
@@ -126,8 +131,8 @@ export interface QuizActions {
   toggleBookmark: (questionId: string) => void;
   toggleMarkForReview: (questionId: string) => void;
   handleDetailedSolution: () => void;
-  viewAnswer: (questionId: string) => void; // This might be deprecated soon
-  closeAnswerView: () => void; // This might be deprecated soon
+  viewAnswer: (questionId: string) => void;
+  closeAnswerView: () => void;
   setTimeLeft: (timeLeft: number) => void;
   showToast: (message: string, type: 'info' | 'warning') => void;
   hideToast: () => void;
@@ -144,16 +149,18 @@ export interface QuizActions {
   
   // Grouping
   setIsGroupingEnabled: (isEnabled: boolean) => void;
+  setPerformanceStats: (stats: PerformanceStats) => void; // Added setter
 
-  // --- 💎 NEW: Set Data Source 💎 ---
+  // Set Data Source
   setDataSource: (source: 'admin' | 'student') => void;
+  setIsLoading: (isLoading: boolean) => void; // Added setter
 }
 
 export type QuizStore = QuizState & QuizActions;
 
 
 // ==================================================================
-// --- 虫 --- NEW "UI" STORE TYPES --- 虫 ---
+// --- 🦁 NEW "UI" STORE TYPES --- 🦁
 // ==================================================================
 
 export interface QuizUIState {
@@ -172,7 +179,6 @@ export interface QuizUIActions {
   openExplanationModal: (questionId: string) => void;
   closeExplanationModal: () => void;
   
-  // Reset UI state (e.g., when quiz resets)
   resetUIState: () => void;
 }
 
@@ -180,7 +186,7 @@ export type QuizUIStore = QuizUIState & QuizUIActions;
 
 
 // ==================================================================
-// --- EXPLANATION TYPES (Unchanged) ---
+// --- EXPLANATION TYPES ---
 // ==================================================================
 
 export type QuestionType =

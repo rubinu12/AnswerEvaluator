@@ -93,22 +93,51 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
       const { analysis, preparedData, subject } = payload;
 
       const finalQuestionAnalysis: QuestionAnalysis[] = preparedData.map(
-        (prepItem: PreparedQuestion) => {
-          const analysisItem = analysis.questionAnalysis?.find(
-            (item) => item.questionNumber === prepItem.questionNumber,
+        (prepItem: PreparedQuestion, index: number) => {
+          
+          // 1. Try finding by Explicit ID Match (Best Practice)
+          // We convert both to strings to ensure loose matching (e.g. "1" == 1)
+          let analysisItem = analysis.questionAnalysis?.find(
+            (item) => String(item.questionNumber) === String(prepItem.questionNumber)
           );
+
+          // 2. Fallback: If ID match fails, try finding by Index (Robustness)
+          // This saves us if the AI returned a weird ID or if IDs are missing
+          if (!analysisItem && analysis.questionAnalysis && analysis.questionAnalysis[index]) {
+             console.warn(`ID mismatch for Q${prepItem.questionNumber}. Falling back to index ${index}.`);
+             analysisItem = analysis.questionAnalysis[index];
+          }
           
           if (!analysisItem) {
             throw new Error(`Analysis for question ${prepItem.questionNumber} is missing.`);
           }
           
+          // Explicit mapping to ensure all new Phase 1 fields are captured correctly
           return {
-            ...analysisItem,
+            // 1. Identity & User Content (Prioritize Prepared Data)
             questionNumber: prepItem.questionNumber,
             questionText: prepItem.questionText,
             userAnswer: prepItem.userAnswer,
             maxMarks: prepItem.maxMarks,
             subject: analysisItem.subject, 
+            
+            // 2. Scores
+            score: analysisItem.score,
+            scoreBreakdown: analysisItem.scoreBreakdown, // NEW: Granular scoring
+
+            // 3. The Intelligence Layers
+            questionDeconstruction: analysisItem.questionDeconstruction, // Receipt
+            blindSpotAnalysis: analysisItem.blindSpotAnalysis,           // Detector
+            coachBlueprint: analysisItem.coachBlueprint,                 // Architect View
+            mentorsPen: analysisItem.mentorsPen,                         // Annotations
+
+            // 4. Value Adds
+            vocabularySwap: analysisItem.vocabularySwap,                 // Language Table
+            topperArsenal: analysisItem.topperArsenal,                   // Flashcards
+            
+            // 5. Legacy/Fallback & Feedback
+            idealAnswer: analysisItem.idealAnswer,
+            overallFeedback: analysis.overallFeedback // Attach global feedback
           };
         },
       );
@@ -122,7 +151,10 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
         questionAnalysis: finalQuestionAnalysis,
       };
 
+      // Generate a unique ID for this session
       const uniqueId = `eval_${Date.now()}`;
+      
+      // Store in Session Storage for the Result Page to retrieve
       sessionStorage.setItem(uniqueId, JSON.stringify(finalDataForStorage));
 
       set({

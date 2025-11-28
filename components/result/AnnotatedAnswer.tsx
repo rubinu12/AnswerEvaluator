@@ -1,111 +1,168 @@
-// components/result/AnnotatedAnswer.tsx
 'use client';
 
-import React, { useMemo } from 'react';
-
-// Define the types for the Red and Green Pen feedback
-interface RedPenFeedback {
-    originalText: string;
-    comment: string;
-}
-
-interface GreenPenFeedback {
-    locationInAnswer: string;
-    suggestion: string;
-}
-
-interface MentorsPenData {
-    redPen: RedPenFeedback[];
-    greenPen: GreenPenFeedback[];
-}
+import { useState } from 'react';
+import { PlusCircle, AlertTriangle, ThumbsUp, ChevronRight, Lightbulb } from 'lucide-react';
+import { MentorsPenData, CoachBlueprint } from '@/lib/types';
 
 interface AnnotatedAnswerProps {
-    userAnswer: string;
-    mentorsPen: MentorsPenData;
+  userAnswer: string;
+  mentorsPen: MentorsPenData;
+  coachBlueprint: CoachBlueprint;
+  isXRayOn: boolean;
+  onShowFeedback: (feedback: { title: string; body: string; action: string; type: 'red' | 'green' | 'blue' }) => void;
 }
 
-// A reusable Tooltip component for hover feedback
-const Tooltip = ({ text, color }: { text: string, color: 'red' | 'green' }) => {
-    const bgColor = color === 'red' ? 'bg-red-600' : 'bg-emerald-600';
-    return (
-        <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 text-xs text-white ${bgColor} rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none`}>
-            {text}
-        </div>
-    );
-};
+export default function AnnotatedAnswer({ 
+  userAnswer, 
+  mentorsPen, 
+  coachBlueprint,
+  isXRayOn,
+  onShowFeedback 
+}: AnnotatedAnswerProps) {
+  
+  // We split the answer into paragraphs to attach "Ghost Drawers" (Side Arrows)
+  // Heuristic: First Para = Intro, Last Para = Conclusion, Middle = Body
+  const paragraphs = userAnswer.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+  
+  return (
+    <div className={`space-y-6 ${isXRayOn ? 'xray-active' : ''}`}>
+      {paragraphs.map((paraText, index) => {
+        // Determine Section Type for the Ghost Drawer
+        let sectionType: 'introduction' | 'body' | 'conclusion' = 'body';
+        if (index === 0) sectionType = 'introduction';
+        else if (index === paragraphs.length - 1 && paragraphs.length > 1) sectionType = 'conclusion';
 
-export default function AnnotatedAnswer({ userAnswer, mentorsPen }: AnnotatedAnswerProps) {
+        // Get the relevant tip from the blueprint
+        const blueprintTip = coachBlueprint[sectionType];
 
-    // useMemo ensures this complex parsing logic only runs when the input changes
-    const annotatedNodes = useMemo(() => {
-        // A helper function to escape special characters for use in a RegExp
-        const escapeRegExp = (string: string) => {
-            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        };
-
-        // 1. Combine all feedback items into a single list with types
-        const allFeedback = [
-            ...(mentorsPen?.redPen?.map(item => ({ ...item, type: 'red', text: item.originalText })) || []),
-            ...(mentorsPen?.greenPen?.map(item => ({ ...item, type: 'green', text: item.locationInAnswer })) || [])
-        ];
-
-        if (allFeedback.length === 0) {
-            return userAnswer.split('\n').map((line, i) => <React.Fragment key={i}>{line}<br /></React.Fragment>);
-        }
-
-        // 2. Create a single, powerful regular expression to find all feedback terms
-        const regex = new RegExp(
-            allFeedback.map(item => `(${escapeRegExp(item.text)})`).join('|'),
-            'g'
+        return (
+          <AnswerBlock 
+            key={index}
+            text={paraText} 
+            mentorsPen={mentorsPen} 
+            onShowFeedback={onShowFeedback}
+            blueprintTip={blueprintTip}
+            sectionLabel={sectionType}
+            isXRayOn={isXRayOn}
+          />
         );
+      })}
+    </div>
+  );
+}
 
-        // 3. Split the original answer string by all the feedback terms
-        const parts = userAnswer.split(regex).filter(part => part);
+// --- SUB-COMPONENT: SINGLE PARAGRAPH BLOCK WITH DRAWER ---
+function AnswerBlock({ 
+  text, 
+  mentorsPen, 
+  onShowFeedback,
+  blueprintTip,
+  sectionLabel,
+  isXRayOn
+}: { 
+  text: string; 
+  mentorsPen: MentorsPenData; 
+  onShowFeedback: any;
+  blueprintTip: any;
+  sectionLabel: string;
+  isXRayOn: boolean;
+}) {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-        // 4. Map over the parts and create either plain text or a styled component
-        return parts.map((part, index) => {
-            const feedbackItem = allFeedback.find(item => item.text === part);
+  // --- ANNOTATION PARSER ---
+  // Wraps matching text with interactive spans
+  const renderText = () => {
+    let parts = [{ text, type: 'text', data: null as any }];
 
-            if (feedbackItem) {
-                if (feedbackItem.type === 'red') {
-                    return (
-                        <span key={index} className="relative group cursor-pointer bg-red-100 text-red-800 underline decoration-red-500 decoration-wavy">
-                            {part}
-                            <Tooltip text={(feedbackItem as RedPenFeedback).comment} color="red" />
-                        </span>
-                    );
-                }
-                if (feedbackItem.type === 'green') {
-                    return (
-                        <span key={index} className="relative group cursor-pointer bg-emerald-100 text-emerald-800 font-semibold p-1 rounded-md">
-                            {part}
-                            <span className="font-bold text-emerald-600">{(feedbackItem as GreenPenFeedback).suggestion}</span>
-                            <Tooltip text="Value Addition Suggestion" color="green" />
-                        </span>
-                    );
-                }
-            }
+    const splitSegments = (feedbackItems: any[], type: 'red' | 'green' | 'blue') => {
+      feedbackItems.forEach(item => {
+        const targetText = item.originalText || item.locationInAnswer || item.appreciatedText;
+        if (!targetText) return;
 
-            // For plain text, we need to handle newlines correctly
-            return part.split('\n').map((line, i, arr) => (
-                <React.Fragment key={`${index}-${i}`}>
-                    {line}
-                    {i < arr.length - 1 && <br />}
-                </React.Fragment>
-            ));
+        const newParts: any[] = [];
+        parts.forEach(part => {
+          if (part.type !== 'text') { newParts.push(part); return; }
+          const split = part.text.split(targetText);
+          for (let i = 0; i < split.length; i++) {
+            if (i > 0) newParts.push({ text: targetText, type, data: item });
+            if (split[i]) newParts.push({ text: split[i], type: 'text', data: null });
+          }
         });
-    }, [userAnswer, mentorsPen]);
+        parts = newParts;
+      });
+    };
 
-    return (
-        <div className="p-6 bg-white rounded-lg border border-gray-200">
-            <h4 className="text-sm font-bold text-gray-800 mb-4">Your Answer with Mentor's Feedback</h4>
-            <div className="text-base text-gray-700 leading-relaxed">
-                {annotatedNodes}
-            </div>
-            <div className="mt-4 text-xs text-gray-500">
-                <p><span className="inline-block w-3 h-3 bg-red-100 rounded-sm mr-2 align-middle"></span> Hover over wavy red text for corrections.</p>
-                <p className="mt-1"><span className="inline-block w-3 h-3 bg-emerald-100 rounded-sm mr-2 align-middle"></span> Green text shows suggested value additions.</p>
-            </div>
+    splitSegments(mentorsPen.redPen, 'red');
+    splitSegments(mentorsPen.greenPen, 'green');
+    splitSegments(mentorsPen.bluePen, 'blue');
+
+    return parts.map((part, idx) => {
+      if (part.type === 'red') {
+        return (
+          <span key={idx} 
+            className="decoration-wavy underline decoration-red-500 cursor-pointer hover:bg-red-50 text-slate-900 font-medium"
+            onClick={() => onShowFeedback({ title: "Correction Required", body: part.data.comment, action: "Fix Logic", type: 'red' })}
+          >
+            {part.text}
+          </span>
+        );
+      }
+      if (part.type === 'green') {
+        return (
+          <span key={idx} className="relative group cursor-pointer"
+            onClick={() => onShowFeedback({ title: "Missed Opportunity", body: part.data.suggestion, action: "Add to Wallet", type: 'green' })}
+          >
+            {part.text}
+            <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-100 text-green-700 text-[10px] align-top hover:bg-green-200">
+              <PlusCircle size={10} />
+            </span>
+          </span>
+        );
+      }
+      if (part.type === 'blue') {
+        return (
+          <span key={idx} 
+            className="border-b-2 border-dashed border-blue-400 cursor-pointer hover:bg-blue-50 text-slate-900"
+            onClick={() => onShowFeedback({ title: "Well Done", body: part.data.comment, action: "Save Phrase", type: 'blue' })}
+          >
+            {part.text}
+          </span>
+        );
+      }
+      return <span key={idx}>{part.text}</span>;
+    });
+  };
+
+  return (
+    <div className="relative group pr-8">
+      {/* Side Arrow (Ghost Trigger) */}
+      <button 
+        onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+        className={`absolute -right-2 top-1 w-6 h-6 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-400 shadow-sm transition-all hover:text-blue-600 hover:border-blue-300 z-10 ${isDrawerOpen ? 'text-blue-600 border-blue-300 rotate-90' : ''}`}
+        title={`View ${sectionLabel} strategy`}
+      >
+        <ChevronRight size={14} />
+      </button>
+
+      {/* The Text Content */}
+      <p className={`serif-font text-base leading-8 text-slate-800 transition-opacity duration-300 ${isXRayOn ? 'opacity-80 group-hover:opacity-100' : ''}`}>
+        {renderText()}
+      </p>
+
+      {/* Ghost Drawer (The Coach's Tip) */}
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isDrawerOpen ? 'max-h-40 opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
+        <div className="bg-slate-50 border-l-2 border-blue-400 p-3 rounded-r-md">
+          <div className="flex items-center gap-2 mb-1">
+            <Lightbulb size={12} className="text-blue-500" />
+            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">
+              Topper's {sectionLabel} Strategy
+            </span>
+          </div>
+          <p className="text-xs text-slate-600">
+            <span className="font-semibold text-slate-800">{blueprintTip.strategy}:</span> {blueprintTip.content}
+          </p>
         </div>
-    );
+      </div>
+    </div>
+  );
 }
