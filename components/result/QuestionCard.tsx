@@ -14,7 +14,7 @@ import AnnotatedAnswer from './AnnotatedAnswer';
 import CoachBlueprint from './CoachBlueprint';
 import ToppersArsenal from './ToppersArsenal';
 import LanguageUpgrade from './LanguageUpgrade';
-import ActionPlan from './ActionPlan'; // Ensure you have this file created as discussed
+import ActionPlan from './ActionPlan'; 
 
 interface QuestionCardProps {
   data: QuestionAnalysis;
@@ -50,8 +50,8 @@ export default function QuestionCard({ data }: QuestionCardProps) {
         data={data}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
-        onBookmark={() => console.log("Bookmark clicked")} // Wire up later
-        onDownload={() => console.log("Download clicked")} // Wire up later
+        onBookmark={() => console.log("Bookmark clicked")} 
+        onDownload={() => console.log("Download clicked")} 
       />
 
       {/* COLLAPSIBLE BODY */}
@@ -63,16 +63,17 @@ export default function QuestionCard({ data }: QuestionCardProps) {
 
           <div className="p-6 space-y-8">
             
-            {/* 3. VERDICT (Punchline) */}
+            {/* 3. VERDICT (Punchline) - [UPDATED FOR NEW SCHEMA] */}
             <div className="bg-blue-50 text-slate-800 rounded-lg p-4 border border-blue-100 flex gap-4 shadow-sm">
               <Megaphone className="text-blue-500 shrink-0 mt-0.5" size={20} />
               <div>
-                {/* Use overallVerdict from BlindSpot or a dedicated field if available */}
+                {/* Use 'headline' instead of generic verdict */}
                 <h3 className="font-bold text-sm mb-1">
-                  {data.blindSpotAnalysis.overallVerdict || "Examiner's Verdict"}
+                  {data.overallFeedback?.headline || "Examiner's Verdict"}
                 </h3>
+                {/* Use 'description' instead of generalAssessment */}
                 <p className="text-xs text-slate-600 leading-relaxed opacity-90">
-                  {data.overallFeedback?.generalAssessment || "Focus on addressing the missed dimensions to boost your score."}
+                  {data.overallFeedback?.description || "Focus on addressing the missed dimensions to boost your score."}
                 </p>
               </div>
             </div>
@@ -101,7 +102,7 @@ export default function QuestionCard({ data }: QuestionCardProps) {
                   </button>
                 </div>
                 
-                {/* X-Ray Toggle (Only visible in Answer Mode) */}
+                {/* X-Ray Toggle */}
                 {viewMode === 'answer' && (
                   <label className="flex items-center gap-2 cursor-pointer group">
                     <span className="text-[10px] font-bold uppercase text-gray-400 group-hover:text-slate-600 transition-colors">
@@ -149,16 +150,14 @@ export default function QuestionCard({ data }: QuestionCardProps) {
         </div>
       )}
 
-      {/* --- FEEDBACK POPUP (Bottom Sheet / Modal) --- */}
+      {/* --- FEEDBACK POPUP --- */}
       {activeFeedback && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center pointer-events-none">
-          {/* Backdrop */}
           <div 
             className="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto transition-opacity" 
             onClick={closeFeedback}
           ></div>
           
-          {/* Card */}
           <div className="bg-white w-full max-w-md sm:rounded-xl rounded-t-xl shadow-2xl p-6 relative pointer-events-auto animate-in slide-in-from-bottom-10 duration-200 m-4 border border-gray-100">
             <button 
               onClick={closeFeedback}

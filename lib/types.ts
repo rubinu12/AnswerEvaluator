@@ -28,16 +28,16 @@ export interface MentorsPenData {
 // --- 2. THE DYNAMIC RECEIPT (Mark Breakdown) ---
 // ==================================================================
 export interface Demand {
-    topic: string; // e.g., "Context: Definition of NGOs"
-    weightage: number; // e.g., 15 (represents 15%)
+    topic: string; 
+    weightage: number; 
     status: 'hit' | 'partial' | 'miss';
-    mentorComment: string; // Concise feedback: "You missed Article 163."
+    mentorComment: string; 
 }
 
 export interface DirectiveAnalysis {
-    verb: string; // e.g., "Critically Analyze"
-    description: string; // "Requires both pros and cons + judgment"
-    fulfillment: 'met' | 'missed'; // Did the user follow the verb?
+    verb: string; 
+    description: string; 
+    fulfillment: 'met' | 'missed'; 
 }
 
 export interface QuestionDeconstruction {
@@ -49,37 +49,37 @@ export interface QuestionDeconstruction {
 // ==================================================================
 // --- 3. THE BLIND SPOT DETECTOR (PESTLE+) ---
 // ==================================================================
+// [RESTORED] This type is required by your UI components
 export type DimensionStatus = 'hit' | 'miss' | 'partial' | 'unused';
 
-export type DimensionName = 
-    | 'Political' | 'Economic' | 'Societal' | 'Technological' | 'Legal' | 'Environmental' 
-    | 'Historical' | 'Cultural' | 'Geographical' | 'Administrative' | 'Ethical' | 'International';
-
 export interface BlindSpotDimension {
-    name: DimensionName;
-    status: DimensionStatus;
-    comment?: string; // "You missed the FCRA Act here."
+    name: string; 
+    status: DimensionStatus; // [UPDATED] Uses the exported type
+    comment: string; 
 }
 
 export interface BlindSpotAnalysis {
     dimensions: BlindSpotDimension[];
-    overallVerdict: string; // "1 Critical Miss: Legal Dimension"
+    overallVerdict: string; 
 }
 
 // ==================================================================
-// --- 4. THE COACH'S BLUEPRINT (Architect View) ---
+// --- 4. THE COACH'S BLUEPRINT (Skeleton View) ---
 // ==================================================================
 export interface CoachBlueprint {
     introduction: {
-        strategy: string; // e.g. "Define + Quantify"
-        content: string;  // Instructions on what to write
+        critique: string; 
+        strategy: string; 
+        content: string;  
     };
     body: {
-        coreArgument: string; // e.g. "The Twin-Pillar Approach"
-        keyPoints: string[];  // Bullet points of arguments
+        critique: string; 
+        coreArgument: string; 
+        keyPoints: string[];  
     };
     conclusion: {
-        strategy: string; // e.g. "Way Forward"
+        critique: string; 
+        strategy: string; 
         content: string; 
     };
 }
@@ -88,14 +88,14 @@ export interface CoachBlueprint {
 // --- 5. VALUE ADDS (Language & Flashcards) ---
 // ==================================================================
 export interface VocabularySwap {
-    original: string;    // "Government stopped money"
-    replacement: string; // "Regulatory tightening via FCRA"
+    original: string;    
+    replacement: string; 
 }
 
 export interface TopperArsenalItem {
     type: 'data' | 'committee' | 'quote' | 'phrase' | 'judgment';
-    content: string; // "Only 10% of NGOs file returns."
-    source?: string; // "CBI Report"
+    content: string; 
+    source?: string; 
 }
 
 // ==================================================================
@@ -109,7 +109,9 @@ export interface ScoreBreakdown {
 }
 
 export interface OverallFeedback {
-    generalAssessment: string; // Used for "Verdict" card
+    // [UPDATED] Replaced 'generalAssessment' with high-impact fields
+    headline: string;      
+    description: string;   
     parameters: {
         structure: { score: number; suggestion: string };
         content: { score: number; suggestion: string };
@@ -118,7 +120,15 @@ export interface OverallFeedback {
 }
 
 // ==================================================================
-// --- 7. MASTER QUESTION ANALYSIS (The Core Object) ---
+// --- 7. THE ACTION PLAN (Directives) ---
+// ==================================================================
+export interface ActionPlan {
+    read: string;    
+    rewrite: string; 
+}
+
+// ==================================================================
+// --- 8. MASTER QUESTION ANALYSIS (The Core Object) ---
 // ==================================================================
 export interface QuestionAnalysis {
     // Identity & User Content
@@ -129,16 +139,19 @@ export interface QuestionAnalysis {
     score: number;
     scoreBreakdown: ScoreBreakdown; 
     
-    subject: 'History' | 'Culture' | 'Geography' | 'Society' | 'Polity & Constitution' | 'Social Justice & Governance' | 'International Relations' | 'Economy' | 'Environment' | 'Science & Tech' | 'Security' | 'Ethics Theory' | 'Ethics Case Study';
+    subject: string;
 
     // Analysis Layers
-    questionDeconstruction: QuestionDeconstruction; // Receipt
-    blindSpotAnalysis: BlindSpotAnalysis;           // Detector
-    coachBlueprint: CoachBlueprint;                 // Architect View
-    mentorsPen: MentorsPenData;                     // Annotations
+    questionDeconstruction: QuestionDeconstruction; 
+    blindSpotAnalysis: BlindSpotAnalysis;           
+    coachBlueprint: CoachBlueprint;                 
+    mentorsPen: MentorsPenData;                     
     
+    // [NEW] The Action Plan
+    actionPlan: ActionPlan;
+
     // Feedback & Action Plan
-    overallFeedback: OverallFeedback;               // Verdict & Next Steps
+    overallFeedback: OverallFeedback;               
 
     // Value Adds
     vocabularySwap: VocabularySwap[];               
@@ -149,10 +162,10 @@ export interface QuestionAnalysis {
 }
 
 // ==================================================================
-// --- 8. SYSTEM / APP TYPES ---
+// --- 9. SYSTEM / APP TYPES ---
 // ==================================================================
 export interface EvaluationData {
-    subject: 'GS1' | 'GS2' | 'GS3' | 'GS4' | 'Essay';
+    subject: string;
     overallScore: number;
     totalMarks: number;
     submittedOn: string;
@@ -165,15 +178,13 @@ export interface PreparedQuestion {
     questionText: string;
     userAnswer: string;
     maxMarks: number;
-    wordLimit?: number; // Optional override
-    
-    // [NEW] Metadata fields from Smart Transcription
+    wordLimit?: number; 
     directive?: string; 
-    subject?: 'Polity' | 'Governance' | 'Social Justice' | 'IR';
+    subject?: string;
 }
 
 export interface EvaluationCompletePayload {
     analysis: Omit<EvaluationData, 'subject' | 'submittedOn'>;
     preparedData: PreparedQuestion[];
-    subject: 'GS1' | 'GS2' | 'GS3' | 'GS4' | 'Essay';
+    subject: string;
 }

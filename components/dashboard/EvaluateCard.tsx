@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { ChevronDown, FileUp, Sparkles } from 'lucide-react';
+import { ChevronDown, FileUp, Sparkles, Info, CheckCircle2 } from 'lucide-react';
 import { useEvaluationStore } from '@/lib/store';
 
 const subjects = [
@@ -78,20 +78,19 @@ export default function EvaluateCard() {
     const isButtonDisabled = !selectedFile || !selectedSubject;
 
     return (
-        // [FIX] Card padding is now responsive
-        <div className="relative flex flex-col rounded-2xl bg-white p-4 xs:p-6 md:p-8 shadow-lg border border-gray-200/60 transition-transform duration-300 hover:scale-[1.02]">
+        <div className="relative flex flex-col rounded-2xl bg-white p-4 xs:p-6 md:p-8 shadow-lg border border-gray-200/60 transition-transform duration-300 hover:scale-[1.01]">
             <Sparkles className="absolute -top-3 -left-3 h-8 w-8 text-yellow-400" fill="currentColor"/>
-            {/* [FIX] Header now wraps on small screens */}
+            
+            {/* Header */}
             <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                 <div>
-                    {/* [FIX] Responsive font sizes for header */}
                     <h2 className="text-lg xs:text-xl font-semibold text-gray-800">Evaluate New Answer</h2>
                     <p className="text-sm text-gray-500">Upload your handwritten answer for AI evaluation</p>
                 </div>
                 <div className="relative w-full sm:w-52">
                     <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="flex items-center justify-between w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm"
+                        className="flex items-center justify-between w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
                     >
                         {selectedSubject ? (
                             <div className="flex items-center gap-2">
@@ -102,7 +101,7 @@ export default function EvaluateCard() {
                         <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}/>
                     </button>
                     {isDropdownOpen && (
-                        <div className="absolute right-0 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-10">
+                        <div className="absolute right-0 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-20">
                             <div className="py-1">
                                 {subjects.map((subject) => (
                                     <a
@@ -121,17 +120,17 @@ export default function EvaluateCard() {
                 </div>
             </div>
 
-            {/* [FIX] Dropzone is now more compact on smaller screens */}
+            {/* Dropzone */}
             <div 
-                className="my-6 flex-grow flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-4 xs:p-8 text-center cursor-pointer hover:border-emerald-400 transition-colors"
+                className="my-6 flex-grow flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-6 xs:p-8 text-center cursor-pointer hover:border-emerald-400 transition-colors group"
                 onClick={() => fileInputRef.current?.click()}
             >
-                {/* [FIX] Icon and container are smaller */}
-                <div className="rounded-full bg-green-100 p-3 xs:p-4">
-                    <FileUp className="h-8 w-8 xs:h-10 xs:w-10 text-green-600" />
+                <div className="rounded-full bg-emerald-100 p-3 group-hover:scale-110 transition-transform duration-200">
+                    <FileUp className="h-8 w-8 text-emerald-600" />
                 </div>
-                 {/* [FIX] Responsive text sizes */}
-                <p className="mt-4 font-semibold text-gray-700 break-all text-sm xs:text-base">{selectedFile ? selectedFile.name : 'Upload Answer Sheet'}</p>
+                <p className="mt-4 font-semibold text-gray-700 break-all text-sm xs:text-base">
+                    {selectedFile ? selectedFile.name : 'Upload Answer Sheet (PDF/IMG)'}
+                </p>
                 <p className="mt-1 text-xs xs:text-sm text-gray-500">Drag and drop or click to browse</p>
                 
                 <input 
@@ -143,14 +142,40 @@ export default function EvaluateCard() {
                     accept="application/pdf,image/jpeg,image/png"
                 />
             </div>
-            {error && (<p className="text-sm text-red-500 mb-4 text-center">{error}</p>)}
+
+            {/* [NEW] Scanning Protocol Guide */}
+            <div className="mb-6 bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <h4 className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2 mb-3">
+                    <Info size={14} /> For Best Results (Multiple Answers)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-start gap-2">
+                        <CheckCircle2 size={14} className="text-blue-600 mt-0.5 shrink-0" />
+                        <p className="text-xs text-blue-700 leading-tight">
+                            <strong>Separate Answers:</strong> Draw a line <code className="bg-white border border-blue-200 px-1 py-0.5 rounded text-[10px] font-mono">---X---X---</code> between questions.
+                        </p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                        <CheckCircle2 size={14} className="text-blue-600 mt-0.5 shrink-0" />
+                        <p className="text-xs text-blue-700 leading-tight">
+                            <strong>Mention Marks:</strong> Write <code className="bg-white border border-blue-200 px-1 py-0.5 rounded text-[10px] font-mono">(10 Marks)</code> at the end of the question text.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {error && (<p className="text-sm text-red-500 mb-4 text-center font-medium bg-red-50 py-2 rounded-lg">{error}</p>)}
+            
             <button
                 onClick={handlePrepareEvaluation}
-                // [FIX] Button is slightly smaller on small screens
-                className={`w-full rounded-lg py-2.5 xs:py-3 text-sm xs:text-base font-semibold text-white transition-all btn ${isButtonDisabled ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                className={`w-full rounded-lg py-3 text-sm xs:text-base font-bold text-white transition-all shadow-md active:scale-[0.98] ${
+                    isButtonDisabled 
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
+                    : 'bg-slate-900 hover:bg-slate-800 hover:shadow-lg'
+                }`}
                 disabled={isButtonDisabled}
             >
-                {selectedSubject ? `Prepare for ${selectedSubject.code}` : 'Select a Subject'}
+                {selectedSubject ? `Analyze ${selectedSubject.code}` : 'Select a Subject to Start'}
             </button>
         </div>
     )

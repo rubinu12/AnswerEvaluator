@@ -11,9 +11,7 @@ import {
 type ProcessingState = 'idle' | 'ocr' | 'editing' | 'evaluating';
 type EvaluationStatus = 'idle' | 'processing' | 'complete';
 
-// Define the structure of our store's state.
 interface EvaluationState {
-  // Existing State
   processingState: ProcessingState;
   evaluationStatus: EvaluationStatus;
   isProcessingInBackground: boolean;
@@ -26,14 +24,10 @@ interface EvaluationState {
   error: string | null;
   isReviewing: boolean;
   isPageLoading: boolean;
-
-  // --- [NEW] STATE FOR MOBILE HEADER ---
   pageTitle: string;
 }
 
-// Define the actions that can be performed on our state.
 interface EvaluationActions {
-  // Existing Actions
   setProcessingState: (state: ProcessingState) => void;
   setIsConfirming: (isConfirming: boolean) => void;
   setExtractedText: (text: string, paper: string) => void;
@@ -50,12 +44,10 @@ interface EvaluationActions {
   startTranscription: () => void;
   cancelTranscription: () => void;
   setPageLoading: (isLoading: boolean) => void;
-
-  // --- [NEW] ACTION FOR MOBILE HEADER ---
   setPageTitle: (title: string) => void;
+  updateQuestionData: (index: number, newData: Partial<PreparedQuestion>) => void;
 }
 
-// Create the Zustand store by combining the state and actions.
 export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
   (set) => ({
     // Initial State
@@ -71,7 +63,7 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
     error: null,
     isReviewing: false,
     isPageLoading: false,
-    pageTitle: 'Dashboard', // Default title
+    pageTitle: 'Dashboard', 
 
     // Actions
     setProcessingState: (state) => set({ processingState: state }),
@@ -85,59 +77,81 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
         isReviewing: true,
       }),
 
-    setPreparedData: (data) => set({ preparedData: data }),
+    setPreparedData: (data) => set({ 
+        preparedData: data.map((item, index) => ({
+            ...item,
+            questionNumber: index + 1 
+        })) 
+    }),
+
+    updateQuestionData: (index, newData) => set((state) => {
+        const updatedData = [...state.preparedData];
+        if (updatedData[index]) {
+            updatedData[index] = { ...updatedData[index], ...newData };
+        }
+        return { preparedData: updatedData };
+    }),
+
     startEvaluation: () =>
       set({ evaluationStatus: 'processing', isProcessingInBackground: true, isConfirming: false }),
 
     completeEvaluation: (payload) => {
-      const { analysis, preparedData, subject } = payload;
+      let { analysis, preparedData, subject } = payload;
+
+      console.log("--- Completing Evaluation (Full Fix) ---");
+      
+      // [SILVER BULLET FIX] Auto-Unwrap Data
+      // @ts-ignore
+      if (analysis && analysis.analysis && Array.isArray(analysis.analysis.questionAnalysis)) {
+          console.log("Detected Double-Wrapped Analysis. Unwrapping...");
+          // @ts-ignore
+          analysis = analysis.analysis;
+      }
+
+      // Safety Check
+      if (!analysis.questionAnalysis || !Array.isArray(analysis.questionAnalysis)) {
+          console.error("CRITICAL: questionAnalysis is missing or not an array", analysis);
+          set({ error: "Evaluation data format error. Please check console." });
+          return;
+      }
 
       const finalQuestionAnalysis: QuestionAnalysis[] = preparedData.map(
         (prepItem: PreparedQuestion, index: number) => {
           
-          // 1. Try finding by Explicit ID Match (Best Practice)
-          // We convert both to strings to ensure loose matching (e.g. "1" == 1)
-          let analysisItem = analysis.questionAnalysis?.find(
-            (item) => String(item.questionNumber) === String(prepItem.questionNumber)
-          );
+          // Match by Index (Ticket Number)
+          let analysisItem = analysis.questionAnalysis[index];
 
-          // 2. Fallback: If ID match fails, try finding by Index (Robustness)
-          // This saves us if the AI returned a weird ID or if IDs are missing
-          if (!analysisItem && analysis.questionAnalysis && analysis.questionAnalysis[index]) {
-             console.warn(`ID mismatch for Q${prepItem.questionNumber}. Falling back to index ${index}.`);
-             analysisItem = analysis.questionAnalysis[index];
-          }
-          
           if (!analysisItem) {
-            throw new Error(`Analysis for question ${prepItem.questionNumber} is missing.`);
+            console.error(`Missing analysis for Ticket #${index + 1} (Index ${index})`);
+            throw new Error(`Analysis for Ticket #${index + 1} failed.`);
           }
           
-          // Explicit mapping to ensure all new Phase 1 fields are captured correctly
           return {
-            // 1. Identity & User Content (Prioritize Prepared Data)
+            // Identity
             questionNumber: prepItem.questionNumber,
             questionText: prepItem.questionText,
             userAnswer: prepItem.userAnswer,
             maxMarks: prepItem.maxMarks,
-            subject: analysisItem.subject, 
+            subject: analysisItem.subject || subject,
             
-            // 2. Scores
+            // Scores
             score: analysisItem.score,
-            scoreBreakdown: analysisItem.scoreBreakdown, // NEW: Granular scoring
-
-            // 3. The Intelligence Layers
-            questionDeconstruction: analysisItem.questionDeconstruction, // Receipt
-            blindSpotAnalysis: analysisItem.blindSpotAnalysis,           // Detector
-            coachBlueprint: analysisItem.coachBlueprint,                 // Architect View
-            mentorsPen: analysisItem.mentorsPen,                         // Annotations
-
-            // 4. Value Adds
-            vocabularySwap: analysisItem.vocabularySwap,                 // Language Table
-            topperArsenal: analysisItem.topperArsenal,                   // Flashcards
+            scoreBreakdown: analysisItem.scoreBreakdown, 
             
-            // 5. Legacy/Fallback & Feedback
+            // Logic Modules
+            questionDeconstruction: analysisItem.questionDeconstruction, 
+            blindSpotAnalysis: analysisItem.blindSpotAnalysis,           
+            coachBlueprint: analysisItem.coachBlueprint,                 
+            mentorsPen: analysisItem.mentorsPen,                         
+            vocabularySwap: analysisItem.vocabularySwap,                 
+            topperArsenal: analysisItem.topperArsenal,                   
+            
+            // [MAPPED] Action Plan & Feedback
+            actionPlan: analysisItem.actionPlan,
+            overallFeedback: analysisItem.overallFeedback,
+            
+            // Legacy
             idealAnswer: analysisItem.idealAnswer,
-            overallFeedback: analysis.overallFeedback // Attach global feedback
           };
         },
       );
@@ -151,10 +165,7 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
         questionAnalysis: finalQuestionAnalysis,
       };
 
-      // Generate a unique ID for this session
       const uniqueId = `eval_${Date.now()}`;
-      
-      // Store in Session Storage for the Result Page to retrieve
       sessionStorage.setItem(uniqueId, JSON.stringify(finalDataForStorage));
 
       set({
@@ -202,19 +213,11 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
       }),
       
     setIsReviewing: (isReviewing) => set({ isReviewing }),
-    
     setSelectedPaper: (paper) => set({ selectedPaper: paper }),
-
-    acknowledgeCompletion: () => set({
-      isProcessingInBackground: false,
-    }),
-
+    acknowledgeCompletion: () => set({ isProcessingInBackground: false }),
     startTranscription: () => set({ processingState: 'ocr', error: null }),
     cancelTranscription: () => set({ processingState: 'idle' }),
-    
     setPageLoading: (isLoading) => set({ isPageLoading: isLoading }),
-
-    // --- [NEW] ACTION IMPLEMENTATION ---
     setPageTitle: (title) => set({ pageTitle: title }),
   }),
 );

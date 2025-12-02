@@ -1,35 +1,42 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { VertexAI } from '@google-cloud/vertexai';
-import { getPromptForSubject } from '@/lib/prompts'; // Ensure this points to your index.ts
-import { admin, db } from '@/lib/firebase-admin';
+import { getPromptForSubject } from '@/lib/prompts'; 
+import { admin } from '@/lib/firebase-admin';
 import { DecodedIdToken } from 'firebase-admin/auth';
 
 // Force dynamic processing
 export const dynamic = 'force-dynamic';
 
-// --- Initialize Vertex AI (Global Scope) ---
+// --- Initialize Vertex AI ---
 const vertex_ai = new VertexAI({
     project: process.env.GOOGLE_PROJECT_ID!,
     location: 'us-central1',
 });
 
-// Configure Model
+// Configure Model - Using Flash Lite for speed
 const geminiModel = vertex_ai.getGenerativeModel({
     model: 'gemini-2.5-flash-lite',
     generationConfig: { 
         responseMimeType: 'application/json',
-        temperature: 0.4
+        temperature: 0.3 
     }
 });
 
-// --- Helper function ---
+// --- Helper: Robust JSON Extraction ---
 function extractJsonFromText(text: string): string | null {
+    // 1. Try Markdown block
     const markdownMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (markdownMatch && markdownMatch[1]) return markdownMatch[1].trim();
+    
+    // 2. Try raw object detection (Find first '{' and last '}')
     const firstBrace = text.indexOf('{');
     const lastBrace = text.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace > firstBrace) return text.substring(firstBrace, lastBrace + 1);
+    
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+        return text.substring(firstBrace, lastBrace + 1);
+    }
+    
     return null;
 }
 
@@ -58,27 +65,28 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No prepared evaluation data provided.' }, { status: 400 });
         }
 
-        // Credit Deduction Logic (Simplified for brevity - keep your existing logic here)
-        // ... [Insert your existing Firestore transaction logic here] ...
-
-        // --- 3. Evaluation Loop (The Fix) ---
+        // --- 3. Evaluation Loop ---
         const results = [];
         let totalScore = 0;
         let totalMaxMarks = 0;
-        let combinedFeedback = { generalAssessment: "", parameters: {} }; // Placeholder aggregation
+        let combinedFeedback = { generalAssessment: "", parameters: {} }; 
 
-        console.log(`Processing ${preparedData.length} questions...`);
+        console.log(`Processing ${preparedData.length} questions for subject: ${subject}...`);
 
         for (const question of preparedData) {
             console.log(`Evaluating Q${question.questionNumber}...`);
             
-            // Extract Metadata
-            const directive = question.directive || 'analyze';
-            const subSubject = question.subject || subject || 'GS1'; // Fallback to passed subject
+            // [FIXED ROUTING LOGIC]
+            // We use the 'subject' (e.g., GS2) to select the Prompt Engine.
+            const routingSubject = subject || 'GS1'; 
             
             // Generate Prompt
-            // Note: Since getPromptForSubject expects an array, we pass [question] to isolate it
-            const evaluationPrompt = getPromptForSubject(subSubject, [question]);
+            const evaluationPrompt = getPromptForSubject(routingSubject, [question]);
+
+            // [DEBUG: PRINT PROMPT]
+            console.log("\n--- [DEBUG] FINAL PROMPT SENT TO GEMINI ---");
+            console.log(evaluationPrompt);
+            console.log("-------------------------------------------\n");
 
             // Call AI
             const result = await geminiModel.generateContent({
@@ -86,32 +94,47 @@ export async function POST(request: Request) {
             });
 
             const rawText = result.response.candidates?.[0]?.content.parts[0].text;
+            
+            // [DEBUG: PRINT RAW RESPONSE]
+            console.log("\n--- [DEBUG] RAW RESPONSE FROM GEMINI ---");
+            console.log(rawText);
+            console.log("----------------------------------------\n");
+
             if (!rawText) throw new Error(`Empty response for Q${question.questionNumber}`);
 
             const jsonString = extractJsonFromText(rawText);
-            if (!jsonString) throw new Error(`Invalid JSON for Q${question.questionNumber}`);
+            if (!jsonString) {
+                console.error("Failed JSON extraction.");
+                throw new Error(`Invalid JSON format for Q${question.questionNumber}`);
+            }
 
-            const evalJson = JSON.parse(jsonString);
+            let evalJson;
+            try {
+                evalJson = JSON.parse(jsonString);
+            } catch (e) {
+                console.error("JSON Parse Error:", e);
+                // Attempt to sanitize control characters if simple parse fails
+                const sanitized = jsonString.replace(/[\x00-\x1F\x7F-\x9F]/g, "");
+                evalJson = JSON.parse(sanitized);
+            }
 
-            // Normalize Result (Handle Array vs Object output from AI)
-            // If AI returns { questionAnalysis: [...] }, extract the first item
+            // Normalize Result
             const analysisItem = Array.isArray(evalJson.questionAnalysis) 
                 ? evalJson.questionAnalysis[0] 
-                : evalJson; // Fallback if AI returns single object
+                : evalJson; 
 
             // Accumulate Totals
             totalScore += analysisItem.score || 0;
             totalMaxMarks += question.maxMarks || 0;
-            // For Phase 1, just take the last feedback (or improved aggregation later)
             if(evalJson.overallFeedback) combinedFeedback = evalJson.overallFeedback;
 
-            // Add to Results Array
+            // Add to Results
             results.push({
                 ...analysisItem,
                 questionNumber: question.questionNumber,
                 userAnswer: question.userAnswer,
                 maxMarks: question.maxMarks,
-                subject: subSubject
+                subject: routingSubject
             });
         }
 
