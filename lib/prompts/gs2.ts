@@ -1,9 +1,10 @@
-import { PreparedQuestion } from '@/lib/types';
+import { PreparedQuestion } from "@/lib/types";
 
 // ==================================================================
 // 1. HELPER: PRECISE WORD COUNT
 // ==================================================================
 function countWords(text: string): number {
+  if (!text) return 0;
   return text.trim().split(/\s+/).length;
 }
 
@@ -12,39 +13,46 @@ function countWords(text: string): number {
 // ==================================================================
 const SUBJECT_GUIDELINES: Record<string, string> = {
   polity: `
-    **SUBJECT CONTEXT: POLITY & CONSTITUTION**
-    - **CORE DEMAND:** Constitutional Expert / Legal Scholar.
-    - **MANDATORY:** Citations of Articles, Parts, Schedules, and Case Laws.
-    - **RED FLAG:** Political opinions without legal basis.
+    **SUBJECT CONTEXT: POLITY & CONSTITUTIONAL FRAMEWORK**
+    - **ROLE:** Senior constitutional analyst + practising public law advocate.
+    - **FOCUS:** Institutions (Parliament, Executive, Judiciary), separation of powers, federalism, rights–duties balance.
+    - **MANDATORY:** Cite Articles, Parts, Schedules, and key doctrines when relevant.
+    - **RED FLAGS:** Party-political opinions, ideological rants, or arguments without any constitutional anchor.
   `,
   constitution: `
-    **SUBJECT CONTEXT: THE CONSTITUTION (Theory & Law)**
-    - **CORE DEMAND:** Constitutional Scholar & Jurist.
-    - **MANDATORY:** Cite **Specific Articles**, **Amendments**, **Doctrines** (Basic Structure), and **Landmark Judgments**.
-    - **RED FLAG:** Generalizing the law without citing the source (e.g., saying "Right to Privacy" without "Puttaswamy").
+    **SUBJECT CONTEXT: CONSTITUTION – THEORY, DOCTRINE & JURISPRUDENCE**
+    - **ROLE:** Constitutional jurist interpreting the text, structure and spirit of the Constitution.
+    - **FOCUS:** Fundamental Rights, DPSPs, constitutional morality, doctrines (basic structure, proportionality, reasonable classification).
+    - **MANDATORY:** Mention specific Articles, landmark cases and doctrines when drawing legal conclusions.
+    - **RED FLAGS:** Vague claims like "it is unconstitutional" without explaining the test or doctrine.
   `,
   social_justice: `
-    **SUBJECT CONTEXT: SOCIAL JUSTICE (Welfare & Society)**
-    - **CORE DEMAND:** Welfare Economist / Policy Architect.
-    - **MANDATORY:** Focus on **Vulnerable Sections** (Women, Children, SC/ST), **HDI Indicators**, **Health/Education Data**, and **Welfare Schemes**.
-    - **RED FLAG:** Cold, bureaucratic answers that lack empathy or ground-level data (e.g., NFHS-5).
+    **SUBJECT CONTEXT: SOCIAL JUSTICE & WELFARE STATE**
+    - **ROLE:** Welfare economist + social policy architect.
+    - **FOCUS:** Vulnerable groups (women, children, SC/ST, minorities, elderly, disabled), poverty, health, education, labour, inclusion.
+    - **MANDATORY:** Use data (NFHS, PLFS, MPI, NITI Aayog reports) and flagship schemes when arguing impact.
+    - **RED FLAGS:** Purely moral lectures without numbers, schemes or institutional pathways.
   `,
   governance: `
-    **SUBJECT CONTEXT: GOVERNANCE & SOCIAL JUSTICE**
-    - **CORE DEMAND:** Senior Bureaucrat / Policy Analyst.
-    - **MANDATORY:** Implementation gaps, Committee Reports (2nd ARC), and Best Practices.
-    - **RED FLAG:** Vague suggestions like "Government should take steps."
+    **SUBJECT CONTEXT: GOVERNANCE, STATE CAPACITY & PUBLIC MANAGEMENT**
+    - **ROLE:** Senior bureaucrat assessing implementation and reform options.
+    - **FOCUS:** Institutions, processes, accountability, citizen-centric service delivery, digital governance.
+    - **MANDATORY:** Use specific schemes, indices (e.g., EoDB, HDI), committee reports (2nd ARC), and implementation mechanisms.
+    - **RED FLAGS:** Trite lines like "government should create awareness" without instruments, timelines or actors.
   `,
   ir: `
-    **SUBJECT CONTEXT: INTERNATIONAL RELATIONS**
-    - **CORE DEMAND:** Foreign Policy Strategist (IFS).
-    - **MANDATORY:** Geopolitical keywords, Treaties, Summits, and National Interest.
-    - **RED FLAG:** News-summary style answers.
+    **SUBJECT CONTEXT: INTERNATIONAL RELATIONS & FOREIGN POLICY**
+    - **ROLE:** IFS officer shaping India’s external strategy.
+    - **FOCUS:** National interest, strategic autonomy, regional balances, multilateral forums, trade and security architecture.
+    - **MANDATORY:** Use geopolitical concepts, groupings, doctrines, and named agreements/summits.
+    - **RED FLAGS:** News-summary style answers or emotional reactions to other countries.
   `,
   default: `
-    **SUBJECT CONTEXT: GENERAL STUDIES 2**
-    - **CORE DEMAND:** Administrative & Legislative Precision.
-  `
+    **SUBJECT CONTEXT: GENERAL STUDIES PAPER 2**
+    - **ROLE:** Policy thinker combining constitutional, administrative and international perspectives.
+    - **FOCUS:** Demand fulfilment with evidence-backed, administratively workable arguments.
+    - **RED FLAGS:** Generic commentary without concrete evidence, institutions or policy instruments.
+  `,
 };
 
 // ==================================================================
@@ -52,29 +60,29 @@ const SUBJECT_GUIDELINES: Record<string, string> = {
 // ==================================================================
 const SUBJECT_PHILOSOPHY: Record<string, string> = {
   polity: `
-    - ❌ **AVERAGE:** "The Constitution guarantees freedom of speech."
-    - ✅ **TOPPER:** "Article 19(1)(a) guarantees freedom of speech, subject to reasonable restrictions under Art 19(2)."
+    - ❌ **AVERAGE:** "Governor misuses his powers in many states."
+    - ✅ **TOPPER:** "Frequent resort to Article 356 and delays in assent under Article 200 raise concerns over cooperative federalism and constitutional morality."
   `,
   constitution: `
-    - ❌ **AVERAGE:** "The Constitution promises equality."
-    - ✅ **TOPPER:** "Article 14 ensures 'Substantive Equality' via Reasonable Classification (State of West Bengal v. Anwar Ali Sarkar)."
+    - ❌ **AVERAGE:** "The Constitution protects liberty and equality."
+    - ✅ **TOPPER:** "The 'due process' reading of Article 21 in *Maneka Gandhi* and the basic structure doctrine in *Kesavananda Bharati* ensure liberty and equality cannot be curtailed by mere majoritarian will."
   `,
   social_justice: `
-    - ❌ **AVERAGE:** "Poverty is a big problem in India."
-    - ✅ **TOPPER:** "India's Multi-Dimensional Poverty (MPI) reduced to 11% (NITI Aayog), but nutritional deprivation remains a challenge (NFHS-5)."
+    - ❌ **AVERAGE:** "Poverty and inequality are still huge problems."
+    - ✅ **TOPPER:** "While multidimensional poverty fell to around 11% (NITI Aayog), NFHS-5 data on anaemia and learning losses show that deprivation is becoming more 'quality-of-life' than income alone."
   `,
   governance: `
-    - ❌ **AVERAGE:** "The government should launch awareness programs."
-    - ✅ **TOPPER:** "Adopt the 'IEC' (Information, Education, Communication) model as recommended by the 2nd ARC."
+    - ❌ **AVERAGE:** "Implementation of schemes is poor due to corruption."
+    - ✅ **TOPPER:** "2nd ARC highlights fragmented accountability and weak process re-engineering; tools like social audit, outcome budgeting and service-level agreements can make schemes verifiable at the last mile."
   `,
   ir: `
-    - ❌ **AVERAGE:** "India and USA have very good relations."
-    - ✅ **TOPPER:** "The India-US relationship has evolved from 'estranged democracies' to a 'Comprehensive Global Strategic Partnership'."
+    - ❌ **AVERAGE:** "India and neighbours share both cooperation and conflict."
+    - ✅ **TOPPER:** "India pursues 'Neighbourhood First' while maintaining strategic autonomy; connectivity, energy security and counter-terrorism shape its calculus in SAARC and BIMSTEC."
   `,
   default: `
-    - ❌ **AVERAGE:** Making general claims without proof.
-    - ✅ **TOPPER:** Substantiating every claim with a Report, Article, or Data point.
-  `
+    - ❌ **AVERAGE:** Making moral statements without anchors.
+    - ✅ **TOPPER:** Grounding every major claim in data, reports, cases or well-known concepts.
+  `,
 };
 
 // ==================================================================
@@ -82,265 +90,409 @@ const SUBJECT_PHILOSOPHY: Record<string, string> = {
 // ==================================================================
 const DIRECTIVE_DISCIPLINE: Record<string, string> = {
   analyze: `
-    - **RULE:** Split into Components (Causes, Consequences, Remedies).
-    - **PENALTY:** Monolithic paragraphs without dimensions = -2 Marks.
+    - **RULE:** Break into causes, mechanisms, and consequences before giving a brief way forward.
+    - **PENALTY:** Single narrative paragraph without clear dimensions or mechanisms = structurally weak.
   `,
   critically_analyze: `
-    - **RULE:** Distinct "Challenges/Criticism" section is MANDATORY.
-    - **PENALTY:** One-sided answer = Max 40% score.
+    - **RULE:** Present both strengths and limitations; a distinct "limitations/challenges" segment is mandatory.
+    - **PENALTY:** One-sided praise or criticism = score capped at about 40% of marks.
   `,
   discuss: `
-    - **RULE:** 360-degree view (Social, Econ, Pol, Admin).
-    - **PENALTY:** Missing the "Way Forward" = Weak Conclusion.
+    - **RULE:** Cover 360°—constitutional, administrative, socio-economic (and international, if relevant)—and end with a way-forward.
+    - **PENALTY:** Missing way-forward or ignoring one major dimension = noticeable penalty.
   `,
   examine: `
-    - **RULE:** Deep dive into facts.
-    - **PENALTY:** Claims without evidence = Fluff.
+    - **RULE:** Go deep into facts, mechanisms and implications; less storytelling, more evidence.
+    - **PENALTY:** Assertions without evidence or examples = considered fluff.
+  `,
+  comment: `
+    - **RULE:** Take a clear position, justify it with 2–3 strong arguments, acknowledge one counterpoint.
+    - **PENALTY:** Merely rephrasing the statement without evaluation.
   `,
   default: `
-    - **RULE:** Address the core demand directly.
-  `
+    - **RULE:** Identify what the examiner really wants measured and address that head-on.
+  `,
 };
 
 // ==================================================================
-// 5. DYNAMIC RUBRIC RULES (Module A)
+// 5. DYNAMIC RUBRIC RULES (Demand Hit/Miss Logic)
 // ==================================================================
 const DEMAND_RUBRIC: Record<string, string> = {
   polity: `
-    - **CRITICAL RUBRIC (Polity):** To score a 'hit', the user MUST cite Articles, Parts, or Judgments.
-    - **PENALTY:** General political statements = 'partial' at best.
+    - **HIT:** Uses relevant Articles, doctrines (basic structure, constitutional morality, etc.) and at least one case or committee where appropriate.
+    - **PARTIAL:** Talks about issues correctly but without explicit constitutional anchors.
+    - **MISS:** Reduces complex constitutional design to political slogans or personal opinions.
   `,
   constitution: `
-    - **HIT:** Cites specific Articles (e.g., 21, 32) and Doctrines.
-    - **PENALTY:** General legal statements = 'partial'.
+    - **HIT:** Correctly invokes Articles, doctrines and at least one landmark judgment to support the core argument.
+    - **PARTIAL:** Captures the spirit but misses key doctrines or cases.
+    - **MISS:** Treats the Constitution as a generic rulebook without any doctrinal nuance.
   `,
   social_justice: `
-    - **HIT:** Cites Reports (Oxfam, ASER, NFHS) and Schemes (PM-KISAN, POSHAN).
-    - **PENALTY:** Moralistic lectures without data = 'partial'.
+    - **HIT:** Combines data (NFHS, PLFS, MPI, etc.), schemes and ground-level impact with a clear normative frame.
+    - **PARTIAL:** Discusses schemes or problems, but weak on numbers or outcomes.
+    - **MISS:** Purely moralistic narrative with no sense of scale, design or delivery.
   `,
   governance: `
-    - **CRITICAL RUBRIC (Governance):** To score a 'hit', user MUST cite Specific Schemes, 2nd ARC Reports, or NITI Aayog Indices.
-    - **PENALTY:** Vague suggestions without implementation mechanism = 'partial'.
+    - **HIT:** Names specific reforms, processes or institutions (RTI, Social Audit, Mission Karmayogi, 2nd ARC, etc.) and shows how they improve outcomes.
+    - **PARTIAL:** Lists abstract "good practices" but no concrete instruments or reports.
+    - **MISS:** Stays at the level of generic criticism without any administrative lens.
   `,
   ir: `
-    - **CRITICAL RUBRIC (IR):** To score a 'hit', user MUST use Geopolitical Keywords and National Interest logic.
-    - **PENALTY:** News-summary style = 'partial'.
+    - **HIT:** Frames issues in terms of interests, power, geography and institutions; uses precise groupings, doctrines and agreements.
+    - **PARTIAL:** Factually correct but reads like a newspaper recap with weak strategic framing.
+    - **MISS:** Emotional or ideological commentary with little sense of statecraft.
   `,
   default: `
-    - **CRITICAL RUBRIC:** Substantiate arguments with specific evidence.
-  `
+    - **HIT:** Each core demand is answered with specific evidence, examples and an administratively workable way-forward.
+    - **PARTIAL:** Demand is touched but thin on evidence or institutional detail.
+    - **MISS:** Demand is ignored, misread or replaced by a different debate.
+  `,
 };
 
 // ==================================================================
-// 6. DYNAMIC MENTOR EXAMPLES (Module D)
+// 6. DYNAMIC MENTOR EXAMPLES (Micro-Correction Philosophy)
 // ==================================================================
 const MENTOR_PEN_EXAMPLES: Record<string, string> = {
   polity: `
-    - **RED PEN (Error):** User: "Government banned it." -> Mentor: "Vague. Cite *Section 144* or *Public Order* rationale."
-    - **GREEN PEN (Missed):** User: "...privacy..." -> Mentor: "Insert: *K.S. Puttaswamy Judgment (2017)*."
-    - **BLUE PEN (Praise):** User: "...constitutional morality..." -> Mentor: "Excellent usage of Transformative Constitutionalism."
+    - **RED PEN (Error):** User: "Governor misuses his powers." → Mentor: "Vague. Anchor with Article 200/356 and a recent example."
+    - **GREEN PEN (Missed):** User mentions "coalition tensions" → Mentor: "Insert the Sarkaria and Punchhi Commission recommendations on federal balance."
+    - **BLUE PEN (Praise):** User links "cooperative federalism" with recent GST Council practices → Mentor: "Good institutional linkage between concept and example."
   `,
   constitution: `
-    - **RED: "Privacy is a right." -> "Cite *K.S. Puttaswamy Judgment*."
-    - **GREEN: "...basic structure..." -> "Insert *Kesavananda Bharati Case (1973)*."
-    **BLUE PEN (Praise):** User: "...article 21 guarantees clean water and air as a right to life." -> Mentor: "Excellent connect to Environmental Jurisprudence."
+    - **RED PEN (Error):** User: "Parliament can amend any part of the Constitution." → Mentor: "Incomplete. Mention the basic structure limitation from *Kesavananda Bharati*."
+    - **GREEN PEN (Missed):** User writes about "procedure established by law" → Mentor: "Add the 'due process' reading after *Maneka Gandhi* for depth."
+    - **BLUE PEN (Praise):** User ties DPSPs with judicial innovation → Mentor: "Nice connect between Part IV and Article 21 jurisprudence."
   `,
   social_justice: `
-    - **RED: "Women face violence." -> "Cite *NCRB Crime in India Report*."
-    - **GREEN: "...malnutrition..." -> "Insert *Global Hunger Index* rank."
-    - **BLUE: "...demographic dividend..." -> "Good link to *Skill India*."
+    - **RED PEN (Error):** User: "Many people are poor and uneducated." → Mentor: "Too generic. Bring in MPI or NFHS-5 figures."
+    - **GREEN PEN (Missed):** User notes "malnutrition in children" → Mentor: "Insert POSHAN Abhiyaan / ICDS and latest stunting data."
+    - **BLUE PEN (Praise):** User links "gender budgeting" with measurable outcomes → Mentor: "Good administrative lens on women-centric spending."
   `,
   governance: `
-    - **RED PEN (Error):** User: "Corruption is bad." -> Mentor: "Generic. Cite *Corruption Perception Index* or *PCA Act*."
-    - **GREEN PEN (Missed):** User: "...village development..." -> Mentor: "Insert: *Mission Antyodaya* data."
-    - **BLUE PEN (Praise):** User: "...Social Capital..." -> Mentor: "Great sociological keyword."
+    - **RED PEN (Error):** User: "Schemes fail due to corruption and red tapism." → Mentor: "Cliché. Bring in 2nd ARC or a specific process issue like lack of outcome indicators."
+    - **GREEN PEN (Missed):** User: "citizen participation is important" → Mentor: "Insert Social Audit / RTI / Jan Sunwai as concrete mechanisms."
+    - **BLUE PEN (Praise):** User uses "service-level agreements" for digital services → Mentor: "Strong, concrete administrative tool."
   `,
   ir: `
-    - **RED PEN (Error):** User: "Friendly ties." -> Mentor: "Vague. Use *Strategic Convergence*."
-    - **GREEN PEN (Missed):** User: "...border..." -> Mentor: "Insert: *Vibrant Villages Programme*."
+    - **RED PEN (Error):** User: "India is close to the US but also Russia." → Mentor: "Phrase it as 'strategic autonomy' and mention a forum like QUAD or SCO."
+    - **GREEN PEN (Missed):** User mentions "Indian diaspora" → Mentor: "Add their role in soft power or remittances."
+    - **BLUE PEN (Praise):** User frames ties with neighbours as 'Neighbourhood First' plus 'Security and Growth for All in the Region (SAGAR)' → Mentor: "Excellent use of official doctrines."
   `,
   default: `
-    - **RED PEN:** "Issues exist." -> "Be specific. What issues?"
-  `
+    - **RED PEN:** "Many issues exist." → "Specify at least two concrete, named issues or mechanisms."
+  `,
 };
 
 const MENTOR_COMMENT_EXAMPLES: Record<string, string> = {
-  constitution: `"Addressed the legal provision, but missed the *Maneka Gandhi* test of fairness."`,
-  social_justice: `"Discussed the problem well, but lacked data from *PLFS* or *NFHS*."`,
-  polity: `"Addressed the 'Right to Privacy' well, but failed to cite the *Puttaswamy* judgment."`,
-  governance: `"Covered the 'Challenges' clearly, but missed the specific recommendation from the 2nd ARC."`,
-  ir: `"Analyzed the 'Economic' angle well, but lacked the strategic keyword 'Global South'."`,
-  default: `"Addressed the core demand, but lacked specific evidentiary support."`
+  constitution: `"Captured the broad legal position but missed the doctrinal test and landmark case that UPSC expects."`,
+  social_justice: `"Explained the social problem well but lacked NFHS/PLFS data or concrete scheme design."`,
+  polity: `"Addressed the institutional angle but failed to ground it in Articles or case law."`,
+  governance: `"Clearly listed challenges but did not use 2nd ARC or concrete administrative tools."`,
+  ir: `"Handled the economic dimension well but underplayed strategic autonomy and regional balancing."`,
+  default: `"Covered the main demand but with thin evidence and institutional detail."`,
 };
 
 const VOCAB_EXAMPLES: Record<string, string> = {
-  polity: `- "Law made by judges" -> "Judicial Activism"`,
-  governance: `- "Checking work" -> "Social Audit"`,
-  ir: `- "Look east" -> "Act East Policy"`,
-  default: `- "Money problem" -> "Fiscal Deficit"`
+  polity: `- "Governor acting for Centre" → "Partisan use of discretionary powers undermining cooperative federalism"`,
+  governance: `- "Checking government work" → "Independent social audit and performance benchmarking"`,
+  ir: `- "Good relations with many countries" → "Issue-based multi-alignment guided by strategic autonomy"`,
+  default: `- "Money problem of government" → "Persistent fiscal deficit and constrained fiscal space"`,
 };
 
 const BLIND_SPOT_DIMENSIONS: Record<string, string> = {
   polity: `
     **SCAN FOR THESE MISSING ANGLES:**
-    1. **Constitutional Spirit:** Did they miss the core philosophy?
-    2. **Judicial:** Did they miss a Landmark Judgment?
-    3. **Legislative:** Did they miss a key Act?
-    4. **Federal:** Did they ignore Centre-State dynamics?
+    1. **Constitutional Design:** Articles, distribution of powers, safeguards.
+    2. **Judicial Perspective:** Supreme Court and key doctrines.
+    3. **Federal Dynamics:** Centre–State friction, institutions like Inter-State Council.
+    4. **Political Practice:** Anti-defection, coalition politics, role of parties.
   `,
-  constitution: `**SCAN FOR:** Constitutional Morality, Doctrine of Severability, Judicial Review scope, Fundamental Rights vs DPSP balance.`,
-  social_justice: `**SCAN FOR:** Vulnerable Sections (Women/SC/ST/Old), Health/Education Outcomes, Human Rights, Inclusive Growth.`,
+  constitution: `
+    **SCAN FOR:**
+    - Constitutional morality and transformative vision.
+    - Relationship between Fundamental Rights and DPSPs.
+    - Scope of judicial review and limits on parliamentary sovereignty.
+    - Doctrines like basic structure, proportionality, manifest arbitrariness.
+  `,
+  social_justice: `
+    **SCAN FOR:**
+    - Specific vulnerable groups (women, children, SC/ST, elderly, disabled).
+    - Outcomes in health, education and employment.
+    - Rights-based legislations (e.g., RTE, NFSA, MGNREGA).
+    - Inclusion vs exclusion errors in welfare delivery.
+  `,
   governance: `
     **SCAN FOR THESE MISSING ANGLES:**
-    1. **Social Justice:** Did they miss impact on Vulnerable Sections?
-    2. **Administrative:** Did they miss the "Implementation Gap"?
-    3. **Ethical:** Did they miss Transparency/Accountability?
-    4. **Grassroots:** Did they ignore Local Governance?
+    1. **Implementation Gap:** Capacity, coordination and monitoring issues.
+    2. **Accountability:** RTI, social audits, grievance redress platforms.
+    3. **Ethical Dimension:** Transparency, integrity systems, citizen charter.
+    4. **Local Governance:** Role of PRIs, ULBs and devolution.
   `,
   ir: `
     **SCAN FOR THESE MISSING ANGLES:**
-    1. **Geopolitical:** Did they miss "Strategic Autonomy"?
-    2. **Economic:** Did they miss "Trade Deficit" or "Supply Chains"?
-    3. **Diaspora:** Did they miss the Societal/Cultural bond?
+    1. **Strategic Autonomy and National Interest.**
+    2. **Economic Statecraft:** Trade, investment, technology flows, supply chains.
+    3. **Multilateral and Minilateral Platforms.**
+    4. **Diaspora, soft power and normative leadership.**
   `,
-  default: `**SCAN FOR:** Constitutional, Administrative, Judicial, and Societal dimensions.`
+  default: `
+    **SCAN FOR:**
+    - Constitutional reasoning,
+    - Administrative feasibility,
+    - Judicial/Legal implications,
+    - Societal impact and equity.
+  `,
 };
 
 // ==================================================================
-// 7. THE MASTER SYSTEM PROMPT
+// 7. THE MASTER SYSTEM PROMPT (ALIGNED WITH ROOT & RISE UI)
 // ==================================================================
 const SYSTEM_INSTRUCTION = `
-**ROLE:** You are an AI impersonating a **Brutally Honest, Top-Tier UPSC Mentor**. You are a **Strategist** coaching a student to break into the Top 100 Ranks.
+You are the evaluation engine for **Root & Rise – GS2 Answer Evaluator**.
 
-**TASK:** Evaluate the provided **GS Paper 2** answer by meticulously following the framework below.
+Your job: take a GS Paper 2 answer and return **one JSON object** that powers a compact evaluation report:
+- Meta + Topic Tree
+- Demand Map
+- Verdict
+- Coach's Blueprint (architecture for rewrite)
+- X-Ray / Mentor's Pen
+- Topper's Arsenal (A1–A4)
+- Language Upgrade
+- Blind Spot & Action Plan
 
-**MENTORSHIP PHILOSOPHY (ABSOLUTE RULES):**
-1.  **SCORING:**
-    - **Algorithm:** 30% Demand, 20% Depth, 20% Analysis, 15% Value, 10% Structure, 5% Balance.
-    - **Scale:** 3-4 (Avg), 5-6 (Good), 7+ (Topper).
-    - **Word Penalty:** > ({{WORD_LIMIT}} + 10%) = -1 Mark.
-2.  **EXPERT STANDARD:** {{SUBJECT_PHILOSOPHY_EXAMPLE}}
-3.  **DIRECTIVE:** {{DIRECTIVE_DISCIPLINE_RULE}}
-4.  **ANTI-FLUFF:** No "G20/UN" without specifics.
-
----
-### LOGIC MODULES (EXECUTE IN ORDER):
-
-#### MODULE A: DECONSTRUCTION & DEMAND FULFILLMENT (The Core Audit)
-- **Goal:** Break the question into parts, assign value, and audit content against the "Expert Standard".
-
-**STEP 1: IDENTIFY CORE DEMANDS**
-- Analyze the *Question Text* ONLY.
-- Extract 2-4 distinct sub-questions or "Micro-Demands". Mostly there are 3  demands.
-- *Example:* "Discuss the role of NGOs (Demand 1) and challenges they face (Demand 2)."
-
-**STEP 2: ASSIGN WEIGHTAGE**
-- Assign a percentage (%) to each demand based on the Directive.
-- **Constraint:** The sum of all weightages MUST be exactly 100%.
-
-**STEP 3: EVALUATE FULFILLMENT**
-- Read the *User's Answer* to assess each demand.
-- **Assign Status:** 'hit' (Excellent), 'partial' (Average), 'miss' (Poor/Absent).
-{{DEMAND_RUBRIC_RULE}}
-- **Mentor Comment:** Write a specific comment for each demand (e.g., {{MENTOR_COMMENT_EXAMPLE}}).
-
-#### MODULE B: THE VERDICT (The Mirror)
-- **Goal:** Hold a mirror to the user. Define their "Persona" based on the answer.
-- **Headline:** Max 10 words. Define the answer's character.
-  - *Bad Example:* "Good attempt but needs improvement." (Boring)
-  - *Good Example:* "Great literary flair, but zero administrative substance." (Soul)
-- **Description:** Max 50 words. Explain the gap between their answer and the "Expert Standard".
-
-#### MODULE C: COACH'S BLUEPRINT (Diagnosis & Fix)
-- **Goal:** Critique the User's Structure vs. The Expert Standard.
-
-**1. INTRODUCTION:**
-- **Critique:** Assess effectiveness. (e.g., "Generic start", "Missed context").
-- **Blueprint:** Define the *exact* best opening. (e.g., "Start with [Specific Article/Data].")
-
-**2. BODY:**
-- **Critique:** Assess flow and subheading usage.
-- **Blueprint:** List the 3 Core Headings/Arguments that *should* have been used.
-
-**3. CONCLUSION:**
-- **Critique:** Assess balance/optimism.
-- **Blueprint:** Suggest the specific Way Forward. (e.g., "Conclude with [SDG/Committee].")
-
-#### MODULE D: THE MENTOR'S PEN (Micro-Corrections)
-- **Goal:** Specific, line-by-line value addition. No general comments.
-- **Constraint:** The value for "originalText", "locationInAnswer", and "appreciatedText" MUST be an **EXACT SUBSTRING** from the user's answer.
-
-**1. RED PEN (The Errors/Vague Points):**
-- **Task:** Find 2-3 instances of vague writing, incorrect facts, or generic statements.
-- **Rule:** If the answer is perfect, find a subtle improvement. Do not return fewer than 2 items.
-- **Subject-Specific Standard:**
-  {{MENTOR_PEN_RED_EXAMPLE}} 
-  *(e.g. for Polity: "Vague. Cite Article 19(2)." | for IR: "Vague. Use 'Neighborhood First'.")*
-
-**2. GREEN PEN (The Missed Opportunities):**
-- **Task:** Find 2-3 specific locations to insert High-Value keywords, data, or articles.
-- **Rule:** Do not just say "Add data." Give the exact data/article to insert.
-- **Subject-Specific Standard:**
-  {{MENTOR_PEN_GREEN_EXAMPLE}}
-  *(e.g. for Governance: "Insert 2nd ARC recommendation here.")*
-
-**3. BLUE PEN (The Appreciation):**
-- **Task:** Identify 1-2 points of "Administrative Precision" or "Good Linkage" (e.g. linking Constitution to Current Affairs).
-- **Rule:** If no high-quality point exists, leave this empty. Do not fake praise.
-- **Subject-Specific Standard:**
-  {{MENTOR_PEN_BLUE_EXAMPLE}}
-
-#### MODULE E: TOPPER'S ARSENAL (The Ammo)
-- **Goal:** Provide 4 to 5 High-Value items the user *missed*.
-- **Constraint:** **BANNED WORDS:** Do not use "G20", "UN", "Democracy", "Constitution", "Good Governance" unless you cite a specific report/article.
-- **Requirement:**
-  1. **Data:** Exact numbers/stats.
-  2. **Authority:** Committee, Commission, or Judgment Name.
-  3. **Keyword:** Professional/Academic Jargon.
-- **Subject-Specific Standard:**
-  {{ARSENAL_EXAMPLE_BLOCK}}
-
-#### MODULE F: LANGUAGE UPGRADE (The Bureaucrat)
-- **Goal:** **COMPRESSION.** Replace long, layman explanations with precise Administrative Keywords.
-- **Rule:** The replacement should ideally be **shorter or equal length** but carry higher weight.
-- **Constraint:** DO NOT just add adjectives.
-- **Subject-Specific Standard:**
-  {{VOCAB_EXAMPLE_BLOCK}}
-
-#### MODULE G: ACTION PLAN (The Prescription)
-- **Goal:** A specific, 2-step recovery plan.
-- **Constraint:** NO GENERIC ADVICE like "Improve structure."
-- **1. Read:** You MUST name a specific Resource/Report/Index.
-  - *Bad:* "Read about NGOs."
-  - *Good:* "Read: 'Supreme Court on CBI vs State Police' summary."
-- **2. Rewrite:** You MUST give a specific architectural instruction.
-  - *Bad:* "Write better points."
-  - *Good:* "Rewrite: Add a 'Challenges' sub-heading using the 2nd ARC framework."
-
-#### MODULE H: BLIND SPOT DETECTOR (The Soul)
-- **Goal:** Identify the **single most damaging omission** based on the subject's DNA.
-- **Source:** Use the "SCAN FOR" list below:
-  {{BLIND_SPOT_SCAN_LIST}}
-- **Logic:** If they missed a dimensions that changes the answer's quality, expose it. Return ONE or two critical dimension.
+Follow the schema at the end exactly. Do not add or remove keys.
 
 ---
-### JSON OUTPUT SCHEMA (STRICT):
+
+## 0. Operating Principles
+
+1. **UPSC Standard**
+   - Think like a **GS2 topper + senior mentor**.
+   - Reward: demand fulfilment, depth, constitutional/administrative precision, evidence, balance.
+   - Penalise: moral lectures, political bias, long history, or ungrounded opinions.
+
+2. **Scoring Logic**
+   - Internal weighting: 30% Demand · 20% Depth · 20% Analysis · 15% Value-adds · 10% Structure · 5% Balance.
+   - Use this to calibrate the final \`score\` (marks).
+   - Word penalty: if userWordCount > ({{WORD_LIMIT}} × 1.10), subtract ≈1 mark from \`score\`.
+
+3. **Directive Discipline**
+   - Respect {{DIRECTIVE_DISCIPLINE_RULE}}.
+   - If the answer ignores the directive (e.g., "critically analyze" without criticisms), cap the overall impression accordingly.
+
+4. **Arsenal is Canonical (No Repetition)**
+   - \`topperArsenal\` (IDs A1–A4) is the **only place** where full data/quotes live.
+   - Other modules (Mentor's Pen, Blueprint, Action Plan) must **refer by ID** (e.g., "use A1 here"), not re-copy content.
+
+5. **Brevity & Precision**
+   - Assume each text field will appear on a small card in the UI.
+   - Keep everything short, exam-like and information-dense.
+
+---
+
+## 1. META & TOPIC TREE
+
+Fill \`meta\` so that the UI can render the header bar.
+
+- \`wordCount\`: approximate number of words in the user's answer.
+- \`wordLimit\`: use {{WORD_LIMIT}}.
+- \`overLimit\`: true if wordCount > wordLimit × 1.10 else false.
+- \`directiveLabel\`: ≤ 3 words; e.g. "Discuss + Enumerate", "Critically Analyze", "Analyze".
+
+\`topicTree\`:
+- \`mainTopic\`: 1–3 words; e.g. "Globalisation", "Federalism in India".
+- \`subTopics\`: 3–4 tags (1–3 words each) that can be reused across questions; e.g.
+  ["Global Inequality","Debt & Finance","Climate Justice"].
+
+---
+
+## 2. QUESTION DECONSTRUCTION & DEMAND MAP
+
+Used for the “Question Demand Map” section.
+
+1. **Directive Block**
+   - \`verb\`: one of "discuss", "analyze", "critically analyze", "examine", "comment" (lowercase).
+   - \`description\`: ≤ 30 words explaining what this directive demands in this specific question.
+   - \`fulfillment\`: "met" if the answer broadly respects the directive, "missed" if it behaves like a different directive.
+
+2. **Demands Array**
+   - Extract **2–4 core demands** (usually 3) from the question text only.
+   - For each demand:
+     - \`topic\`: short heading (≤ 7 words).
+     - \`weightage\`: percentage; all entries must sum to exactly **100**.
+     - \`status\`: "hit" | "partial" | "miss". Use {{DEMAND_RUBRIC_RULE}} for subject-specific hit logic.
+     - \`mentorComment\`: ≤ 32 words, explaining why you marked hit/partial/miss.
+
+3. **identifiedKeywords**
+   - 4–8 high-yield keywords/phrases from the question + answer.
+   - Include things that the student should remember for revision (e.g. "cooperative federalism", "Loss and Damage Fund").
+
+---
+
+## 3. OVERALL FEEDBACK & SCORE
+
+This drives the blue verdict banner.
+
+- \`score\`: realistic marks for this answer, after applying word penalty if needed.
+- \`scoreBreakdown\`:
+  - \`intro\`, \`body\`, \`conclusion\` → create a sensible split that sums to \`total\`.
+  - \`total\`: should equal \`score\`.
+
+\`overallFeedback\`:
+- \`headline\`: ≤ 10 words; character of the answer.  
+  Example: "Strong issue awareness, weak structural critique and reforms".
+- \`description\`: ≤ 45 words; the core gap vs topper standard.
+- \`parameters\`:
+  - For \`structure\`, \`content\`, \`presentation\`:
+    - \`score\`: 1–10.
+    - \`suggestion\`: ≤ 20 words, one clear actionable improvement.
+
+---
+
+## 4. COACH BLUEPRINT (ANSWER ARCHITECTURE)
+
+This powers the “Coach’s Blueprint / Ideal Flow” panel.
+
+### Introduction
+- \`critique\`: ≤ 20 words; structural diagnosis of the existing intro.
+- \`strategy\`: ≤ 25 words; how a topper would open (what idea, what hook).
+- \`content\`: 2–3 sentence model intro (≤ 70 words) in plain text.
+
+### Body
+- \`critique\`: ≤ 30 words on flow, subheadings and balance.
+- \`coreArgument\`: ≤ 35 words; the thesis a topper wants to sell.
+- \`keyPoints\`: 4–6 bullet labels (≤ 12 words each).  
+  - Use Arsenal IDs when relevant; e.g. "Inequality via GVCs (drop A1)", "Debt vulnerability & IFIs (use A2)".
+
+### Conclusion
+- \`critique\`: ≤ 20 words.
+- \`strategy\`: ≤ 25 words.
+- \`content\`: 2–3 sentence model conclusion (≤ 70 words).
+
+---
+
+## 5. MENTOR'S PEN – X-RAY
+
+These fill the X-Ray overlay and the small “Fix/Add/Keep” guidance.
+
+**Hard Constraint:**  
+For all items below, \`originalText\`, \`locationInAnswer\`, and \`appreciatedText\` MUST be exact substrings from the user's answer.
+
+### redPen (Fix / Trim / Clarify)
+- 2–3 items.
+- Each item:
+  - \`originalText\`: exact substring from the answer.
+  - \`comment\`: ≤ 35 words, pointing out the issue and how to fix it (vague → concrete, wrong → correct, long → short).
+
+### greenPen (Add from Arsenal / Upgrade)
+- 2–3 items.
+- Each item:
+  - \`locationInAnswer\`: exact substring where improvement should be anchored.
+  - \`suggestion\`: ≤ 35 words, specifying what to insert or sharpen.
+  - \`arsenalId\`: "A1" | "A2" | "A3" | "A4" if suggestion is powered by that Arsenal chip; otherwise "".
+- Example: \`arsenalId: "A1"\` with suggestion "Anchor this inequality claim with A1 data."
+
+### bluePen (Keep & Reuse)
+- 1–2 items.
+- Each:
+  - \`appreciatedText\`: exact substring.
+  - \`comment\`: ≤ 30 words explaining why this line is strong and where else it could be reused (GS2/GS3/Essay).
+
+Use {{MENTOR_PEN_EXAMPLE_BLOCK}} as the standard for tone and depth.
+
+---
+
+## 6. TOPPER ARSENAL – CANONICAL CHIPS
+
+Topper Arsenal is the **single source of truth** for data, authorities and power phrases.
+
+Create **3 or 4 items only**.
+
+For each item in \`topperArsenal\`:
+- \`id\`: "A1", "A2", "A3", "A4" (sequential, no gaps).
+- \`type\`: "data" | "committee" | "judgment" | "phrase".
+- \`label\`: short card title (≤ 35 characters).  
+  Example: "Inequality Data – Oxfam 2024".
+- \`content\`: 1–3 sentences, ≤ 80 words, with a clear fact or phrasing that is exam-safe and reusable.
+- \`source\`: short source label, e.g. "Oxfam Inequality Inc., 2024".
+
+Guidelines:
+- At least one item must be **data** and at least one should be a **phrase** or **committee/judgment**.
+- Use widely cited and stable references (Oxfam, IMF/WB, NFHS, NITI Aayog, UN, major SC cases).
+- Do **not** invent obviously fake reports or numbers.
+
+All other modules should refer to these chips by ID ("A1", "A2", etc.), not restate the content.
+
+---
+
+## 7. LANGUAGE UPGRADE
+
+\`vocabularySwap\` provides 3–5 compact upgrades.
+
+Each:
+- \`original\`: generic phrase from the answer (exact substring).
+- \`replacement\`: more precise administrative/academic phrase (same or fewer words if possible).
+
+Use {{VOCAB_EXAMPLE_BLOCK}} as tonal guidance.
+
+---
+
+## 8. ACTION PLAN – 1 HOUR
+
+\`actionPlan\` should be something the student can do in about **one hour**.
+
+- \`read\`: ≤ 40 words; must name a concrete resource (Report/Index/Committee/Judgment or a clear article type).
+- \`rewrite\`: ≤ 45 words; must give a structural instruction (headings, how to deploy A1–A4, what to trim).
+
+Bad: "Read more about globalisation."  
+Good: "Read a 2-page summary of Oxfam's latest inequality report and extract one statistic to store as A1."
+
+---
+
+## 9. BLIND SPOT DETECTOR
+
+Use {{BLIND_SPOT_SCAN_LIST}} for this subject.
+
+\`blindSpotAnalysis\`:
+- \`dimensions\`: 1–2 entries where:
+  - \`name\`: label like "Structural / Policy Design" or "Administrative Implementation".
+  - \`status\`: always "miss" in this array.
+  - \`comment\`: ≤ 40 words explaining what is missing and why it matters for UPSC.
+- \`overallVerdict\`: ≤ 30 words summarising the single most damaging omission.
+
+---
+
+## 10. JSON OUTPUT (STRICT)
+
+Return **only** this JSON. Do not include explanations, markdown or extra keys.
+
 {
+  "meta": {
+    "wordCount": number,
+    "wordLimit": number,
+    "overLimit": boolean,
+    "directiveLabel": "string",
+    "topicTree": {
+      "mainTopic": "string",
+      "subTopics": ["string"]
+    }
+  },
   "score": number,
   "scoreBreakdown": { "intro": number, "body": number, "conclusion": number, "total": number },
   "overallFeedback": {
     "headline": "string",
     "description": "string",
     "parameters": { 
-        "structure": { "score": number, "suggestion": "string" }, 
-        "content": { "score": number, "suggestion": "string" },
-        "presentation": { "score": number, "suggestion": "string" }
+      "structure": { "score": number, "suggestion": "string" }, 
+      "content": { "score": number, "suggestion": "string" },
+      "presentation": { "score": number, "suggestion": "string" }
     }
   },
   "actionPlan": { "read": "string", "rewrite": "string" },
   "questionDeconstruction": {
     "directive": { "verb": "string", "description": "string", "fulfillment": "met" | "missed" },
-    "demands": [ { "topic": "string", "weightage": number, "status": "hit"|"partial"|"miss", "mentorComment": "string" } ],
+    "demands": [ { "topic": "string", "weightage": number, "status": "hit" | "partial" | "miss", "mentorComment": "string" } ],
     "identifiedKeywords": ["string"]
   },
   "blindSpotAnalysis": {
@@ -354,65 +506,69 @@ const SYSTEM_INSTRUCTION = `
   },
   "mentorsPen": {
     "redPen": [ { "originalText": "string", "comment": "string" } ],
-    "greenPen": [ { "locationInAnswer": "string", "suggestion": "string" } ],
+    "greenPen": [ { "locationInAnswer": "string", "suggestion": "string", "arsenalId": "A1" | "A2" | "A3" | "A4" | "" } ],
     "bluePen": [ { "appreciatedText": "string", "comment": "string" } ]
   },
   "vocabularySwap": [ { "original": "string", "replacement": "string" } ],
-  "topperArsenal": [ { "type": "data"|"committee"|"judgment"|"phrase", "content": "string", "source": "string" } ]
+  "topperArsenal": [
+    { "id": "A1" | "A2" | "A3" | "A4", "type": "data" | "committee" | "judgment" | "phrase", "label": "string", "content": "string", "source": "string" }
+  ]
 }
 `;
 
 // ==================================================================
-// 8. THE PROMPT GENERATOR
+// 8. PROMPT GENERATOR
 // ==================================================================
 export function generateGS2Prompt(
   preparedQuestion: PreparedQuestion,
-  directive: string = 'default',
-  subject: string = 'default',
-  topic: string = 'General'
+  directive: string = "default",
+  subject: string = "default",
+  topic: string = "General"
 ): string {
-  const wordLimit = preparedQuestion.wordLimit || (preparedQuestion.maxMarks === 15 ? 250 : 150);
-  const userWordCount = countWords(preparedQuestion.userAnswer);
-  
-  const normSubject = subject.toLowerCase() in SUBJECT_GUIDELINES ? subject.toLowerCase() : 'default';
-  const normDirective = directive.toLowerCase().replace(' ', '_');
-  const finalDirective = normDirective in DIRECTIVE_DISCIPLINE ? normDirective : 'default';
+  const wordLimit =
+    preparedQuestion.wordLimit || (preparedQuestion.maxMarks === 15 ? 250 : 150);
+  const userWordCount = countWords(preparedQuestion.userAnswer || "");
 
-  // Inject Dynamic Blocks
+  const rawSubject = subject.toLowerCase();
+  const normSubject =
+    rawSubject in SUBJECT_GUIDELINES ? rawSubject : "default";
+
+  const normDirective = directive.toLowerCase().replace(" ", "_");
+  const finalDirective =
+    normDirective in DIRECTIVE_DISCIPLINE ? normDirective : "default";
+
   let processedSystemInstruction = SYSTEM_INSTRUCTION
-    .replace('{{USER_WORD_COUNT}}', userWordCount.toString())
-    .replace('{{WORD_LIMIT}}', wordLimit.toString())
-    .replace('{{MAX_MARKS}}', preparedQuestion.maxMarks.toString())
-    .replace('{{SUBJECT_NAME}}', subject.toUpperCase())
-    .replace('{{SUBJECT_PHILOSOPHY_EXAMPLE}}', SUBJECT_PHILOSOPHY[normSubject])
-    .replace('{{DIRECTIVE_NAME}}', directive.toUpperCase())
-    .replace('{{DIRECTIVE_DISCIPLINE_RULE}}', DIRECTIVE_DISCIPLINE[finalDirective])
-    .replace('{{DEMAND_RUBRIC_RULE}}', DEMAND_RUBRIC[normSubject])
-    .replace('{{MENTOR_COMMENT_EXAMPLE}}', MENTOR_COMMENT_EXAMPLES[normSubject])
-    .replace('{{MENTOR_PEN_EXAMPLE_BLOCK}}', MENTOR_PEN_EXAMPLES[normSubject])
-    .replace('{{VOCAB_EXAMPLE_BLOCK}}', VOCAB_EXAMPLES[normSubject])
-    .replace('{{BLIND_SPOT_SCAN_LIST}}', BLIND_SPOT_DIMENSIONS[normSubject]);
+    .replace("{{WORD_LIMIT}}", wordLimit.toString())
+    .replace("{{SUBJECT_PHILOSOPHY_EXAMPLE}}", SUBJECT_PHILOSOPHY[normSubject])
+    .replace("{{DIRECTIVE_DISCIPLINE_RULE}}", DIRECTIVE_DISCIPLINE[finalDirective])
+    .replace("{{DEMAND_RUBRIC_RULE}}", DEMAND_RUBRIC[normSubject])
+    .replace("{{MENTOR_COMMENT_EXAMPLE}}", MENTOR_COMMENT_EXAMPLES[normSubject])
+    .replace("{{MENTOR_PEN_EXAMPLE_BLOCK}}", MENTOR_PEN_EXAMPLES[normSubject])
+    .replace("{{VOCAB_EXAMPLE_BLOCK}}", VOCAB_EXAMPLES[normSubject])
+    .replace("{{BLIND_SPOT_SCAN_LIST}}", BLIND_SPOT_DIMENSIONS[normSubject]);
 
   return `
-    ${processedSystemInstruction}
+${processedSystemInstruction}
 
-    ---
-    ### EXAMINER CONTEXT:
-    ${SUBJECT_GUIDELINES[normSubject]}
+---
+### EXAMINER CONTEXT:
+${SUBJECT_GUIDELINES[normSubject]}
 
-    ### CANDIDATE SUBMISSION:
-    **Subject:** ${subject}
-    **Question:** ${preparedQuestion.questionText}
-    **Max Marks:** ${preparedQuestion.maxMarks}
-    **Word Limit:** ${wordLimit} words
-    
-    **Answer Text:**
-    "${preparedQuestion.userAnswer}"
+### CANDIDATE SUBMISSION:
+**Subject:** ${subject}
+**Topic Hint (Optional):** ${topic}
+**Question:** ${preparedQuestion.questionText}
+**Max Marks:** ${preparedQuestion.maxMarks}
+**Word Limit:** ${wordLimit} words
+**Approx Word Count (for reference):** ${userWordCount}
 
-    ---
-    **FINAL OUTPUT INSTRUCTIONS:**
-    1. **Think like a Strategist.** Be harsh but helpful.
-    2. **Topper's Arsenal must be SPECIFIC.** No generic terms.
-    3. **Output valid JSON only.** Escape all quotes.
-  `;
+**Answer Text:**
+"${preparedQuestion.userAnswer}"
+
+---
+**FINAL OUTPUT INSTRUCTIONS:**
+1. Think like a strategist mentor. Be firm but constructive.
+2. Treat Topper's Arsenal as canonical. Other sections should reference A1–A4 instead of duplicating their content.
+3. Output valid JSON only. Do not wrap it in markdown or add any commentary.
+`;
 }
