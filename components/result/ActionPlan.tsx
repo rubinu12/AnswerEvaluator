@@ -1,3 +1,4 @@
+// components/result/ActionPlan.tsx
 'use client';
 
 import { Rocket } from 'lucide-react';

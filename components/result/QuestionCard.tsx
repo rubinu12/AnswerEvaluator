@@ -1,3 +1,4 @@
+// components/result/QuestionCard.tsx
 'use client';
 
 import { useState } from 'react';

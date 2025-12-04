@@ -1,3 +1,4 @@
+// components/result/AnnotatedAnswer.tsx
 'use client';
 
 import { useState } from 'react';
