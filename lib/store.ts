@@ -1,4 +1,3 @@
-// lib/store.ts
 import { create } from 'zustand';
 import {
   EvaluationCompletePayload,
@@ -98,7 +97,7 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
     completeEvaluation: (payload) => {
       let { analysis, preparedData, subject } = payload;
 
-      console.log("--- Completing Evaluation (Full Fix) ---");
+      console.log("--- Completing Evaluation (V2 Fix) ---");
       
       // [SILVER BULLET FIX] Auto-Unwrap Data
       // @ts-ignore
@@ -119,7 +118,7 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
         (prepItem: PreparedQuestion, index: number) => {
           
           // Match by Index (Ticket Number)
-          let analysisItem = analysis.questionAnalysis[index];
+          let analysisItem = analysis.questionAnalysis[index] as any;
 
           if (!analysisItem) {
             console.error(`Missing analysis for Ticket #${index + 1} (Index ${index})`);
@@ -127,31 +126,34 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
           }
           
           return {
-            // Identity
+            // 1. Meta Data (Header)
+            meta: analysisItem.meta, 
+
+            // 2. Identity
             questionNumber: prepItem.questionNumber,
             questionText: prepItem.questionText,
             userAnswer: prepItem.userAnswer,
             maxMarks: prepItem.maxMarks,
             subject: analysisItem.subject || subject,
             
-            // Scores
+            // 3. Scoring
             score: analysisItem.score,
             scoreBreakdown: analysisItem.scoreBreakdown, 
             
-            // Logic Modules
+            // 4. Core Logic Modules
             questionDeconstruction: analysisItem.questionDeconstruction, 
             blindSpotAnalysis: analysisItem.blindSpotAnalysis,           
             coachBlueprint: analysisItem.coachBlueprint,                 
             mentorsPen: analysisItem.mentorsPen,                         
             vocabularySwap: analysisItem.vocabularySwap,                 
-            topperArsenal: analysisItem.topperArsenal,                   
+            topperArsenal: analysisItem.topperArsenal,
             
-            // [MAPPED] Action Plan & Feedback
+            // [NEW] Interdisciplinary Edge
+            interdisciplinaryContext: analysisItem.interdisciplinaryContext, 
+            
+            // 5. Feedback & Action
             actionPlan: analysisItem.actionPlan,
             overallFeedback: analysisItem.overallFeedback,
-            
-            // Legacy
-            idealAnswer: analysisItem.idealAnswer,
           };
         },
       );

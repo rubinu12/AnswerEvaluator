@@ -1,7 +1,23 @@
 // lib/types.ts
 
 // ==================================================================
-// --- 1. MENTOR'S PEN (The Annotation Layer) ---
+// --- 1. META & TOPIC TREE (The Header) ---
+// ==================================================================
+export interface TopicTree {
+    mainTopic: string;
+    subTopics: string[];
+}
+
+export interface MetaData {
+    wordCount: number;
+    wordLimit: number;
+    overLimit: boolean;
+    directiveLabel: string;
+    topicTree: TopicTree;
+}
+
+// ==================================================================
+// --- 2. MENTOR'S PEN (The Annotation Layer) ---
 // ==================================================================
 export interface RedPenFeedback {
     originalText: string;
@@ -11,6 +27,8 @@ export interface RedPenFeedback {
 export interface GreenPenFeedback {
     locationInAnswer: string;
     suggestion: string;
+    // Links to Topper's Arsenal (A1, A2...) if the suggestion is data-backed
+    arsenalId: "A1" | "A2" | "A3" | "A4" | ""; 
 }
 
 export interface BluePenFeedback {
@@ -25,81 +43,87 @@ export interface MentorsPenData {
 }
 
 // ==================================================================
-// --- 2. THE DYNAMIC RECEIPT (Mark Breakdown) ---
+// --- 3. THE DEMAND MAP (Marks & Verdict) ---
 // ==================================================================
 export interface Demand {
-    topic: string; 
-    weightage: number; 
+    topic: string;
+    weightage: number; // percentage (0-100)
     status: 'hit' | 'partial' | 'miss';
-    mentorComment: string; 
+    mentorComment: string;
 }
 
 export interface DirectiveAnalysis {
-    verb: string; 
-    description: string; 
-    fulfillment: 'met' | 'missed'; 
+    verb: string;
+    description: string;
+    fulfillment: 'met' | 'missed';
 }
 
 export interface QuestionDeconstruction {
     directive: DirectiveAnalysis;
     demands: Demand[];
-    identifiedKeywords: string[]; 
+    identifiedKeywords: string[];
 }
 
 // ==================================================================
-// --- 3. THE BLIND SPOT DETECTOR (PESTLE+) ---
+// --- 4. THE BLIND SPOT DETECTOR ---
 // ==================================================================
-// [RESTORED] This type is required by your UI components
-export type DimensionStatus = 'hit' | 'miss' | 'partial' | 'unused';
-
 export interface BlindSpotDimension {
-    name: string; 
-    status: DimensionStatus; // [UPDATED] Uses the exported type
-    comment: string; 
+    name: string;
+    status: 'miss'; // Blind spots are always 'missed' dimensions
+    comment: string;
 }
 
 export interface BlindSpotAnalysis {
     dimensions: BlindSpotDimension[];
-    overallVerdict: string; 
+    overallVerdict: string;
 }
 
 // ==================================================================
-// --- 4. THE COACH'S BLUEPRINT (Skeleton View) ---
+// --- 5. THE COACH'S BLUEPRINT (Architectural View) ---
 // ==================================================================
+export interface BlueprintSectionIntro {
+    critique: string;
+    strategy: string;
+    content: string; // The model introduction text
+}
+
+export interface BlueprintSectionBody {
+    critique: string;
+    coreArgument: string;
+    keyPoints: string[]; // The bullet points (may reference A1-A4)
+}
+
+export interface BlueprintSectionConclusion {
+    critique: string;
+    strategy: string;
+    content: string; // The model conclusion text
+}
+
 export interface CoachBlueprint {
-    introduction: {
-        critique: string; 
-        strategy: string; 
-        content: string;  
-    };
-    body: {
-        critique: string; 
-        coreArgument: string; 
-        keyPoints: string[];  
-    };
-    conclusion: {
-        critique: string; 
-        strategy: string; 
-        content: string; 
-    };
+    introduction: BlueprintSectionIntro;
+    body: BlueprintSectionBody;
+    conclusion: BlueprintSectionConclusion;
 }
 
 // ==================================================================
-// --- 5. VALUE ADDS (Language & Flashcards) ---
+// --- 6. VALUE ADDS (Arsenal & Language) ---
 // ==================================================================
+// "Purple Pen"
 export interface VocabularySwap {
-    original: string;    
-    replacement: string; 
+    original: string;
+    replacement: string;
 }
 
 export interface TopperArsenalItem {
-    type: 'data' | 'committee' | 'quote' | 'phrase' | 'judgment';
-    content: string; 
-    source?: string; 
+    id: "A1" | "A2" | "A3" | "A4";
+    type: 'data' | 'committee' | 'judgment' | 'phrase';
+    label: string;  // e.g. "Inequality Data (Oxfam)"
+    content: string;
+    source: string;
 }
 
 // ==================================================================
-// --- 6. FEEDBACK & SCORING ---
+// --- 7. FEEDBACK & SCORING ---
 // ==================================================================
 export interface ScoreBreakdown {
     intro: number;
@@ -108,68 +132,85 @@ export interface ScoreBreakdown {
     total: number;
 }
 
+export interface FeedbackParameter {
+    score: number; // 1-10
+    suggestion: string;
+}
+
+export interface OverallFeedbackParameters {
+    structure: FeedbackParameter;
+    content: FeedbackParameter;
+    presentation: FeedbackParameter;
+}
+
 export interface OverallFeedback {
-    // [UPDATED] Replaced 'generalAssessment' with high-impact fields
-    headline: string;      
-    description: string;   
-    parameters: {
-        structure: { score: number; suggestion: string };
-        content: { score: number; suggestion: string };
-        presentation: { score: number; suggestion: string };
-    };
+    headline: string;
+    description: string;
+    parameters: OverallFeedbackParameters;
 }
 
 // ==================================================================
-// --- 7. THE ACTION PLAN (Directives) ---
+// --- 8. THE ACTION PLAN ---
 // ==================================================================
 export interface ActionPlan {
-    read: string;    
-    rewrite: string; 
+    read: string;
+    rewrite: string;
+}
+
+export interface InterdisciplinaryConnection {
+  paper: string;   // e.g. "GS3" or "GS4"
+  topic: string;   // e.g. "Environment" or "Public Ethics"
+  content: string; // e.g. "Link federalism to forest rights..."
+}
+
+export interface InterdisciplinaryContext {
+  summary: string; // "Strong economic focus; missed ethical angle."
+  tag: string;     // "Polity + Economy"
+  // Allow multiple 'used' connections if the student is really good
+  used: InterdisciplinaryConnection[] | null; 
+  // Always provide 2-3 suggestions
+  suggested: InterdisciplinaryConnection[];
 }
 
 // ==================================================================
-// --- 8. MASTER QUESTION ANALYSIS (The Core Object) ---
+// --- 9. MASTER QUESTION ANALYSIS (Root Object) ---
 // ==================================================================
 export interface QuestionAnalysis {
-    // Identity & User Content
+    // 1. Meta Data (Header)
+    meta: MetaData;
+
+    // 2. Identity & Inputs (Provided by App, not AI)
     questionNumber: number;
     questionText: string;
     userAnswer: string;
     maxMarks: number;
-    score: number;
-    scoreBreakdown: ScoreBreakdown; 
-    
     subject: string;
-
-    // Analysis Layers
-    questionDeconstruction: QuestionDeconstruction; 
-    blindSpotAnalysis: BlindSpotAnalysis;           
-    coachBlueprint: CoachBlueprint;                 
-    mentorsPen: MentorsPenData;                     
     
-    // [NEW] The Action Plan
+    // 3. Scoring
+    score: number;
+    scoreBreakdown: ScoreBreakdown;
+
+    // 4. Core AI Analysis Layers
+    questionDeconstruction: QuestionDeconstruction;
+    overallFeedback: OverallFeedback;
+    coachBlueprint: CoachBlueprint;
+    mentorsPen: MentorsPenData;
+    topperArsenal: TopperArsenalItem[];
+    vocabularySwap: VocabularySwap[];
+    blindSpotAnalysis: BlindSpotAnalysis;
     actionPlan: ActionPlan;
-
-    // Feedback & Action Plan
-    overallFeedback: OverallFeedback;               
-
-    // Value Adds
-    vocabularySwap: VocabularySwap[];               
-    topperArsenal: TopperArsenalItem[];             
-    
-    // Legacy/Fallback
-    idealAnswer?: string; 
+    interdisciplinaryContext: InterdisciplinaryContext;
 }
 
 // ==================================================================
-// --- 9. SYSTEM / APP TYPES ---
+// --- 10. APP LEVEL TYPES ---
 // ==================================================================
 export interface EvaluationData {
     subject: string;
     overallScore: number;
     totalMarks: number;
     submittedOn: string;
-    overallFeedback: OverallFeedback;
+    overallFeedback: OverallFeedback; // Aggregated or primary question feedback
     questionAnalysis: QuestionAnalysis[];
 }
 
@@ -178,9 +219,10 @@ export interface PreparedQuestion {
     questionText: string;
     userAnswer: string;
     maxMarks: number;
-    wordLimit?: number; 
-    directive?: string; 
+    wordLimit?: number;
+    directive?: string;
     subject?: string;
+    topic?: string;
 }
 
 export interface EvaluationCompletePayload {
@@ -188,3 +230,4 @@ export interface EvaluationCompletePayload {
     preparedData: PreparedQuestion[];
     subject: string;
 }
+

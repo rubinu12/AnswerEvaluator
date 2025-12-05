@@ -194,12 +194,37 @@ const MENTOR_COMMENT_EXAMPLES: Record<string, string> = {
 };
 
 const VOCAB_EXAMPLES: Record<string, string> = {
-  polity: `- "Governor acting for Centre" → "Partisan use of discretionary powers undermining cooperative federalism"`,
-  governance: `- "Checking government work" → "Independent social audit and performance benchmarking"`,
-  ir: `- "Good relations with many countries" → "Issue-based multi-alignment guided by strategic autonomy"`,
-  default: `- "Money problem of government" → "Persistent fiscal deficit and constrained fiscal space"`,
+  polity: `
+  - "The Governor is interfering too much in the daily work of the state government" (13 words) -> "Gubernatorial Activism" (2 words)
+  - "The central government has more power than states in financial matters" (11 words) -> "Fiscal Asymmetry" (2 words)
+  - "Judges are making laws instead of just interpreting them" (9 words) -> "Judicial Overreach" (2 words)
+  `,
+  constitution: `
+  - "This law goes against the basic spirit and values of the constitution" (12 words) -> "Violates Constitutional Morality" (3 words)
+  - "Parliament cannot change the core features of the constitution" (9 words) -> "Basic Structure Doctrine" (3 words)
+  - "The procedure followed by law must be fair and just" (10 words) -> "Due Process of Law" (4 words)
+  `,
+  social_justice: `
+  - "Many poor people are left out of the food security list" (11 words) -> "Exclusion Errors" (2 words)
+  - "The number of women working in the economy is very low" (11 words) -> "Low Female LFPR" (3 words)
+  - "The gap between the rich and the poor is increasing" (10 words) -> "Rising Gini Coefficient" (3 words)
+  `,
+  governance: `
+  - "There is no one checking if the government schemes are working properly" (12 words) -> "Lack of Social Audit" (4 words)
+  - "Giving more power and funds to the village panchayats" (9 words) -> "Democratic Decentralization" (2 words)
+  - "Civil servants are not answering to the public for their actions" (11 words) -> "Administrative Accountability" (2 words)
+  `,
+  ir: `
+  - "India maintains friendly relations with all major powers independently" (9 words) -> "Strategic Autonomy" (2 words)
+  - "China is building ports around India to surround it" (9 words) -> "String of Pearls" (3 words)
+  - "Using culture and values to influence other countries" (8 words) -> "Soft Power" (2 words)
+  `,
+  default: `
+  - "The government is spending more money than it is earning" (10 words) -> "Fiscal Deficit" (2 words)
+  - "People moving from villages to cities in large numbers" (9 words) -> "Rapid Urbanization" (2 words)
+  - "Problems that stop the project from being implemented" (8 words) -> "Implementation Bottlenecks" (2 words)
+  `,
 };
-
 const BLIND_SPOT_DIMENSIONS: Record<string, string> = {
   polity: `
     **SCAN FOR THESE MISSING ANGLES:**
@@ -242,6 +267,33 @@ const BLIND_SPOT_DIMENSIONS: Record<string, string> = {
     - Administrative feasibility,
     - Judicial/Legal implications,
     - Societal impact and equity.
+  `,
+};
+
+const INTERDISCIPLINARY_EXAMPLES: Record<string, string> = {
+  polity: `
+  - Example 1: { paper: "GS3", topic: "Environment", content: "Weakening state autonomy over forests harms tribal culture and local ecology." }
+  - Example 2: { paper: "GS4", topic: "Ethics", content: "Centralized decision-making often violates the ethical principle of subsidiarity and ignores local aspirations." }
+  `,
+  constitution: `
+  - Example 1: { paper: "GS1", topic: "Society", content: "A Uniform Civil Code must be weighed against the constitutional preservation of cultural diversity (Indian Society)." }
+  - Example 2: { paper: "GS4", topic: "Ethics", content: "Fundamental Duties create an ethical obligation for citizenship, moving beyond a purely rights-based social contract." }
+  `,
+  social_justice: `
+  - Example 1: { paper: "GS3", topic: "Economy", content: "Poor health outcomes directly reduce the demographic dividend and stifle long-term GDP growth by lowering workforce productivity." }
+  - Example 2: { paper: "GS4", topic: "Ethics", content: "The State has a moral obligation to ensure dignity for the marginalized, moving beyond mere survival to capability enhancement." }
+  `,
+  governance: `
+  - Example 1: { paper: "GS3", topic: "Security", content: "Rapid e-Governance expansion without robust cyber-security creates vulnerabilities in critical information infrastructure." }
+  - Example 2: { paper: "GS4", topic: "Ethics", content: "Corruption in welfare delivery breaches the social contract and erodes public trust in democratic institutions." }
+  `,
+  ir: `
+  - Example 1: { paper: "GS3", topic: "Economy", content: "Free Trade Agreements often have asymmetric impacts, hurting domestic MSMEs and agricultural livelihoods despite aggregate growth." }
+  - Example 2: { paper: "GS1", topic: "History", content: "Current border disputes are often legacies of colonial cartography errors that ignored historical frontiers." }
+  `,
+  default: `
+  - Example 1: { paper: "GS3", topic: "Economy", content: "This policy failure exacerbates the fiscal deficit and creates long-term structural bottlenecks." }
+  - Example 2: { paper: "GS4", topic: "Ethics", content: "This decision raises ethical concerns regarding transparency and equitable resource distribution." }
   `,
 };
 
@@ -350,25 +402,33 @@ This drives the blue verdict banner.
 
 ---
 
-## 4. COACH BLUEPRINT (ANSWER ARCHITECTURE)
+## 3. SCORE & FEEDBACK
+- \`score\`, \`scoreBreakdown\`, \`overallFeedback\`.
 
-This powers the “Coach’s Blueprint / Ideal Flow” panel.
+---
+
+## 4. COACH BLUEPRINT (THE ARCHITECTURAL SKELETON)
+**CRITICAL:** Do NOT write full sentences. Write **imperative instructions** (e.g., "Define X", "List Y").
 
 ### Introduction
-- \`critique\`: ≤ 20 words; structural diagnosis of the existing intro.
-- \`strategy\`: ≤ 25 words; how a topper would open (what idea, what hook).
-- \`content\`: 2–3 sentence model intro (≤ 70 words) in plain text.
+- \`critique\`: ≤ 10 words; quick diagnosis.
+- \`strategy\`: ≤ 5 words; the "Hook" type (e.g., "Definition + Data").
+- \`content\`: **Micro-Instruction (Max 20 words).** Tell them how to build the opening.
+  - Example: "Define Globalization paradox, then immediately list the 'Triple Crisis' using Oxfam stats (A1)."
 
 ### Body
-- \`critique\`: ≤ 30 words on flow, subheadings and balance.
-- \`coreArgument\`: ≤ 35 words; the thesis a topper wants to sell.
-- \`keyPoints\`: 4–6 bullet labels (≤ 12 words each).  
-  - Use Arsenal IDs when relevant; e.g. "Inequality via GVCs (drop A1)", "Debt vulnerability & IFIs (use A2)".
+- \`critique\`: ≤ 15 words on structure.
+- \`coreArgument\`: ≤ 15 words; the main thesis.
+- \`keyPoints\`: 5-6 bullet instructions. **Max 12 words each.**
+  - Bad: "You should discuss the issue of inequality in detail."
+  - Good: "Inequality: Cite Top 1% wealth concentration (Use A1)."
+  - Good: "Debt: Explain 'Sovereignty Loss' via IMF conditionalities (Use A2)."
 
 ### Conclusion
-- \`critique\`: ≤ 20 words.
-- \`strategy\`: ≤ 25 words.
-- \`content\`: 2–3 sentence model conclusion (≤ 70 words).
+- \`critique\`: ≤ 10 words.
+- \`strategy\`: ≤ 5 words; the "Ending" type (e.g., "Way Forward").
+- \`content\`: **Micro-Instruction (Max 20 words).** How to close?
+  - Example: "Conclude by linking human-centric growth to SDG 10 and India's G20 Presidency."
 
 ---
 
@@ -426,16 +486,13 @@ All other modules should refer to these chips by ID ("A1", "A2", etc.), not rest
 
 ---
 
-## 7. LANGUAGE UPGRADE
+## 7. LANGUAGE UPGRADE (PRECISION & COMPRESSION)
+**GOAL:** Identify verbose, layman explanations and replace them with **Single Administrative Terms**. you must need to generate 5-6 replacements (minimum 3).
+- \`original\`: A wordy phrase (8-15 words) from the user's answer (exact match).
+- \`replacement\`: The specific technical term (1-3 words) that compresses the meaning.
 
-\`vocabularySwap\` provides 3–5 compact upgrades.
-
-Each:
-- \`original\`: generic phrase from the answer (exact substring).
-- \`replacement\`: more precise administrative/academic phrase (same or fewer words if possible).
-
-Use {{VOCAB_EXAMPLE_BLOCK}} as tonal guidance.
-
+**Strictly follow these Subject-Specific Examples:**
+{{VOCAB_EXAMPLE_BLOCK}}
 ---
 
 ## 8. ACTION PLAN – 1 HOUR
@@ -462,8 +519,35 @@ Use {{BLIND_SPOT_SCAN_LIST}} for this subject.
 - \`overallVerdict\`: ≤ 30 words summarising the single most damaging omission.
 
 ---
+## 10. INTERDISCIPLINARY EDGE (THE BONUS MARKS)
+Analyze if the student connected the core topic to **other** GS papers (History, Society, Environment, Ethics, Economy).Also suggest 2-3 (max one) The missing link from another paper , which would have strengthened their answer.
 
-## 10. JSON OUTPUT (STRICT)
+- \`summary\`: ≤ 15 words. High-level verdict. (e.g. "Strong economic focus; missed ethical angle.")
+- \`tag\`: ≤ 8 words. Label the current mix. (e.g. "Polity + Economy")
+
+- \`used\`: Array of connections the student **already made**.
+  - If none, return empty array [].
+  - Format: { \`paper\`: "GS3", \`topic\`: "Economy", \`content\`: "You correctly linked X to Y." }
+
+- \`suggested\`: **Generate 2 or 3 distinct connections** to papers NOT covered.
+  - **Constraint:** Do not give instructions (e.g. "Discuss X"). **Give the direct argument/sentence** the student can use.
+  - Use these examples as the gold standard for style:
+  {{INTERDISCIPLINARY_EXAMPLE_BLOCK}}
+
+---
+
+- \`summary\`: ≤ 15 words. High-level verdict. (e.g. "Strong economic focus; missed ethical angle.")
+- \`tag\`: ≤ 8 words. Label the mix. (e.g. "Polity + Economy")
+
+- \`used\`: **Did they make a cross-connection?**
+  - If YES: { \`content\`: "You correctly linked X to Y...", \`tag\`: "Connects GS2 to GS3." }
+  - If NO: Return \`null\`.
+
+- \`suggested\`: **The missing link.**
+  - \`content\`: ≤ 25 words. Give **one** specific argument from a different paper.
+  - \`tag\`: ≤ 15 words. Why this adds value. (e.g. "Adds an Ethics lens to a technical answer.")
+
+## 11. JSON OUTPUT (STRICT)
 
 Return **only** this JSON. Do not include explanations, markdown or extra keys.
 
@@ -513,6 +597,12 @@ Return **only** this JSON. Do not include explanations, markdown or extra keys.
   "topperArsenal": [
     { "id": "A1" | "A2" | "A3" | "A4", "type": "data" | "committee" | "judgment" | "phrase", "label": "string", "content": "string", "source": "string" }
   ]
+  "interdisciplinaryContext": {
+    "summary": "string",
+    "tag": "string",
+    "used": [ { "paper": "string", "topic": "string", "content": "string" } ],
+    "suggested": [ { "paper": "string", "topic": "string", "content": "string" } ]
+  }
 }
 `;
 
