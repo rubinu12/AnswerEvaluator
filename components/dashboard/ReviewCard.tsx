@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useEvaluationStore } from '@/lib/store';
 import { PreparedQuestion, EvaluationCompletePayload } from '@/lib/types';
-import { ChevronDown, Edit3, Trash2, Plus, ArrowUpToLine, AlertTriangle } from 'lucide-react';
+import { ChevronDown, Edit3, Trash2, Plus, ArrowUpToLine, AlertTriangle, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useAuthContext } from '@/lib/AuthContext';
@@ -17,56 +17,54 @@ const countWords = (text: string): number => {
 const EditableQuestionCard = ({
     question,
     index,
-    totalQuestions,
-    updateQuestion,
+    isEditing, // Controlled by Parent
+    setEditing, // Function to tell parent "I want to edit"
+    onSave,     // Function to save data and close
+    onCancel,   // Function to close without saving
     removeQuestion,
     mergeUp,
 }: {
     question: PreparedQuestion;
     index: number;
-    totalQuestions: number;
-    updateQuestion: (index: number, updatedQuestion: PreparedQuestion) => void;
+    isEditing: boolean;
+    setEditing: () => void;
+    onSave: (qText: string, aText: string) => void;
+    onCancel: () => void;
     removeQuestion: (index: number) => void;
     mergeUp: (index: number) => void;
 }) => {
     const [isOpen, setIsOpen] = useState(true);
-    const [isEditing, setIsEditing] = useState(false);
+    
+    // Local form state
     const [editedAnswer, setEditedAnswer] = useState(question.userAnswer);
-    const [editedText, setEditedText] = useState(question.questionText); // Allow editing question text too
+    const [editedText, setEditedText] = useState(question.questionText);
+
+    // Sync local state when the card enters Edit Mode or Props change
+    useEffect(() => {
+        setEditedAnswer(question.userAnswer);
+        setEditedText(question.questionText);
+    }, [isEditing, question.userAnswer, question.questionText]);
 
     const wordCount = useMemo(() => countWords(editedAnswer), [editedAnswer]);
 
-    const handleSaveChanges = () => {
-        updateQuestion(index, { 
-            ...question, 
-            userAnswer: editedAnswer,
-            questionText: editedText 
-        });
-        setIsEditing(false);
-    };
-
-    const handleMarksChange = (marks: number) => {
-        updateQuestion(index, { ...question, maxMarks: marks });
-    };
-    
-    // Logic for "Short Question" Warning
+    // Derived State
     const isTooShort = wordCount < 40;
-    
     const wordLimit = question.maxMarks === 10 ? 150 : 250;
     const wordCountColor = wordCount > wordLimit * 1.1 ? 'text-red-500' : wordCount > wordLimit ? 'text-amber-500' : 'text-slate-500';
 
     return (
-        <div className="border-b border-slate-200 last:border-b-0 group/card">
+        <div className={`border-b border-slate-200 last:border-b-0 group/card ${isEditing ? 'bg-blue-50/30' : ''}`}>
             <div className="flex w-full items-start p-4 gap-4 bg-white hover:bg-slate-50 transition-colors">
-                {/* Ticket Number Badge */}
+                {/* Badge */}
                 <div className="flex flex-col items-center gap-1 mt-1">
-                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-xs font-bold text-slate-600 border border-slate-200">
+                    <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold border transition-colors ${
+                        isEditing ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
                         {index + 1}
                     </span>
-                    {/* MERGE UP BUTTON (Only for Q2 onwards) */}
-                    {index > 0 && (
+                    {index > 0 && !isEditing && (
                         <button 
-                            onClick={() => mergeUp(index)}
+                            onClick={(e) => { e.stopPropagation(); mergeUp(index); }}
                             className="mt-1 p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="Merge with previous question"
                         >
@@ -75,14 +73,14 @@ const EditableQuestionCard = ({
                     )}
                 </div>
 
-                {/* Main Content */}
+                {/* Content */}
                 <div className="flex-1 min-w-0" onClick={() => !isEditing && setIsOpen(!isOpen)}>
                     <div className="flex justify-between items-start cursor-pointer">
                         <div className="flex-1 pr-4">
                             <h4 className="font-semibold text-slate-800 text-sm line-clamp-2">
                                 {question.questionText || "Untitled Question"}
                             </h4>
-                            {isTooShort && (
+                            {isTooShort && !isEditing && (
                                 <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-600 font-medium bg-amber-50 px-2 py-0.5 rounded w-fit">
                                     <AlertTriangle size={10} />
                                     <span>Looks incomplete. Merge or Edit?</span>
@@ -91,17 +89,15 @@ const EditableQuestionCard = ({
                         </div>
                         
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            <select
-                                value={question.maxMarks}
-                                onChange={(e) => handleMarksChange(Number(e.target.value))}
-                                className="rounded-md border-slate-300 shadow-sm text-xs py-1 focus:ring-emerald-500 focus:border-emerald-500"
-                            >
-                                {[10, 15, 20, 25].map(m => <option key={m} value={m}>{m} Marks</option>)}
-                            </select>
-                            <ChevronDown
-                                size={16}
-                                className={clsx('text-slate-400 transition-transform', { 'rotate-180': isOpen })}
-                            />
+                            <div className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                                {question.maxMarks} Marks
+                            </div>
+                            {!isEditing && (
+                                <ChevronDown
+                                    size={16}
+                                    className={clsx('text-slate-400 transition-transform', { 'rotate-180': isOpen })}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -114,48 +110,58 @@ const EditableQuestionCard = ({
                                 className="overflow-hidden mt-3"
                             >
                                 {isEditing ? (
-                                    <div className="bg-white p-3 rounded-lg border border-blue-400 shadow-sm space-y-3">
+                                    <div className="bg-white p-4 rounded-xl border-2 border-blue-500/20 shadow-lg space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
                                         <div>
-                                            <label className="text-[10px] uppercase font-bold text-slate-400">Question Text</label>
+                                            <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 block">Question Text</label>
                                             <input 
                                                 value={editedText}
                                                 onChange={(e) => setEditedText(e.target.value)}
-                                                className="w-full text-sm border border-slate-200 rounded p-2 mt-1 focus:outline-none focus:border-blue-500"
+                                                className="w-full text-sm border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] uppercase font-bold text-slate-400">Your Answer</label>
+                                            <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 block">Your Answer</label>
                                             <textarea
                                                 value={editedAnswer}
                                                 onChange={(e) => setEditedAnswer(e.target.value)}
-                                                className="w-full text-sm text-slate-700 min-h-[200px] p-2 mt-1 border border-slate-200 rounded focus:outline-none focus:border-blue-500 resize-y"
+                                                className="w-full text-sm text-slate-700 min-h-[240px] p-3 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-y leading-relaxed transition-all"
                                             />
                                         </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className={`text-xs font-semibold ${wordCountColor}`}>
+                                        <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                                            <span className={`text-xs font-bold ${wordCountColor}`}>
                                                 {wordCount} / {wordLimit} words
                                             </span>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded">Cancel</button>
-                                                <button onClick={handleSaveChanges} className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded">Save</button>
+                                            <div className="flex gap-3">
+                                                <button 
+                                                    onClick={onCancel}
+                                                    className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button 
+                                                    onClick={() => onSave(editedText, editedAnswer)} 
+                                                    className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-1.5"
+                                                >
+                                                    <Save size={14} /> Save Changes
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="relative group">
-                                        <p className="text-xs text-slate-600 whitespace-pre-wrap line-clamp-6 bg-slate-50 p-3 rounded border border-slate-100">
+                                        <p className="text-xs text-slate-600 whitespace-pre-wrap line-clamp-6 bg-slate-50 p-3 rounded border border-slate-100 font-medium leading-relaxed">
                                             {question.userAnswer || <span className="italic text-slate-400">No answer text extracted...</span>}
                                         </p>
-                                        <div className="flex justify-end gap-3 mt-2">
+                                        <div className="flex justify-end gap-3 mt-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                             <button 
-                                                onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                                                className="text-blue-600 hover:text-blue-700 text-xs font-semibold flex items-center gap-1"
+                                                onClick={(e) => { e.stopPropagation(); setEditing(); }}
+                                                className="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
                                             >
                                                 <Edit3 size={12} /> Edit
                                             </button>
                                             <button 
                                                 onClick={(e) => { e.stopPropagation(); removeQuestion(index); }}
-                                                className="text-red-500 hover:text-red-700 text-xs font-semibold flex items-center gap-1"
+                                                className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 bg-red-50 hover:bg-red-100 px-2 py-1 rounded"
                                             >
                                                 <Trash2 size={12} /> Remove
                                             </button>
@@ -182,20 +188,30 @@ export default function ReviewCard() {
         failEvaluation,
         selectedPaper,
     } = useEvaluationStore();
+    
     const [error, setError] = useState('');
+    
+    // [LIFTED STATE] Track which card is editing (if any)
+    // null = no one editing. number = index of editing card.
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-    const updateQuestion = (index: number, updatedQuestion: PreparedQuestion) => {
+    const handleSaveUpdate = (index: number, qText: string, aText: string) => {
         const newData = [...preparedData];
-        newData[index] = updatedQuestion;
+        newData[index] = { 
+            ...newData[index], 
+            questionText: qText,
+            userAnswer: aText 
+        };
         setPreparedData(newData);
+        setEditingIndex(null); // Close edit mode
     };
 
     const removeQuestion = (index: number) => {
+        if (editingIndex === index) setEditingIndex(null); // Safety reset
         const newData = preparedData.filter((_, i) => i !== index);
-        setPreparedData(newData); // Store auto-renumbers in Step 1, but we can trust the map index
+        setPreparedData(newData);
     };
 
-    // [NEW] MERGE LOGIC: Combines current question with the previous one
     const mergeUp = (index: number) => {
         if (index === 0) return;
         const prev = preparedData[index - 1];
@@ -204,26 +220,26 @@ export default function ReviewCard() {
         const merged: PreparedQuestion = {
             ...prev,
             userAnswer: `${prev.userAnswer}\n\n${curr.userAnswer}`,
-            // We keep the previous question text unless it's empty
             questionText: prev.questionText.length > 10 ? prev.questionText : curr.questionText,
         };
 
         const newData = [...preparedData];
-        newData.splice(index - 1, 2, merged); // Remove 2, insert 1
+        newData.splice(index - 1, 2, merged);
         setPreparedData(newData);
+        setEditingIndex(null); // Reset to be safe
     };
 
-    // [NEW] ADD LOGIC: Creates a blank slate
     const addNewQuestion = () => {
         const newQ: PreparedQuestion = {
             questionNumber: preparedData.length + 1,
             questionText: "Enter Question Text Here...",
             userAnswer: "Type or paste your answer here...",
             maxMarks: 15,
-            directive: "Analyze", // Default
+            directive: "Analyze",
             subject: selectedPaper as any
         };
         setPreparedData([...preparedData, newQ]);
+        setEditingIndex(preparedData.length); // Auto-open edit for new question
     };
 
     const handleConfirmEvaluation = async () => {
@@ -240,7 +256,6 @@ export default function ReviewCard() {
             return;
         }
 
-        // [BILLING CHECK - Client Side Pre-Check]
         if (userProfile.subscriptionStatus !== 'PREMIUM' && userProfile.subscriptionStatus !== 'ADMIN') {
             if (userProfile.remainingEvaluations < evaluationCost) {
                 setError(`Insufficient Credits. Cost: ${evaluationCost}, You have: ${userProfile.remainingEvaluations}`);
@@ -248,7 +263,6 @@ export default function ReviewCard() {
             }
         }
 
-        // Renumber one last time to be safe
         const correctlyNumberedData = preparedData.map((q, i) => ({ ...q, questionNumber: i + 1 }));
         setPreparedData(correctlyNumberedData);
 
@@ -272,7 +286,6 @@ export default function ReviewCard() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Evaluation failed.');
             
-            // --- [CRITICAL FIX: Unwrap the Data] ---
             completeEvaluation({
                 analysis: result.analysis, 
                 preparedData: correctlyNumberedData,
@@ -285,6 +298,9 @@ export default function ReviewCard() {
         }
     };
 
+    // [SAFETY LOCK] Disable button if ANY card is in edit mode
+    const isConfirmDisabled = editingIndex !== null;
+
     return (
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
             {/* Header */}
@@ -292,7 +308,7 @@ export default function ReviewCard() {
                 <div>
                     <h3 className="text-lg font-bold text-slate-800">Review Tickets</h3>
                     <p className="text-xs text-slate-500">
-                        {preparedData.length} Ticket{preparedData.length !== 1 ? 's' : ''} generated from your upload.
+                        {preparedData.length} Ticket{preparedData.length !== 1 ? 's' : ''} generated.
                     </p>
                 </div>
                 <button 
@@ -303,7 +319,7 @@ export default function ReviewCard() {
                 </button>
             </div>
 
-            {/* Scrollable List */}
+            {/* List */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {preparedData.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-48 text-slate-400">
@@ -313,11 +329,15 @@ export default function ReviewCard() {
                 ) : (
                     preparedData.map((q, index) => (
                         <EditableQuestionCard
-                            key={index} // Index is safe here as we rebuild array on change
+                            key={index}
                             index={index}
-                            totalQuestions={preparedData.length}
                             question={q}
-                            updateQuestion={updateQuestion}
+                            // [LIFTED STATE PROPS]
+                            isEditing={editingIndex === index}
+                            setEditing={() => setEditingIndex(index)}
+                            onCancel={() => setEditingIndex(null)}
+                            onSave={(qText, aText) => handleSaveUpdate(index, qText, aText)}
+                            // Actions
                             removeQuestion={removeQuestion}
                             mergeUp={mergeUp}
                         />
@@ -325,15 +345,15 @@ export default function ReviewCard() {
                 )}
             </div>
 
-            {/* Footer / Actions */}
+            {/* Footer */}
             <div className="p-5 border-t border-slate-100 bg-slate-50">
                 {error && (
-                    <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
                         <AlertTriangle size={16} /> {error}
                     </div>
                 )}
                 
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="text-xs text-slate-500 hidden sm:block">
                         <strong>Cost:</strong> {preparedData.length} Credits
                     </div>
@@ -344,11 +364,18 @@ export default function ReviewCard() {
                         >
                             Discard
                         </button>
+                        
                         <button
                             onClick={handleConfirmEvaluation}
-                            className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                            disabled={isConfirmDisabled}
+                            className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 ${
+                                isConfirmDisabled 
+                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed border border-slate-300' 
+                                    : 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-lg'
+                            }`}
                         >
-                            Confirm & Evaluate <span className="opacity-70 text-xs font-normal">({preparedData.length} Credits)</span>
+                            {isConfirmDisabled ? 'Save open edits to continue' : 'Confirm & Evaluate'}
+                            {!isConfirmDisabled && <span className="opacity-70 text-xs font-normal ml-1">({preparedData.length})</span>}
                         </button>
                     </div>
                 </div>
