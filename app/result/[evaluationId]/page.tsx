@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { LogOut, ArrowLeft, Download, Loader } from 'lucide-react';
+import { LogOut, ArrowLeft, Download, Loader, AlertTriangle } from 'lucide-react';
 
 // --- SHARED COMPONENTS ---
 import UniversalNavbar, { NavLink } from '@/components/shared/UniversalNavbar';
@@ -24,7 +24,6 @@ const MobileView = ({ evaluationData }: { evaluationData: EvaluationData }) => {
                 <p className="text-sm text-slate-600 mb-4">{evaluationData.subject}</p>
                 
                 <div className="space-y-6">
-                    {/* Only render Question Cards. No old AssessmentCard. */}
                     {evaluationData.questionAnalysis.map((q, index) => (
                         <QuestionCard key={index} data={q} />
                     ))}
@@ -115,10 +114,6 @@ const DesktopView = ({
 
                     {/* Main Content */}
                     <div className="lg:col-span-9 space-y-12">
-                        {/* REMOVED: <OverallAssessmentCard /> 
-                           REASON: Verdict & Action Plan are now inside QuestionCard
-                        */}
-                        
                         {evaluationData.questionAnalysis.map((q, index) => (
                             <div key={index} ref={el => { questionRefs.current[index] = el }}>
                                 <QuestionCard data={q} />
@@ -154,9 +149,10 @@ export default function ResultPage() {
         if (resultDataString) {
             try {
                 const parsedData = JSON.parse(resultDataString);
-                // Safety check for new data structure
-                if (!parsedData.questionAnalysis?.[0]?.blindSpotAnalysis) {
-                    console.warn("Legacy data detected. Some features might be missing.");
+                
+                // 4-Pillar Safety Check: Ensure the data has the new structure
+                if (!parsedData.questionAnalysis?.[0]?.logicChecks) {
+                    console.warn("Legacy evaluation data detected. Some features might be missing.");
                 }
 
                 setEvaluationData({
@@ -237,8 +233,16 @@ export default function ResultPage() {
 
     if (error) return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
-            <div className="text-red-500 bg-red-50 px-4 py-2 rounded-lg border border-red-100 font-medium">{error}</div>
-            <button onClick={handleBackToDashboard} className="mt-4 text-sm text-slate-500 hover:text-slate-900 underline">Return to Dashboard</button>
+            <div className="flex flex-col items-center gap-4 text-center">
+                <div className="w-12 h-12 rounded-full bg-red-100 text-red-500 flex items-center justify-center">
+                    <AlertTriangle size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Evaluation Not Found</h3>
+                <p className="text-slate-500 max-w-md">{error}</p>
+                <button onClick={handleBackToDashboard} className="px-6 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors">
+                    Return to Dashboard
+                </button>
+            </div>
         </div>
     );
     

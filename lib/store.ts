@@ -144,10 +144,13 @@ export const useEvaluationStore = create<EvaluationState & EvaluationActions>(
             questionDeconstruction: analysisItem.questionDeconstruction, 
             blindSpotAnalysis: analysisItem.blindSpotAnalysis,           
             coachBlueprint: analysisItem.coachBlueprint,                 
-            mentorsPen: analysisItem.mentorsPen,                         
-            vocabularySwap: analysisItem.vocabularySwap,                 
-            topperArsenal: analysisItem.topperArsenal,
             
+            // --- THE 4 PILLARS (MAPPED CORRECTLY) ---
+            vocabularySwaps: analysisItem.vocabularySwaps || [],                 
+            logicChecks: analysisItem.logicChecks || [],
+            contentInjections: analysisItem.contentInjections || [],
+            strategicPraise: analysisItem.strategicPraise || [],
+
             // [NEW] Interdisciplinary Edge
             interdisciplinaryContext: analysisItem.interdisciplinaryContext, 
             

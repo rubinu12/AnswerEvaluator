@@ -17,29 +17,39 @@ export interface MetaData {
 }
 
 // ==================================================================
-// --- 2. MENTOR'S PEN (The Annotation Layer) ---
+// --- 2. THE 4 PILLARS OF EVALUATION (Replaces Old Mentor's Pen) ---
 // ==================================================================
-export interface RedPenFeedback {
-    originalText: string;
-    comment: string;
+
+// 🟣 PURPLE PEN: Administrative Compression (Language)
+// Role: Replace wordy/layman phrases with technical administrative terms.
+export interface VocabularySwap {
+    original: string;
+    replacement: string;
 }
 
-export interface GreenPenFeedback {
-    locationInAnswer: string;
-    suggestion: string;
-    // Links to Topper's Arsenal (A1, A2...) if the suggestion is data-backed
-    arsenalId: "A1" | "A2" | "A3" | "A4" | ""; 
+// 🔴 RED PEN: Logic & Accuracy Filter (Logic Checks)
+// Role: Catch contradictions, factual errors, and logical gaps.
+export interface LogicCheck {
+    originalText: string;     // The problematic text
+    critique: string;         // Explanation of why it is wrong/weak
+    severity: 'critical' | 'structural'; // 'critical' = factual error/contradiction. 'structural' = weak argument/vague.
+    tag: 'factually_incorrect' | 'contradiction' | 'demand_miss' | 'vague' | 'irrelevant'; // For categorization
 }
 
-export interface BluePenFeedback {
+// 🟢 GREEN PEN: Value Injection (Content Injections)
+// Role: Inject specific Data, Cases, Articles, or Committees.
+export interface ContentInjection {
+    locationInAnswer: string; // The text to hook onto (e.g., "poverty levels")
+    injectionContent: string; // The content to add: "Insert: NITI Aayog MPI Report (11%)..."
+    type: 'data' | 'case' | 'committee' | 'law' | 'scholar' | 'example'; // For database/icons
+    source?: string;          // Optional: "NITI Aayog", "Puttaswamy Judgment"
+}
+
+// 🔵 BLUE PEN: Strategic Praise (Reinforcement)
+// Role: Highlight strong analysis or good interlinking.
+export interface StrategicPraise {
     appreciatedText: string;
-    comment: string;
-}
-
-export interface MentorsPenData {
-    redPen: RedPenFeedback[];
-    greenPen: GreenPenFeedback[];
-    bluePen: BluePenFeedback[];
+    comment: string;          // "Good interlinking of Article 21 with Environmental norms."
 }
 
 // ==================================================================
@@ -90,7 +100,7 @@ export interface BlueprintSectionIntro {
 export interface BlueprintSectionBody {
     critique: string;
     coreArgument: string;
-    keyPoints: string[]; // The bullet points (may reference A1-A4)
+    keyPoints: string[]; // The bullet points
 }
 
 export interface BlueprintSectionConclusion {
@@ -106,24 +116,7 @@ export interface CoachBlueprint {
 }
 
 // ==================================================================
-// --- 6. VALUE ADDS (Arsenal & Language) ---
-// ==================================================================
-// "Purple Pen"
-export interface VocabularySwap {
-    original: string;
-    replacement: string;
-}
-
-export interface TopperArsenalItem {
-    id: "A1" | "A2" | "A3" | "A4";
-    type: 'data' | 'committee' | 'judgment' | 'phrase';
-    label: string;  // e.g. "Inequality Data (Oxfam)"
-    content: string;
-    source: string;
-}
-
-// ==================================================================
-// --- 7. FEEDBACK & SCORING ---
+// --- 6. FEEDBACK & SCORING ---
 // ==================================================================
 export interface ScoreBreakdown {
     intro: number;
@@ -150,7 +143,7 @@ export interface OverallFeedback {
 }
 
 // ==================================================================
-// --- 8. THE ACTION PLAN ---
+// --- 7. THE ACTION PLAN ---
 // ==================================================================
 export interface ActionPlan {
     read: string;
@@ -166,14 +159,12 @@ export interface InterdisciplinaryConnection {
 export interface InterdisciplinaryContext {
   summary: string; // "Strong economic focus; missed ethical angle."
   tag: string;     // "Polity + Economy"
-  // Allow multiple 'used' connections if the student is really good
   used: InterdisciplinaryConnection[] | null; 
-  // Always provide 2-3 suggestions
   suggested: InterdisciplinaryConnection[];
 }
 
 // ==================================================================
-// --- 9. MASTER QUESTION ANALYSIS (Root Object) ---
+// --- 8. MASTER QUESTION ANALYSIS (Root Object) ---
 // ==================================================================
 export interface QuestionAnalysis {
     // 1. Meta Data (Header)
@@ -194,23 +185,31 @@ export interface QuestionAnalysis {
     questionDeconstruction: QuestionDeconstruction;
     overallFeedback: OverallFeedback;
     coachBlueprint: CoachBlueprint;
-    mentorsPen: MentorsPenData;
-    topperArsenal: TopperArsenalItem[];
-    vocabularySwap: VocabularySwap[];
+    
+    // --- THE 4 PILLARS (REFACTORED) ---
+    vocabularySwaps: VocabularySwap[];    // Purple
+    logicChecks: LogicCheck[];            // Red
+    contentInjections: ContentInjection[];// Green
+    strategicPraise: StrategicPraise[];   // Blue
+    
+    // --- REMOVED OLD FIELDS ---
+    // mentorsPen: MentorsPenData; (Deleted)
+    // topperArsenal: TopperArsenalItem[]; (Deleted)
+
     blindSpotAnalysis: BlindSpotAnalysis;
     actionPlan: ActionPlan;
     interdisciplinaryContext: InterdisciplinaryContext;
 }
 
 // ==================================================================
-// --- 10. APP LEVEL TYPES ---
+// --- 9. APP LEVEL TYPES ---
 // ==================================================================
 export interface EvaluationData {
     subject: string;
     overallScore: number;
     totalMarks: number;
     submittedOn: string;
-    overallFeedback: OverallFeedback; // Aggregated or primary question feedback
+    overallFeedback: OverallFeedback; 
     questionAnalysis: QuestionAnalysis[];
 }
 
@@ -230,4 +229,3 @@ export interface EvaluationCompletePayload {
     preparedData: PreparedQuestion[];
     subject: string;
 }
-
