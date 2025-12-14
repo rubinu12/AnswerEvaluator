@@ -1,31 +1,23 @@
 // app/admin/topics/page.tsx
-// No changes here, just showing it for context.
-// It loads the TopicTreeManager component which we are updating.
+import { getTopicList } from '@/app/actions/topics';
+import TopicManagerClient from '@/app/admin/components/TopicManagerClient';
 
-import TopicTreeManager from '@/app/admin/components/TopicTreeManager';
+export const dynamic = 'force-dynamic';
 
-export default function MasterTopicTreePage() {
+export default async function TopicsPage() {
+  const topics = await getTopicList();
+  
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Master Topic Tree</h1>
-
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold">Syllabus Manager</h2>
-          <p className="text-sm text-gray-500">
-            This is the foundation of your entire platform. Add, edit, or delete
-            topics to build your "micro-syllabus".
-          </p>
-          <p className="text-sm text-gray-500">
-            All content (Prelims, Mains, Lexicon, etc.) will be tagged using
-            this tree.
-          </p>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-slate-900">Master Topic Tree</h1>
+        <div className="text-sm text-slate-500 bg-white px-3 py-1 rounded border">
+          Total Nodes: <span className="font-bold text-slate-900">{topics.length}</span>
         </div>
-        
-        {/* We load the main client component that holds all the logic. */}
-        {/* This component is being updated to include the bulk-add feature. */}
-        <TopicTreeManager />
       </div>
+      
+      {/* Interactive Client Component */}
+      <TopicManagerClient initialTopics={topics} />
     </div>
   );
 }

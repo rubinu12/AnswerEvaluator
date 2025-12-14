@@ -13,6 +13,7 @@ import {
   Image,
   UploadCloud,
   ChevronsLeft,
+  PenTool, // New Icon Imported
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -23,6 +24,8 @@ interface AdminSidebarProps {
 // Helper component for nav links
 const NavLink = ({ href, icon: Icon, label }: any) => {
   const pathname = usePathname();
+  // Active if exact match OR if it's a sub-path (e.g. /admin/mains/add is active for /admin/mains parent logic if desired, 
+  // but here exact matching or startsWith is often better for nested routes)
   const isActive = pathname === href;
 
   return (
@@ -77,11 +80,20 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
               icon={BookCopy}
               label="Prelims Quiz Engine"
             />
+            
+            {/* --- MAINS SECTION --- */}
             <NavLink
               href="/admin/mains"
               icon={FileText}
-              label="Mains Evaluator"
+              label="Mains Dashboard"
             />
+            <NavLink
+              href="/admin/mains/add" 
+              icon={PenTool} 
+              label="Mains Studio" 
+            />
+            {/* --------------------- */}
+
             <NavLink
               href="/admin/current-affairs"
               icon={Sparkles}
