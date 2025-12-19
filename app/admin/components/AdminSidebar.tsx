@@ -13,7 +13,9 @@ import {
   Image,
   UploadCloud,
   ChevronsLeft,
-  PenTool, // New Icon Imported
+  PenTool,
+  CheckCircle, // Added icon for Answers
+  PlusCircle, // Added icon for Questions
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -24,18 +26,19 @@ interface AdminSidebarProps {
 // Helper component for nav links
 const NavLink = ({ href, icon: Icon, label }: any) => {
   const pathname = usePathname();
-  // Active if exact match OR if it's a sub-path (e.g. /admin/mains/add is active for /admin/mains parent logic if desired, 
-  // but here exact matching or startsWith is often better for nested routes)
+  // Improved active state logic: checks for exact match OR if we are inside a sub-route
+  // e.g. /admin/mains/answers should not strictly highlight /admin/mains unless desired.
+  // Here we use simple exact match for clarity, or startsWith for parent sections.
   const isActive = pathname === href;
 
   return (
     <Link
       href={href}
-      className={`flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 ${
-        isActive ? 'bg-gray-100 font-semibold' : ''
+      className={`flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors ${
+        isActive ? 'bg-gray-100 font-semibold text-indigo-600' : ''
       }`}
     >
-      <Icon className="w-5 h-5 mr-3" />
+      <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-indigo-600' : 'text-gray-500'}`} />
       <span>{label}</span>
     </Link>
   );
@@ -44,17 +47,20 @@ const NavLink = ({ href, icon: Icon, label }: any) => {
 export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transition-transform duration-300 flex flex-col ${
+      className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transition-transform duration-300 flex flex-col border-r border-gray-200 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
-        <h1 className="text-xl font-bold text-gray-800">Mission Control</h1>
-        {/* This is your "arrow key" to CLOSE the sidebar */}
+        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+           <LayoutDashboard className="w-6 h-6 text-indigo-600"/> 
+           Admin Panel
+        </h1>
+        {/* Close Button */}
         <button
           onClick={() => setIsOpen(false)}
-          className="p-1 rounded-full text-gray-500 hover:bg-gray-100"
+          className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
           title="Collapse Sidebar"
         >
           <ChevronsLeft className="w-5 h-5" />
@@ -62,37 +68,50 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
       </div>
 
       {/* Navigation Links */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        <NavLink href="/admin" icon={LayoutDashboard} label="Dashboard" />
+      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+        
+        {/* 1. GENERAL */}
+        <div>
+           <NavLink href="/admin" icon={LayoutDashboard} label="Dashboard" />
+        </div>
 
-        <div className="pt-4">
-          <h2 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Content
+        {/* 2. CONTENT MANAGEMENT */}
+        <div>
+          <h2 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Content Engines
           </h2>
-          <div className="space-y-2 mt-2">
+          <div className="space-y-1">
             <NavLink
               href="/admin/topics"
               icon={ListTree}
-              label="Master Topic Tree"
+              label="Topic Tree"
             />
             <NavLink
               href="/admin/quiz"
               icon={BookCopy}
-              label="Prelims Quiz Engine"
+              label="Prelims Quiz"
             />
             
-            {/* --- MAINS SECTION --- */}
-            <NavLink
-              href="/admin/mains"
-              icon={FileText}
-              label="Mains Dashboard"
-            />
-            <NavLink
-              href="/admin/mains/add" 
-              icon={PenTool} 
-              label="Mains Studio" 
-            />
-            {/* --------------------- */}
+            {/* --- NEW MAINS SECTION --- */}
+            <div className="pt-2 pb-2">
+               <div className="px-3 text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Mains Studio</div>
+               <NavLink
+                 href="/admin/mains"
+                 icon={FileText}
+                 label="Mains Dashboard"
+               />
+               <NavLink
+                 href="/admin/mains/questions" 
+                 icon={PlusCircle} 
+                 label="Add Questions" 
+               />
+               <NavLink
+                 href="/admin/mains/answers" 
+                 icon={CheckCircle} 
+                 label="Write Answers" 
+               />
+            </div>
+            {/* ------------------------- */}
 
             <NavLink
               href="/admin/current-affairs"
@@ -102,33 +121,36 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
           </div>
         </div>
 
-        <div className="pt-4">
-          <h2 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Tools
+        {/* 3. KNOWLEDGE BANKS */}
+        <div>
+          <h2 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Knowledge Banks
           </h2>
-          <div className="space-y-2 mt-2">
-            <NavLink href="/admin/lexicon" icon={Database} label="Lexicon Bank" />
+          <div className="space-y-1">
+            <NavLink href="/admin/lexicon" icon={Database} label="Lexicon" />
             <NavLink
               href="/admin/visuals"
               icon={Image}
-              label="Visual Bank"
+              label="Visuals"
             />
-            <NavLink href="/admin/essay" icon={Quote} label="Essay & Ethics Bank" />
+            <NavLink href="/admin/essay" icon={Quote} label="Essay & Ethics" />
           </div>
         </div>
 
-        <div className="pt-4">
-          <h2 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Publishing
+        {/* 4. SYSTEM */}
+        <div>
+          <h2 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+            System
           </h2>
-          <div className="space-y-2 mt-2">
+          <div className="space-y-1">
             <NavLink
               href="/admin/publish"
               icon={UploadCloud}
-              label="Publish Content"
+              label="Publish App"
             />
           </div>
         </div>
+
       </nav>
     </aside>
   );
