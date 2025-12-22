@@ -1,4 +1,6 @@
+// app/auth/page.tsx
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
@@ -10,13 +12,14 @@ import { getFirestore, doc, setDoc, updateDoc, Timestamp } from 'firebase/firest
 import firebase_app from '@/lib/firebase';
 import { useAuthContext } from '@/lib/AuthContext';
 import { useEvaluationStore } from '@/lib/store';
+// 👇 Import the server action
+import { syncUserToPostgres } from '@/app/actions/auth';
 
 const auth = getAuth(firebase_app);
 const db = getFirestore(firebase_app);
 
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
-    // Add state for new form fields
     const [name, setName] = useState('');
     const [phoneNo, setPhoneNo] = useState('');
     const [targetExamYear, setTargetExamYear] = useState(new Date().getFullYear() + 1);
@@ -40,31 +43,52 @@ export default function AuthPage() {
 
         try {
             if (isLogin) {
+                // --- LOGIN FLOW ---
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                // On login, update the lastLogin timestamp
-                const userDocRef = doc(db, "users", userCredential.user.uid);
+                const firebaseUser = userCredential.user;
+
+                // 👇 SYNC TO POSTGRES (Login Mode)
+                await syncUserToPostgres({
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email || null,
+                    fullName: firebaseUser.displayName || null,
+                    avatarUrl: firebaseUser.photoURL || null,
+                    // We don't send phone here as we don't have it in the login form
+                });
+
+                // Original Firestore Logic
+                const userDocRef = doc(db, "users", firebaseUser.uid);
                 await updateDoc(userDocRef, {
                     lastLogin: Timestamp.now()
                 });
             } else {
-                // --- SIGNUP LOGIC WITH FULL PROFILE CREATION ---
+                // --- SIGNUP FLOW ---
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const newUser = userCredential.user;
 
-                // Create the complete user profile document in Firestore
+                // 👇 SYNC TO POSTGRES (Signup Mode)
+                await syncUserToPostgres({
+                    uid: newUser.uid,
+                    email: newUser.email || null,
+                    fullName: name,      // Capture Name from state
+                    phone: phoneNo,      // Capture Phone from state
+                    avatarUrl: null,
+                });
+
+                // Original Firestore Logic
                 const userDocRef = doc(db, "users", newUser.uid);
                 await setDoc(userDocRef, {
                     name: name,
                     email: newUser.email,
                     phoneNo: phoneNo,
-                    profilePicture: "", // Default empty
+                    profilePicture: "",
                     targetExamYear: Number(targetExamYear),
                     createdAt: Timestamp.now(),
                     lastLogin: Timestamp.now(),
                     subscriptionStatus: 'TRIAL',
-                    subscriptionExpiry: null, // No expiry for trial
-                    remainingEvaluations: 2, // Standard trial limit
-                    aiCredits: 10 // Standard trial limit
+                    subscriptionExpiry: null,
+                    remainingEvaluations: 2,
+                    aiCredits: 10
                 });
             }
         } catch (error: any) {
@@ -85,7 +109,6 @@ export default function AuthPage() {
                     {isLogin ? 'Welcome Back' : 'Create an Account'}
                 </h1>
                 <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                    {/* --- New fields that only show on the Sign Up form --- */}
                     {!isLogin && (
                         <>
                             <div className="text-left">
