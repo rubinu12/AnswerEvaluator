@@ -1,20 +1,17 @@
 "use server";
 
-import { db, pool } from "@/lib/db";
+import { db } from "@/lib/db";
 import { 
   prelimQuestions, 
   prelimQuestionStatements, 
+  prelimQuestionPairs,
   prelimQuestionTopics, 
   topics 
 } from "@/lib/schema";
 import { v1, helpers } from '@google-cloud/aiplatform';
-import { eq, and, ilike, sql } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-/**
- * AI PLATFORM CONFIGURATION
- * Exact copy of your working logic in topics.ts
- */
 const PROJECT_ID = process.env.GOOGLE_PROJECT_ID;
 const LOCATION = 'us-central1';
 const MODEL_NAME = 'text-embedding-004';
@@ -23,10 +20,6 @@ const API_ENDPOINT = `${LOCATION}-aiplatform.googleapis.com`;
 const clientOptions = { apiEndpoint: API_ENDPOINT, fallback: true };
 const predictionServiceClient = new v1.PredictionServiceClient(clientOptions);
 
-/**
- * INTERNAL EMBEDDING GENERATOR
- * Uses the exact parameters from topics.ts
- */
 async function getEmbedding(text: string): Promise<number[]> {
   const endpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODEL_NAME}`;
   const instance = helpers.toValue({ content: text, task_type: 'RETRIEVAL_DOCUMENT' });
@@ -42,117 +35,91 @@ async function getEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * SCOPED TOPIC DISCOVERY
- * Search logic: Only searches within the specified parent's lineage.
- * If match < 0.85, it flags for provisional creation.
+ * Resolves a list of suggested topics against the database.
+ * Returns metadata for the UI to display confidence colors.
  */
-async function resolveScopedTopic(tx: any, name: string, parentId: string, level: number, contextNames: { paper: string; subject: string }) {
-  const embedding = await getEmbedding(`Paper: ${contextNames.paper}, Subject: ${contextNames.subject}, Topic: ${name}`);
-  const vectorStr = JSON.stringify(embedding);
+export async function analyzeTopicsAction(suggestions: string[], subjectId: string | null) {
+  const results = [];
+  for (const text of suggestions) {
+    const embedding = await getEmbedding(text);
+    const vectorStr = JSON.stringify(embedding);
 
-  // 1. Search for existing match under the parent
-  // We use raw SQL with pgvector because Drizzle vector support depends on specific plugins
-  const matchRes = await tx.execute(sql`
-    SELECT id, name, ancestry_path, (1 - (embedding <=> ${vectorStr}::vector)) as similarity
-    FROM topics
-    WHERE primary_parent_id = ${parentId} AND level = ${level}
-    ORDER BY embedding <=> ${vectorStr}::vector
-    LIMIT 1
-  `);
+    // Scoped search: find matches within the specified subject if provided
+    const matchRes = await db.execute(sql`
+      SELECT id, name, topic_type, (1 - (embedding <=> ${vectorStr}::vector)) as similarity
+      FROM topics
+      ${subjectId ? sql`WHERE primary_parent_id = ${subjectId}` : sql``}
+      ORDER BY embedding <=> ${vectorStr}::vector
+      LIMIT 1
+    `);
 
-  const bestMatch = matchRes.rows[0];
+    const bestMatch = matchRes.rows[0];
+    const similarity = bestMatch ? Number(bestMatch.similarity) : 0;
 
-  if (bestMatch && Number(bestMatch.similarity) > 0.85) {
-    return { id: bestMatch.id, ancestryPath: bestMatch.ancestry_path, isNew: false };
+    results.push({
+      original: text,
+      matchedId: bestMatch?.id || null,
+      matchedName: bestMatch?.name || "No Match Found",
+      similarity,
+      // Logic: < 0.10 is Cold Start, >= 0.92 is High Confidence
+      status: similarity >= 0.92 ? 'high' : similarity < 0.10 ? 'cold' : 'warning'
+    });
   }
-
-  // 2. No Match found: Prepare Provisional Seeding
-  const cleanSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  const parentRes = await tx.select({ path: topics.ancestryPath, slug: topics.slug }).from(topics).where(eq(topics.id, parentId)).limit(1);
-  const parent = parentRes[0];
-  
-  const newPath = `${parent.path}.${cleanSlug}`;
-  const newSlug = `${parent.slug}-${cleanSlug}`;
-
-  const [newTopic] = await tx.insert(topics).values({
-    name,
-    slug: newSlug,
-    level,
-    primaryParentId: parentId,
-    ancestryPath: newPath,
-    topicType: 'provisional',
-    isNavigable: true,
-    embedding: embedding // customType handles JSON.stringify
-  }).returning({ id: topics.id, ancestryPath: topics.ancestryPath });
-
-  return { id: newTopic.id, ancestryPath: newTopic.ancestryPath, isNew: true };
+  return results;
 }
 
-/**
- * BULK IMPORT PRELIMS
- * Unified Drizzle transaction handling hierarchy discovery and data seeding.
- */
-export async function bulkImportPrelims(jsonBatch: any[]) {
+export async function commitBatchAction(jsonBatch: any[]) {
   try {
     return await db.transaction(async (tx) => {
-      const results = [];
-
       for (const item of jsonBatch) {
-        // 1. Resolve L2 Subject (Manual Entry Required)
-        const [l2Subject] = await tx.select().from(topics)
-          .where(and(eq(topics.level, 2), ilike(topics.name, item.subject)))
-          .limit(1);
-        
-        if (!l2Subject) throw new Error(`Subject '${item.subject}' not found. Please populate Level 2 manually.`);
-
-        // 2. Resolve L3 Macro Topic under L2
-        const l3 = await resolveScopedTopic(tx, item.l3_topic, l2Subject.id, 3, { paper: item.paper, subject: item.subject });
-
-        // 3. Resolve L4 Micro Topic under L3
-        const l4 = await resolveScopedTopic(tx, item.l4_topic, l3.id, 4, { paper: item.paper, subject: item.subject });
-
-        // 4. Insert Main Question
         const [question] = await tx.insert(prelimQuestions).values({
-          paper: item.paper,
-          year: item.year,
-          source: item.source,
-          questionType: item.question_type,
-          questionText: item.question_text,
-          optionA: item.options.A,
-          optionB: item.options.B,
-          optionC: item.options.C,
-          optionD: item.options.D,
-          correctOption: item.correct_option,
-          weightage: item.metadata.weightage,
-          complexity: item.metadata.complexity,
+          paper: item.meta.paper,
+          year: item.meta.year,
+          source: item.meta.source,
+          questionType: item.meta.question_type,
+          questionText: item.question.question_text,
+          optionA: item.question.options.find((o: any) => o.label === 'A')?.text,
+          optionB: item.question.options.find((o: any) => o.label === 'B')?.text,
+          optionC: item.question.options.find((o: any) => o.label === 'C')?.text,
+          optionD: item.question.options.find((o: any) => o.label === 'D')?.text,
+          correctOption: item.question.correct_option,
+          weightage: item.question.weightage,
         }).returning({ id: prelimQuestions.id });
 
-        // 5. Insert Statements (if type: 'statements')
-        if (item.question_type === 'statements' && item.statements) {
+        if (item.meta.question_type === 'statement') {
           await tx.insert(prelimQuestionStatements).values(
-            item.statements.map((s: any) => ({
+            item.question.statements.map((s: any) => ({
               questionId: question.id,
-              statementNumber: s.number,
+              statementNumber: s.idx,
               statementText: s.text,
-              correctTruth: s.is_true
+              correctTruth: s.is_statement_true
+            }))
+          );
+        } else if (item.meta.question_type === 'pair') {
+          await tx.insert(prelimQuestionPairs).values(
+            item.question.pairs.map((p: any) => ({
+              questionId: question.id,
+              col1: p.col_1,
+              col2: p.col_2,
+              correctMatch: p.is_correct ? 'TRUE' : 'FALSE'
             }))
           );
         }
 
-        // 6. Final Topic Mapping (Linked to the deepest resolved node - L4)
-        await tx.insert(prelimQuestionTopics).values({
-          questionId: question.id,
-          topicId: l4.id
-        });
-
-        results.push(question.id);
+        // Link resolved topics
+        for (const t of item.resolvedTopics) {
+          if (t.matchedId) {
+            await tx.insert(prelimQuestionTopics).values({
+              questionId: question.id,
+              topicId: t.matchedId
+            });
+          }
+        }
       }
-      
-      revalidatePath("/admin/quiz");
-      return { success: true, count: results.length };
+      revalidatePath("/admin/prelims");
+      return { success: true };
     });
-  } catch (error: any) {
-    console.error("Bulk Import Critical Failure:", error);
-    return { success: false, error: error.message };
+  } catch (e: any) {
+    return { success: false, error: e.message };
   }
 }

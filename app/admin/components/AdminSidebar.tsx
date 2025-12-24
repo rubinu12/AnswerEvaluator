@@ -13,9 +13,9 @@ import {
   Image,
   UploadCloud,
   ChevronsLeft,
-  PenTool,
-  CheckCircle, // Added icon for Answers
-  PlusCircle, // Added icon for Questions
+  CheckCircle,
+  PlusCircle,
+  Zap, // Icon for Prelims Studio
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -23,12 +23,8 @@ interface AdminSidebarProps {
   setIsOpen: (isOpen: boolean) => void;
 }
 
-// Helper component for nav links
 const NavLink = ({ href, icon: Icon, label }: any) => {
   const pathname = usePathname();
-  // Improved active state logic: checks for exact match OR if we are inside a sub-route
-  // e.g. /admin/mains/answers should not strictly highlight /admin/mains unless desired.
-  // Here we use simple exact match for clarity, or startsWith for parent sections.
   const isActive = pathname === href;
 
   return (
@@ -57,7 +53,6 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
            <LayoutDashboard className="w-6 h-6 text-indigo-600"/> 
            Admin Panel
         </h1>
-        {/* Close Button */}
         <button
           onClick={() => setIsOpen(false)}
           className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
@@ -75,7 +70,7 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
            <NavLink href="/admin" icon={LayoutDashboard} label="Dashboard" />
         </div>
 
-        {/* 2. CONTENT MANAGEMENT */}
+        {/* 2. CONTENT ENGINES */}
         <div>
           <h2 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
             Content Engines
@@ -86,13 +81,23 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
               icon={ListTree}
               label="Topic Tree"
             />
-            <NavLink
-              href="/admin/quiz"
-              icon={BookCopy}
-              label="Prelims Quiz"
-            />
             
-            {/* --- NEW MAINS SECTION --- */}
+            {/* --- NEW PRELIMS STUDIO SECTION --- */}
+            <div className="pt-2 pb-2">
+               <div className="px-3 text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Prelims Studio</div>
+               <NavLink
+                 href="/admin/prelims"
+                 icon={Zap}
+                 label="Ingestion Studio"
+               />
+               <NavLink
+                 href="/admin/quiz"
+                 icon={BookCopy}
+                 label="Question Bank"
+               />
+            </div>
+
+            {/* --- MAINS STUDIO SECTION --- */}
             <div className="pt-2 pb-2">
                <div className="px-3 text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Mains Studio</div>
                <NavLink
@@ -111,7 +116,6 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
                  label="Write Answers" 
                />
             </div>
-            {/* ------------------------- */}
 
             <NavLink
               href="/admin/current-affairs"
