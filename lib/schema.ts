@@ -1,3 +1,4 @@
+// lib/schema.ts
 import { 
   pgTable, text, timestamp, boolean, pgEnum, 
   varchar, bigint, integer, char, real, uuid, 

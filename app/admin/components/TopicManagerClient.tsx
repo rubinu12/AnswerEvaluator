@@ -1,3 +1,4 @@
+// app/admin/components/TopicManagerClient.tsx
 "use client";
 
 import React, { useState, useMemo } from 'react';

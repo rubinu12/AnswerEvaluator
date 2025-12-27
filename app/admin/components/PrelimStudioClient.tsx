@@ -1,142 +1,245 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Search, Edit3, Trash2, CheckCircle, AlertTriangle, Snowflake, ChevronRight, X, Database } from 'lucide-react';
-import { analyzeTopicsAction, commitBatchAction } from '@/app/actions/prelim-bulk';
-import { toast } from 'sonner';
+import { useEffect, useState } from "react";
+import QuestionCard, {
+  ResolvedTopic,
+} from "@/app/admin/components/QuestionCard";
+import EditQuestionPanel from "@/app/admin/components/EditQuestionPanel";
+import { validateBatch } from "@/app/admin/components/validateIngestion";
+import { commitBatchAction } from "@/app/actions/prelim-bulk";
+import { parseIngestedJSON } from "./jsonParser";
 
-export default function PrelimStudioClient({ initialSubjects }: { initialSubjects: any[] }) {
-  const [view, setView] = useState<'paste' | 'review'>('paste');
-  const [jsonInput, setJsonInput] = useState('');
-  const [batch, setBatch] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+/* ---------------------------------------------
+   Types
+--------------------------------------------- */
 
-  const handlePreview = async () => {
+export interface Subject {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+type IngestedQuestion = {
+  tempId: string;
+  questionText: string;
+  questionType: string;
+  statements?: {
+    idx: number;
+    text: string;
+    isTrue: boolean;
+  }[];
+  options?: {
+    label: string;
+    text: string;
+  }[];
+  correctOption?: string;
+  resolvedTopics: ResolvedTopic[];
+};
+
+export interface PrelimStudioClientProps {
+  initialSubjects: Subject[];
+}
+
+/* ---------------------------------------------
+   Component
+--------------------------------------------- */
+
+export default function PrelimStudioClient({
+  initialSubjects,
+}: PrelimStudioClientProps) {
+  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
+  const [rawJSON, setRawJSON] = useState("");
+  const [parseError, setParseError] = useState<string | null>(null);
+
+  const [questions, setQuestions] = useState<IngestedQuestion[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialSubjects.length > 0) {
+      setActiveSubjectId(initialSubjects[0].id);
+    }
+  }, [initialSubjects]);
+
+  /* -------------------------------------------
+     Validation
+  ------------------------------------------- */
+
+  const validationResults = validateBatch(questions);
+  const hasBlockingErrors = validationResults.some(
+    (r) => r.errors.length > 0
+  );
+
+  /* -------------------------------------------
+     JSON INGESTION (CORE FIX)
+  ------------------------------------------- */
+
+  function handleParseJSON() {
+    setParseError(null);
+
     try {
-      const parsed = JSON.parse(jsonInput);
-      setLoading(true);
-      
-      const enrichedBatch = await Promise.all(parsed.map(async (item: any) => {
-        // Find subject ID from metadata name for scoped search
-        const subject = initialSubjects.find(s => s.name.toLowerCase() === item.topics[0].subject.toLowerCase());
-        const resolved = await analyzeTopicsAction(item.topics.map((t: any) => t.detailed), subject?.id || null);
-        return { ...item, resolvedTopics: resolved, subjectId: subject?.id || null };
-      }));
-
-      setBatch(enrichedBatch);
-      setView('review');
-    } catch (e) {
-      toast.error("Invalid JSON format.");
-    } finally {
-      setLoading(false);
+      const parsed = parseIngestedJSON(rawJSON);
+      setQuestions(parsed);
+    } catch (e: any) {
+      setParseError(e.message);
     }
-  };
-
-  const handleCommit = async () => {
-    setLoading(true);
-    const res = await commitBatchAction(batch);
-    setLoading(false);
-    if (res.success) {
-      toast.success("Batch successfully committed to PostgreSQL.");
-      setView('paste');
-      setJsonInput('');
-    } else {
-      const message = 'error' in res ? String(res.error) : 'Unknown error';
-      toast.error(message);
-    }
-  };
-
-  if (view === 'paste') {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-20 bg-slate-50">
-        <div className="w-full max-w-4xl space-y-6">
-          <h1 className="text-3xl font-black text-slate-900">Prelim Ingestion Studio</h1>
-          <textarea 
-            value={jsonInput} onChange={(e) => setJsonInput(e.target.value)}
-            className="w-full h-96 p-8 rounded-[2rem] shadow-xl border-none font-mono text-xs outline-none focus:ring-4 focus:ring-emerald-500/10"
-            placeholder="Paste your JSON batch array here..."
-          />
-          <button 
-            disabled={loading} onClick={handlePreview}
-            className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-black text-lg hover:bg-emerald-700 transition-all shadow-lg"
-          >
-            {loading ? "Analyzing Semantics..." : "Enter High-Velocity Review"}
-          </button>
-        </div>
-      </div>
-    );
   }
 
+  /* -------------------------------------------
+     Commit
+  ------------------------------------------- */
+
+  async function handleCommitAllQuestions() {
+    if (questions.length === 0) {
+      setCommitError("No questions to commit.");
+      return;
+    }
+    if (hasBlockingErrors) return;
+
+    setIsCommitting(true);
+    setCommitError(null);
+
+    try {
+      const payload = {
+        paper: "GS",
+        year: new Date().getFullYear(),
+        source: "UPSC",
+        questions: questions.map((q) => ({
+          questionText: q.questionText,
+          questionType: q.questionType,
+          options: q.options,
+          correctOption: q.correctOption,
+          statements: q.statements,
+          resolvedTopics: q.resolvedTopics
+            .filter((t) => t.topicId)
+            .map((t) => ({ topicId: t.topicId! })),
+        })),
+      };
+
+      const result = await commitBatchAction(payload);
+      if (!result.success) throw new Error(result.error);
+
+      setQuestions([]);
+      setRawJSON("");
+      alert("Questions committed successfully");
+    } catch (e: any) {
+      setCommitError(e.message);
+    } finally {
+      setIsCommitting(false);
+    }
+  }
+
+  /* -------------------------------------------
+     Render
+  ------------------------------------------- */
+
   return (
-    <div className="flex flex-col h-full bg-slate-100">
-      <header className="h-16 bg-white border-b flex items-center justify-between px-8 shrink-0 shadow-sm z-10">
-      <div className="flex items-center space-x-6">
-          <button onClick={() => setView('paste')} className="text-[10px] font-black text-blue-600 uppercase">← Edit JSON</button>
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{batch.length} Questions in Queue</span>
-        </div>
-        <button onClick={handleCommit} disabled={loading} className="bg-slate-900 text-white px-8 py-2 rounded-xl font-bold text-xs">
-          {loading ? "Syncing..." : "COMMIT ALL TO DB"}
-        </button>
-      </header>
+    <div className="mx-auto max-w-7xl px-6 py-6">
+      <h1 className="mb-4 text-xl font-semibold">
+        Prelims Question Ingestion Studio
+      </h1>
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-8">
-        {batch.map((item, idx) => (
-          <div key={idx} className="flex bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[450px] group transition-all hover:shadow-md">
-            {/* Left: Content (65%) */}
-            <div className="flex-1 p-10 flex flex-col justify-between border-r border-slate-50">
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-xs font-black text-slate-900">{item.meta.year} • {item.meta.source}</span>
-                    <button className="text-[9px] font-black text-blue-600 uppercase border border-blue-100 px-2 py-0.5 rounded-lg hover:bg-blue-50">Edit Meta</button>
-                  </div>
-                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{item.meta.question_type}</span>
-                </div>
-                <h3 className="text-xl font-extrabold text-slate-800 leading-snug mb-6">{item.question.question_text}</h3>
-                
-                {item.meta.question_type === 'pair' && (
-                  <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-6">
-                    <table className="w-full text-xs">
-                      <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200"><th className="text-left pb-3">Item A</th><th className="text-left pb-3">Item B</th></tr>
-                      {item.question.pairs.map((p: any, i: number) => (
-                        <tr key={i} className="border-b border-slate-100 last:border-0"><td className="py-3 font-bold">{p.col_1}</td><td className="py-3 text-slate-600">{p.col_2}</td></tr>
-                      ))}
-                    </table>
-                  </div>
-                )}
-              </div>
+      {/* JSON INGESTION */}
+      <div className="mb-6 rounded-lg border bg-white p-4">
+        <textarea
+          value={rawJSON}
+          onChange={(e) => setRawJSON(e.target.value)}
+          placeholder="Paste AI-generated JSON here..."
+          className="h-40 w-full rounded border p-2 text-sm"
+        />
 
-              <div className="pt-8 border-t border-slate-50 flex items-center justify-between">
-                <p className="text-sm font-black text-emerald-600 uppercase italic">
-                  Correct: {item.question.correct_option} ({item.question.options.find((o:any)=>o.label===item.question.correct_option)?.text})
-                </p>
-                <div className="flex space-x-3">
-                  <button onClick={() => setBatch(batch.filter((_, i) => i !== idx))} className="bg-red-50 text-red-500 text-[10px] font-black px-5 py-2 rounded-xl hover:bg-red-100">DISCARD</button>
-                  <button className="bg-slate-100 text-slate-700 text-[10px] font-black px-6 py-2 rounded-xl">FLAG FOR EDIT</button>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Topic Rows (35%) */}
-            <div className="w-80 shrink-0 flex flex-col bg-slate-50/30">
-              <div className="p-4 border-b text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] bg-white">Topic Resolution Decision Hub</div>
-              {item.resolvedTopics.map((rt: any, rtIdx: number) => (
-                <div key={rtIdx} className={`p-6 border-b border-white/40 last:border-0 ${rt.status === 'high' ? 'bg-emerald-50/60' : rt.status === 'cold' ? 'bg-blue-50/60' : 'bg-amber-50/60'}`}>
-                  <div className="flex justify-between mb-2">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">AI Suggestion: {rt.original}</span>
-                    <span className="text-[10px] font-black px-1.5 rounded bg-white/80 shadow-sm">{rt.similarity}</span>
-                  </div>
-                  <p className="text-[13px] font-black text-slate-900 leading-tight mb-4">{rt.matchedName}</p>
-                  <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-all">
-                    <button className="bg-white text-[9px] font-black px-3 py-1.5 rounded-lg shadow-sm border border-slate-100 hover:bg-slate-900 hover:text-white">CHANGE</button>
-                    <button className="bg-white text-[9px] font-black px-3 py-1.5 rounded-lg shadow-sm border border-slate-100 hover:bg-purple-600 hover:text-white">PROV</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {parseError && (
+          <div className="mt-2 text-sm text-red-600">
+            {parseError}
           </div>
-        ))}
+        )}
+
+        <button
+          onClick={handleParseJSON}
+          className="mt-3 rounded bg-blue-600 px-4 py-2 text-sm text-white"
+        >
+          Parse JSON
+        </button>
       </div>
+
+      {/* QUESTIONS */}
+      {questions.map((q, index) => (
+        <QuestionCard
+          key={q.tempId}
+          tempId={q.tempId}
+          questionText={q.questionText}
+          questionType={q.questionType as any}
+          statements={q.statements}
+          options={q.options}
+          correctOption={q.correctOption}
+          subjectId={activeSubjectId!}
+          resolvedTopics={q.resolvedTopics}
+          validation={validationResults[index]}
+          onReplaceTopic={(t, id, path) => {
+            const next = [...questions];
+            next[index].resolvedTopics[t] = {
+              ...next[index].resolvedTopics[t],
+              topicId: id,
+              ancestryPath: path,
+              topicType: "canonical",
+            };
+            setQuestions(next);
+          }}
+          onRemoveTopic={(t) => {
+            const next = [...questions];
+            next[index].resolvedTopics.splice(t, 1);
+            setQuestions(next);
+          }}
+          onAttachTopicManually={(id, path) => {
+            const next = [...questions];
+            next[index].resolvedTopics.push({
+              aiLabel: "Manual Attach",
+              topicId: id,
+              ancestryPath: path,
+              topicType: "canonical",
+            });
+            setQuestions(next);
+          }}
+          onEditQuestion={() => setEditingIndex(index)}
+          onDeleteQuestion={() =>
+            setQuestions((prev) => prev.filter((_, i) => i !== index))
+          }
+        />
+      ))}
+
+      {/* COMMIT */}
+      <div className="mt-8 flex justify-end gap-4">
+        {commitError && (
+          <div className="text-sm text-red-600">{commitError}</div>
+        )}
+
+        <button
+          onClick={handleCommitAllQuestions}
+          disabled={hasBlockingErrors || isCommitting || questions.length === 0}
+          className={`rounded px-6 py-2 text-white ${
+            hasBlockingErrors || isCommitting || questions.length === 0
+              ? "bg-slate-400"
+              : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {isCommitting ? "Committing..." : "Commit All Questions"}
+        </button>
+      </div>
+
+      <EditQuestionPanel
+        isOpen={editingIndex !== null}
+        question={editingIndex !== null ? questions[editingIndex] : null}
+        onSave={(updated) => {
+          if (editingIndex !== null) {
+            const next = [...questions];
+            next[editingIndex] = { ...next[editingIndex], ...updated };
+            setQuestions(next);
+          }
+        }}
+        onClose={() => setEditingIndex(null)}
+      />
     </div>
   );
 }
